@@ -33,10 +33,10 @@ export class CompetitiveHeatMapService {
         state,
         COUNT(*)::integer as "filingCount",
         COUNT(*) FILTER (WHERE status = 'active')::integer as "activeFilingCount",
-        COUNT(DISTINCT debtor_name)::integer as "uniqueDebtors",
+        COUNT(DISTINCT debtor_name_normalized)::integer as "uniqueDebtors",
         NULL::numeric as "marketSharePct"
       FROM ucc_filings
-      WHERE LOWER(TRIM(secured_party_name)) = LOWER(TRIM($1))
+      WHERE secured_party_normalized = LOWER(TRIM($1))
       GROUP BY state
       ORDER BY COUNT(*) DESC
     `,
@@ -46,18 +46,25 @@ export class CompetitiveHeatMapService {
 
   // Who dominates a given state? Compute HHI.
   async getCompetitiveSaturation(state: string, industry?: string): Promise<SaturationAnalysis> {
+    // Group by the NORMALIZED secured party so name variants ("ABC Funding",
+    // "ABC FUNDING ", "abc funding") collapse into a single competitor rather
+    // than being counted as separate funders (which would understate each one's
+    // share and distort the HHI). A representative raw display name is kept via
+    // MAX().
     const query = `
       SELECT
-        secured_party_name as funder,
+        MAX(secured_party) as funder,
+        secured_party_normalized as "funderNormalized",
         COUNT(*)::integer as "filingCount",
-        COUNT(DISTINCT debtor_name)::integer as "uniqueDebtors"
+        COUNT(DISTINCT debtor_name_normalized)::integer as "uniqueDebtors"
       FROM ucc_filings
       WHERE state = $1
-      GROUP BY secured_party_name
+      GROUP BY secured_party_normalized
       ORDER BY COUNT(*) DESC
     `
     const competitors = await this.db.query<{
       funder: string
+      funderNormalized: string
       filingCount: number
       uniqueDebtors: number
     }>(query, [state.toUpperCase()])
@@ -76,8 +83,16 @@ export class CompetitiveHeatMapService {
       }
     })
 
-    // HHI = sum of squared market shares
-    const hhi = ranked.reduce((sum, c) => sum + Math.pow(c.marketSharePct, 2), 0)
+    // HHI must be computed from UNROUNDED shares. Squaring 2-decimal-rounded
+    // percentages zeroes out every funder with <0.005% share and biases the
+    // index, so we recompute exact shares here from the raw filing counts.
+    const hhi =
+      totalFilings > 0
+        ? competitors.reduce((sum, c) => {
+            const exactShare = (c.filingCount / totalFilings) * 100
+            return sum + exactShare * exactShare
+          }, 0)
+        : 0
 
     return {
       state: state.toUpperCase(),

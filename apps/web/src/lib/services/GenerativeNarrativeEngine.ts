@@ -304,7 +304,7 @@ Format as plain text with markdown section headers.
   /**
    * Parse narrative response into structured sections
    */
-  private parseNarrativeResponse(response: string): GenerativeNarrative['sections'] {
+  private parseNarrativeResponse(response: string): GenerativeNarrativeSections {
     const sections = {
       summary: '',
       keyFindings: [] as string[],

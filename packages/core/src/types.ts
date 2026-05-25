@@ -98,7 +98,7 @@ export interface PortfolioCompany {
 }
 
 export interface RequalificationLead {
-  id: string
+  id?: string
   originalProspect: Prospect
   newSignals: GrowthSignal[]
   netScore: number
@@ -159,59 +159,119 @@ export interface OutreachEmail {
 }
 
 // Recursive & Advanced Feature Types
+export type RelationshipType =
+  | 'parent'
+  | 'subsidiary'
+  | 'affiliate'
+  | 'common_secured_party'
+  | 'guarantor'
+  | 'same_industry'
+
+export interface CompanyRelationship {
+  fromCompanyId: string
+  toCompanyId: string
+  relationshipType: RelationshipType
+  confidence: number
+  sourceFilingId?: string
+  discoveredDate: string
+  depth: number
+  metadata?: Record<string, unknown>
+}
+
 export interface CompanyNode {
   id: string
-  name: string
+  companyName: string
   prospect?: Prospect
+  relationships: CompanyRelationship[]
   depth: number
-  relationshipType: 'parent' | 'subsidiary' | 'affiliate' | 'common_secured_party'
+  visitedAt: string
 }
 
 export interface CompanyGraph {
-  root: CompanyNode
-  nodes: CompanyNode[]
-  edges: Array<{ from: string; to: string; type: string }>
-  depth: number
-  totalCompanies: number
+  rootId: string
+  nodes: Map<string, CompanyNode>
+  edges: CompanyRelationship[]
+  maxDepth: number
+  totalNodes: number
+  totalEdges: number
+  createdAt: string
+  metadata: {
+    riskConcentration: number
+    networkHealth: HealthGrade
+    totalExposure: number
+  }
 }
 
 export interface RecursiveTraversalConfig {
   maxDepth: number
-  relationshipTypes: string[]
+  relationshipTypes: RelationshipType[]
   includeProspectData: boolean
   stopConditions?: {
-    maxCompanies?: number
-    maxBranches?: number
+    maxNodes?: number
+    maxEdges?: number
   }
 }
 
+export interface RecommendationReason {
+  factor: string
+  description: string
+  weight: number
+  evidence: string[]
+}
+
 export interface PersonalizedRecommendation {
+  id: string
+  userId: string
   prospectId: string
+  prospect: Prospect
   score: number
-  reasoning: string
-  factors: {
+  reasons: RecommendationReason[]
+  matchFactors: {
     industryMatch: number
-    scoreAlignment: number
-    signalStrength: number
-    networkValue: number
+    scoreMatch: number
+    signalMatch: number
+    behaviorMatch: number
+    networkMatch: number
   }
-  action: 'claim' | 'watch' | 'research'
-  priority: 'high' | 'medium' | 'low'
+  generatedAt: string
+  expiresAt: string
+  status: 'new' | 'viewed' | 'acted' | 'dismissed'
 }
 
 export interface GenerativeContext {
   prospect: Prospect
-  marketData?: unknown[]
+  marketData?: CompetitorData[]
   relationships?: CompanyGraph
-  historicalSignals?: unknown[]
-  industryTrends?: unknown[]
+  historicalSignals?: GrowthSignal[]
+  industryTrends?: IndustryTrend[]
 }
 
 export interface GenerativeInsight {
-  category: string
-  text: string
+  // Narrative-style insight fields (used by GenerativeNarrative.keyInsights)
+  category?: string
+  text?: string
+  sources?: string[]
+  // Report-style insight fields (used by report builder / generateInsights)
+  id?: string
+  type?: 'opportunity' | 'risk' | 'trend' | 'recommendation' | string
+  title?: string
+  description?: string
+  impact?: 'low' | 'medium' | 'high'
+  relatedProspects?: string[]
+  generatedAt?: string
+  evidence?: string[]
+  // Shared
   confidence: number
-  sources: string[]
+}
+
+export interface GenerativeNarrativeSections {
+  summary: string
+  keyFindings: string[]
+  opportunityAnalysis: string
+  riskFactors: string[]
+  recommendedActions: string[]
+  marketContext: string
+  competitiveLandscape: string
 }
 
 export interface GenerativeNarrative {
@@ -222,14 +282,31 @@ export interface GenerativeNarrative {
   opportunities: string[]
   recommendedActions: string[]
   generatedAt: string
+  /** Parsed structured sections (optional; populated by some generators). */
+  sections?: GenerativeNarrativeSections
+  /** Overall narrative confidence (optional). */
+  confidence?: number
+  /** Source attributions (optional). */
+  sources?: string[]
+}
+
+export interface ChainedSignal {
+  signal: GrowthSignal
+  depth: number
+  parentSignalId: string
+  relationshipType: 'triggered_by' | 'correlated_with' | 'implies'
+  confidence: number
 }
 
 export interface SignalChain {
-  signals: GrowthSignal[]
-  correlation: number
-  predictedNext: SignalType[]
-  confidence: number
-  narrative: string
+  id: string
+  prospectId: string
+  rootSignal: GrowthSignal
+  chainedSignals: ChainedSignal[]
+  totalConfidence: number
+  chainStrength: number
+  discoveryPath: string[]
+  detectedAt: string
 }
 
 export interface RecursiveSignalConfig {
@@ -239,11 +316,18 @@ export interface RecursiveSignalConfig {
   correlationThreshold: number
 }
 
-export interface ReportSection {
+export interface ReportSubsection {
   title: string
   content: string
-  insights: GenerativeInsight[]
+}
+
+export interface ReportSection {
+  id: string
+  title: string
+  content: string
+  insights?: GenerativeInsight[]
   visualizations?: Visualization[]
+  subsections?: ReportSubsection[]
 }
 
 export interface Visualization {
@@ -252,69 +336,173 @@ export interface Visualization {
   config: Record<string, unknown>
 }
 
+export interface GenerativeReportMetadata {
+  generatedAt: string
+  generatedBy: string
+  dataRange: { start: string; end: string }
+  prospectCount: number
+  sources: string[]
+}
+
 export interface GenerativeReport {
   id: string
   type: 'portfolio' | 'market' | 'prospect' | 'competitive'
   title: string
-  summary: string
   sections: ReportSection[]
-  generatedAt: string
-  generatedFor: string
+  insights: GenerativeInsight[]
+  recommendations: string[]
+  metadata: GenerativeReportMetadata
+  format: 'markdown' | 'html' | 'pdf' | 'json'
+  content: string
+}
+
+export type EnrichmentStepType =
+  | 'revenue'
+  | 'industry'
+  | 'signals'
+  | 'health'
+  | 'relationships'
+  | 'market'
+
+export interface EnrichmentStep {
+  id: string
+  name: string
+  type: EnrichmentStepType
+  priority: number
+  dependencies: string[]
+  estimatedDuration: number
+}
+
+export interface EnrichmentPlan {
+  prospectId: string
+  steps: EnrichmentStep[]
+  currentDepth: number
+  maxDepth: number
+  adaptiveStrategy: boolean
+  completedSteps: string[]
+  createdAt: string
 }
 
 export interface RecursiveEnrichmentResult {
   prospectId: string
-  depth: number
-  enrichments: Array<{
-    source: string
-    data: unknown
-    confidence: number
-  }>
-  totalDataPoints: number
-  completeness: number
+  originalProspect: Prospect
+  enrichedProspect: Prospect
+  executedSteps: EnrichmentStep[]
+  improvements: {
+    dataCompleteness: number
+    confidenceIncrease: number
+    newFieldsAdded: string[]
+  }
+  totalDepth: number
+  duration: number
+}
+
+export interface NetworkRecommendation {
+  type: 'cluster_approach' | 'cross_sell'
+  targetCompanies: string[]
+  reasoning: string
+  estimatedValue: number
+  confidence: number
+  priority: number
 }
 
 export interface NetworkRequalification {
-  leadId: string
-  originalScore: number
-  networkScore: number
-  finalScore: number
-  networkValue: number
-  recommendation: 'revive' | 'dismiss'
-  reasoning: string
-  relatedCompanies: string[]
+  rootLeadId: string
+  requalifiedLeads: RequalificationLead[]
+  networkGraph: CompanyGraph
+  totalOpportunityValue: number
+  recommendations: NetworkRecommendation[]
+  executionDepth: number
+  completedAt: string
+}
+
+export interface ClaimPattern {
+  industries: IndustryType[]
+  avgScore: number
+  signalTypes: SignalType[]
+  outcomeRate: number
+  frequency: number
+}
+
+export interface SavedFilter {
+  id: string
+  name: string
+  filters: {
+    industries?: IndustryType[]
+    states?: string[]
+    minScore?: number
+    maxScore?: number
+    statuses?: ProspectStatus[]
+    signalTypes?: SignalType[]
+    healthGrades?: HealthGrade[]
+    [key: string]: unknown
+  }
+  isDefault: boolean
+  createdAt: string
+  usageCount: number
+}
+
+export interface DashboardWidget {
+  id: string
+  type: string
+  position: { x: number; y: number }
+  size: { width: number; height: number }
+  config: Record<string, unknown>
+}
+
+export interface DashboardLayout {
+  widgets: DashboardWidget[]
+  columns: number
+  theme: 'light' | 'dark' | 'auto'
+}
+
+export interface NotificationSettings {
+  newProspects: boolean
+  healthAlerts: boolean
+  signalDetection: boolean
+  portfolioUpdates: boolean
+  competitorActivity: boolean
+  requalificationOpportunities: boolean
+  aiInsights: boolean
+  channels: {
+    email: boolean
+    inApp: boolean
+    push: boolean
+  }
 }
 
 export interface UserProfile {
   userId: string
   preferences: {
     industries: IndustryType[]
-    minScore: number
-    maxDistance?: number
-    autoRefresh: boolean
+    states: string[]
+    minPriorityScore: number
+    minHealthGrade: HealthGrade
+    preferredSignalTypes: SignalType[]
+    riskTolerance: 'low' | 'medium' | 'high'
   }
-  actionHistory: Array<{
-    type: string
-    timestamp: string
-    data: unknown
-  }>
-  savedFilters: Array<{
-    id: string
-    name: string
-    config: unknown
-  }>
-  dashboardLayout: unknown
-  notificationSettings: {
-    email: boolean
-    desktop: boolean
-    frequency: 'realtime' | 'daily' | 'weekly'
+  behavior: {
+    claimPatterns: ClaimPattern[]
+    conversionRate: number
+    avgTimeToContact: number
+    successfulIndustries: IndustryType[]
+    preferredDealSize: { min: number; max: number }
   }
+  customFilters: SavedFilter[]
+  dashboardLayout: DashboardLayout
+  notificationSettings: NotificationSettings
+  createdAt: string
+  lastActive: string
 }
 
 export type IndustryTrend = {
   industry: IndustryType
-  trend: 'growing' | 'stable' | 'declining'
-  data: unknown[]
+  direction: 'growing' | 'stable' | 'declining'
+  growthRate: number
+  keyDrivers: string[]
+  opportunities: string[]
+  threats: string[]
+  data?: unknown[]
 }
 
 export type ImprovementCategory =

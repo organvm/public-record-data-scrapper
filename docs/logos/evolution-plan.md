@@ -55,18 +55,28 @@ Legend: **Rewrite** = backend code change required; **Ops** = ongoing operationa
 | **E. Full Cloudflare (target, later)** | **Pages** (SPA) + **Workers** (API, ported Express→Hono or `nodejs_compat`) + **Queues**+**Cron Triggers**+**Durable Objects** (replace BullMQ/Redis) + **Hyperdrive**→external Postgres (Neon/Supabase) or **D1** (SQLite rewrite) + **R2** | **high** | low | ¢ | Matches your 9-Worker muscle; cheapest, fastest edge, best previews. But BullMQ/Redis/Express all need re-architecting. Do via strangler pattern, endpoint by endpoint. |
 | **F. Self-host AWS (Terraform)** | ECS/Fargate + RDS + ElastiCache via existing `terraform/` | low | **high** | $$$ | Most control; far too much ops for a solo operator. Recommend **retiring** this path. |
 
-**My expert recommendation:** **D now, E later.**
-- **D (start):** lowest risk, immediate guardrails, leverages Cloudflare for what
-  it's best at, and lets you delete the Vercel + Terraform + k8s sprawl. The
-  Node backend (Express + BullMQ + Redis + Postgres) stays on a real always-on
-  host (Render or Fly) where it already works — no rewrite to merge #234 safely.
-- **E (target):** once D is stable, *incrementally* port the API to Workers and
-  swap BullMQ→Queues + Cron, Redis→Durable Objects/Upstash, Postgres-via-Hyperdrive
-  (keep Postgres; **avoid D1** here — you rely on `pg_trgm`/JSONB GIN). Move one
-  endpoint/job at a time behind the CF router; never a big-bang.
+**DECISION (locked 2026-05-25): Option E — full Cloudflare, including D1.**
+Constraints that drove it: **$0 budget** (no paid Railway/Render facility) +
+existing Cloudflare fluency (9 Workers) + an explicit choice for the *elevated*
+form over the easy route. The idealized target is specified in
+[`telos.md`](./telos.md). This supersedes the earlier "D now, E later" hedge.
 
-**Decision needed from you:** confirm **D→E**, or pick A/B/C instead. Everything
-below assumes D→E but the release discipline (§4) is identical for any option.
+- **Chosen — E (full Cloudflare):** Pages (SPA) + Workers/Hono (API) +
+  **D1** (system of record; FTS5 replaces `pg_trgm`, `json1` replaces JSONB) +
+  Cron Triggers + a D1-backed job drain (Queues/Durable Objects when on the $5
+  plan) + KV + R2 + Workers AI/Vectorize (scoring) + Cloudflare Access (auth,
+  supplies `org_id`). Single vendor, $0 floor, edge-native.
+- **Accepted cost:** a backend rewrite (Express→Hono, BullMQ/Redis→Cron+drain/DO,
+  Postgres→D1) and a one-time data migration. The **#234 security logic ports
+  forward**; tenant isolation moves to the query layer (no RLS in D1).
+- **Method:** strangler migration — stand up the `cloudflare/` foundation, then
+  port endpoints/jobs from `server/` one at a time (security-critical first),
+  flip Pages to serve the SPA, and retire Vercel + Render + Terraform + k8s at
+  parity. Never a big-bang.
+
+Options A–D and F remain documented above as the roads not taken. The release
+discipline (§4) is inherent to the Cloudflare platform (previews, `[env.*]`,
+version rollback).
 
 ## 4. Release discipline (platform-independent — the real fix)
 

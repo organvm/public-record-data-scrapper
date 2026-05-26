@@ -1,0 +1,117 @@
+# ============================================================================
+# ucc-mca-edge — Cloudflare Workers config (the edge-native substrate)
+# ----------------------------------------------------------------------------
+# This is the strangler-pattern base for migrating the Express + BullMQ + Redis
+# + Postgres + Vite SPA app to an all-Cloudflare, $0-floor architecture.
+# See docs/logos/telos.md for the ideal-form target and ./README.md for setup.
+#
+# SECRETS are NOT declared here. Set them per environment via:
+#     wrangler secret put JWT_SECRET            --env staging
+#     wrangler secret put STRIPE_WEBHOOK_SECRET  --env staging
+#     wrangler secret put JWT_SECRET            --env production
+#     ...
+# (JWT_SECRET, STRIPE_WEBHOOK_SECRET, SENDGRID_API_KEY, etc.)
+#
+# The account id is NOT pinned here so the same toml is portable; CI passes it
+# via the CLOUDFLARE_ACCOUNT_ID secret. For reference, the target account is:
+#     e0921b840fd656d8ea46426f1f114c30
+# (set `account_id = "..."` below if you prefer to pin it locally.)
+# ============================================================================
+
+name = "ucc-mca-edge"
+main = "workers/api/src/index.ts"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+# Uncomment to pin the account locally; CI uses the CLOUDFLARE_ACCOUNT_ID secret.
+# account_id = "e0921b840fd656d8ea46426f1f114c30"  # TODO: confirm before pinning
+
+# ----------------------------------------------------------------------------
+# Top-level (default / local-dev) bindings.
+# `[env.staging]` and `[env.production]` below RE-DECLARE their own ids — the
+# top-level block is what `wrangler dev` uses by default.
+# ----------------------------------------------------------------------------
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ucc-mca"
+database_id = "00000000-0000-0000-0000-000000000000"  # TODO: `wrangler d1 create ucc-mca` then paste the id here
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "0000000000000000000000000000000000"  # TODO: `wrangler kv namespace create KV` then paste the id here
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "cronus-assets"
+
+# Scheduled triggers — the $0 async pipeline (Cron + a D1 jobs drain).
+#   "0 2 * * *"    daily 02:00 UTC  → UCC ingestion (was ucc-ingestion queue)
+#   "0 */6 * * *"  every 6 hours    → data enrichment (was data-enrichment queue)
+#   "0 */12 * * *" every 12 hours   → health scoring (was health-scores queue)
+[triggers]
+crons = ["0 2 * * *", "0 */6 * * *", "0 */12 * * *"]
+
+# Non-secret config. Cloudflare Access supplies org_id in the JWT; these point
+# the verifier at your Zero Trust team + application audience (AUD) tag.
+[vars]
+ENVIRONMENT = "development"
+ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"  # TODO: your Zero Trust team domain
+ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD"     # TODO: Access application Audience (AUD) tag
+
+# ============================================================================
+# STAGING — auto-deployed on push to main (see .github/workflows/deploy-cloudflare.yml)
+# ============================================================================
+[env.staging]
+name = "ucc-mca-edge-staging"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "ucc-mca"
+database_id = "00000000-0000-0000-0000-000000000000"  # TODO: staging D1 id (can reuse a dedicated staging db)
+migrations_dir = "migrations"
+
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "0000000000000000000000000000000000"  # TODO: staging KV namespace id
+
+[[env.staging.r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "cronus-assets-staging"  # TODO: create or rename to your staging bucket
+
+[env.staging.triggers]
+crons = ["0 2 * * *", "0 */6 * * *", "0 */12 * * *"]
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"  # TODO
+ACCESS_AUD = "REPLACE_WITH_STAGING_ACCESS_AUD"          # TODO
+
+# ============================================================================
+# PRODUCTION — manual promotion only (workflow_dispatch with confirm=DEPLOY)
+# ============================================================================
+[env.production]
+name = "ucc-mca-edge-production"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "ucc-mca"
+database_id = "00000000-0000-0000-0000-000000000000"  # TODO: production D1 id
+migrations_dir = "migrations"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "0000000000000000000000000000000000"  # TODO: production KV namespace id
+
+[[env.production.r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "cronus-assets"
+
+[env.production.triggers]
+crons = ["0 2 * * *", "0 */6 * * *", "0 */12 * * *"]
+
+[env.production.vars]
+ENVIRONMENT = "production"
+ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"  # TODO
+ACCESS_AUD = "REPLACE_WITH_PRODUCTION_ACCESS_AUD"       # TODO

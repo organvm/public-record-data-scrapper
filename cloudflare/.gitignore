@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Wrangler local dev state (local D1/KV/R2 emulation, build cache)
+.wrangler/
+
+# Build output
+dist/
+
+# Local env / secrets (never commit; use `wrangler secret put`)
+.dev.vars
+.env

@@ -1,0 +1,96 @@
+# ============================================================================
+# Deploy ucc-mca-edge (Cloudflare Workers)
+# ----------------------------------------------------------------------------
+# Strangler-pattern edge deploy, fully scoped to the cloudflare/ directory.
+#   * push to main          → auto-deploy to STAGING
+#   * workflow_dispatch      → deploy to PRODUCTION (requires confirm == DEPLOY)
+#
+# Secrets required (repo or environment scope):
+#   CLOUDFLARE_API_TOKEN   — least-privilege token. Grant ONLY:
+#                            Account · Workers Scripts:Edit,
+#                            Account · D1:Edit, Account · Workers KV Storage:Edit,
+#                            Account · Workers R2 Storage:Edit (+ Account:Read).
+#                            Do NOT use a Global API Key.
+#   CLOUDFLARE_ACCOUNT_ID  — e0921b840fd656d8ea46426f1f114c30 (target account).
+# ============================================================================
+name: deploy-cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare/**'
+      - '.github/workflows/deploy-cloudflare.yml'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY to confirm a PRODUCTION deploy'
+        required: true
+        default: ''
+
+# Least privilege: the deploy needs only repo read.
+permissions:
+  contents: read
+
+jobs:
+  # --- STAGING: automatic on push to main -----------------------------------
+  deploy-staging:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install edge deps
+        working-directory: cloudflare
+        run: npm ci || npm install
+
+      - name: Deploy Worker (staging)
+        # TODO: SHA-pin this action (replace the tag with the commit SHA it
+        # resolves to) before trusting it in production CI.
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare
+          command: deploy --env staging
+
+      # --- How the SPA (apps/web) Pages deploy would attach (left commented;
+      #     this workflow stays scoped to the Worker for now) -----------------
+      # - name: Build SPA
+      #   run: npm ci && npm run build      # produces dist/ (apps/web)
+      # - name: Deploy SPA to Pages
+      #   uses: cloudflare/wrangler-action@v3
+      #   with:
+      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     command: pages deploy dist --project-name ucc-mca-web --branch=main
+
+  # --- PRODUCTION: manual, gated on confirm == DEPLOY -----------------------
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm == 'DEPLOY'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install edge deps
+        working-directory: cloudflare
+        run: npm ci || npm install
+
+      - name: Deploy Worker (production)
+        # TODO: SHA-pin this action before trusting it in production CI.
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare
+          command: deploy --env production

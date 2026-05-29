@@ -45,16 +45,12 @@ function App() {
   const [tourOpen, setTourOpen] = useState(false)
   const { dataTier } = useDataTier()
 
-  // Preview (mock) data is the default source so the workspace is always
-  // populated. Set VITE_USE_MOCK_DATA=false AND VITE_API_BASE_URL once the live
-  // backend (auth + seeded DB) is wired. Either way, useDataFetching falls back
-  // to preview data if a live load fails, so the UI is never an empty shell.
+  // Real, free public data (USAspending.gov) is the default source. Preview
+  // (synthetic) data is opt-in via VITE_USE_MOCK_DATA=true, and is also used
+  // automatically as a fallback if a live load fails — so the deck is never an
+  // empty shell, but shows REAL data whenever it can.
   const mockFlag = String(import.meta.env.VITE_USE_MOCK_DATA ?? '').toLowerCase()
-  const useDemoData = ['false', '0', 'no'].includes(mockFlag)
-    ? false
-    : ['1', 'true', 'yes'].includes(mockFlag)
-      ? true
-      : !import.meta.env.VITE_API_BASE_URL
+  const useDemoData = ['1', 'true', 'yes'].includes(mockFlag)
 
   // Data fetching
   const data = useDataFetching({ useMockData: useDemoData, dataTier })
@@ -174,7 +170,7 @@ function App() {
 
   return (
     <div className="min-h-screen">
-      <Header onRefresh={handleRefreshData} />
+      <Header onRefresh={handleRefreshData} dataSource={data.dataSource} />
       <QuickAccessBanner />
       <DemoTour isOpen={tourOpen} onClose={() => setTourOpen(false)} />
 

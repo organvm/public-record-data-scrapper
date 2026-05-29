@@ -11,6 +11,10 @@ import { fetchProspects } from '@/lib/api/prospects'
 import { fetchCompetitors } from '@/lib/api/competitors'
 import { fetchPortfolio } from '@/lib/api/portfolio'
 import { fetchUserActions } from '@/lib/api/userActions'
+import {
+  fetchLiveProspects,
+  deriveCompetitorsFromProspects
+} from '@/lib/data-sources/live-prospects'
 
 export interface UseDataFetchingOptions {
   useMockData: boolean
@@ -24,6 +28,7 @@ export interface UseDataFetchingResult {
   userActions: UserAction[]
   isLoading: boolean
   loadError: string | null
+  dataSource: 'live' | 'preview' | 'api'
   lastDataRefresh: string
   setProspects: (updater: Prospect[] | ((prev: Prospect[]) => Prospect[])) => void
   setCompetitors: (
@@ -51,6 +56,7 @@ export function useDataFetching({
 
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [dataSource, setDataSource] = useState<'live' | 'preview' | 'api'>('live')
 
   const fetchData = useCallback(
     async ({ signal, silent }: { signal?: AbortSignal; silent?: boolean } = {}) => {
@@ -72,36 +78,57 @@ export function useDataFetching({
             return false
           }
           loadPreviewData()
+          setDataSource('preview')
           return true
         }
 
-        const [liveProspects, liveCompetitors, livePortfolio, liveUserActions] = await Promise.all([
-          fetchProspects(signal, { dataTier }),
-          fetchCompetitors(signal, { dataTier }),
-          fetchPortfolio(signal, { dataTier }),
-          fetchUserActions(signal, { dataTier })
-        ])
+        // When a real backend is configured (VITE_API_BASE_URL), use it.
+        if (import.meta.env.VITE_API_BASE_URL) {
+          const [liveProspects, liveCompetitors, livePortfolio, liveUserActions] =
+            await Promise.all([
+              fetchProspects(signal, { dataTier }),
+              fetchCompetitors(signal, { dataTier }),
+              fetchPortfolio(signal, { dataTier }),
+              fetchUserActions(signal, { dataTier })
+            ])
 
+          if (signal?.aborted) {
+            return false
+          }
+
+          const hasLiveData =
+            liveProspects.length > 0 || liveCompetitors.length > 0 || livePortfolio.length > 0
+
+          if (!hasLiveData) {
+            // Backend reachable but empty (e.g. an unseeded DB) — show preview.
+            loadPreviewData()
+            setDataSource('preview')
+            setLoadError(null)
+            return true
+          }
+
+          setProspects(liveProspects)
+          setCompetitors(liveCompetitors)
+          setPortfolio(livePortfolio)
+          setUserActions(liveUserActions)
+          setLastDataRefresh(new Date().toISOString())
+          setDataSource('api')
+          return true
+        }
+
+        // Default: real, free public data (USAspending.gov) — no server/auth
+        // required. Prospects are real federal-award recipients; the competitor
+        // view is derived from the same real records. Portfolio is the operator's
+        // own funded book (no public source), so it uses preview data.
+        const liveProspects = await fetchLiveProspects(signal, { limit: 60 })
         if (signal?.aborted) {
           return false
         }
-
-        const hasLiveData =
-          liveProspects.length > 0 || liveCompetitors.length > 0 || livePortfolio.length > 0
-
-        if (!hasLiveData) {
-          // Backend reachable but empty (e.g. an unseeded DB). Show preview data
-          // so the workspace is never a dead, empty shell.
-          loadPreviewData()
-          setLoadError(null)
-          return true
-        }
-
         setProspects(liveProspects)
-        setCompetitors(liveCompetitors)
-        setPortfolio(livePortfolio)
-        setUserActions(liveUserActions)
+        setCompetitors(deriveCompetitorsFromProspects(liveProspects))
+        setPortfolio(generatePortfolioCompanies(15, { dataTier }))
         setLastDataRefresh(new Date().toISOString())
+        setDataSource('live')
         return true
       } catch (error) {
         if (signal?.aborted) {
@@ -112,6 +139,7 @@ export function useDataFetching({
         // data so the redesigned UI stays populated and demonstrable.
         console.warn('Live data unavailable; using preview dataset.', error)
         loadPreviewData()
+        setDataSource('preview')
         return true
       } finally {
         if (!silent && !signal?.aborted) {
@@ -143,6 +171,7 @@ export function useDataFetching({
     userActions: userActions || [],
     isLoading,
     loadError,
+    dataSource,
     lastDataRefresh: lastDataRefresh || new Date().toISOString(),
     setProspects,
     setCompetitors,

@@ -40,6 +40,21 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
         changeOrigin: true
+      },
+      // Real free public-data sources, proxied to avoid browser CORS in dev.
+      // In production, point the app at a deployed proxy or the direct API.
+      '/ext/usaspending': {
+        target: 'https://api.usaspending.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/usaspending/, '')
+      },
+      '/ext/sec': {
+        target: 'https://www.sec.gov',
+        changeOrigin: true,
+        secure: true,
+        headers: { 'User-Agent': 'UCC-MCA-Intelligence research@example.com' },
+        rewrite: (p) => p.replace(/^\/ext\/sec/, '')
       }
     },
     fs: {

@@ -170,7 +170,11 @@ function App() {
 
   return (
     <div className="min-h-screen">
-      <Header onRefresh={handleRefreshData} dataSource={data.dataSource} />
+      <Header
+        onRefresh={handleRefreshData}
+        dataSource={data.dataSource}
+        dataSourceName={data.dataSourceName}
+      />
       <QuickAccessBanner />
       <DemoTour isOpen={tourOpen} onClose={() => setTourOpen(false)} />
 

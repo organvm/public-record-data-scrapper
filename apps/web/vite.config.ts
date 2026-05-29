@@ -49,6 +49,13 @@ export default defineConfig({
         secure: true,
         rewrite: (p) => p.replace(/^\/ext\/usaspending/, '')
       },
+      // NY Dept. of State open data (Socrata) — real state business registrations.
+      '/ext/nyopendata': {
+        target: 'https://data.ny.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/nyopendata/, '')
+      },
       '/ext/sec': {
         target: 'https://www.sec.gov',
         changeOrigin: true,

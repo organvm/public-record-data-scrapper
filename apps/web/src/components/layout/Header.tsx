@@ -6,13 +6,14 @@ import { ArrowClockwise, Info } from '@phosphor-icons/react'
 interface HeaderProps {
   onRefresh: () => void
   dataSource?: 'live' | 'preview' | 'api'
+  dataSourceName?: string
 }
 
-export function Header({ onRefresh, dataSource = 'preview' }: HeaderProps) {
+export function Header({ onRefresh, dataSource = 'preview', dataSourceName }: HeaderProps) {
   const isLive = dataSource === 'live' || dataSource === 'api'
   const sourceLabel =
     dataSource === 'live'
-      ? 'Live · USAspending.gov — real federal award data'
+      ? `Live · ${dataSourceName ?? 'real public-record data'}`
       : dataSource === 'api'
         ? 'Live · connected intelligence backend'
         : 'Preview · synthetic sample data'

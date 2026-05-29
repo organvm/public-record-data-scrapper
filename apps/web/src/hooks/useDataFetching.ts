@@ -13,6 +13,7 @@ import { fetchPortfolio } from '@/lib/api/portfolio'
 import { fetchUserActions } from '@/lib/api/userActions'
 import {
   fetchLiveProspects,
+  fetchNYBusinessRecords,
   deriveCompetitorsFromProspects
 } from '@/lib/data-sources/live-prospects'
 
@@ -29,6 +30,7 @@ export interface UseDataFetchingResult {
   isLoading: boolean
   loadError: string | null
   dataSource: 'live' | 'preview' | 'api'
+  dataSourceName: string
   lastDataRefresh: string
   setProspects: (updater: Prospect[] | ((prev: Prospect[]) => Prospect[])) => void
   setCompetitors: (
@@ -57,6 +59,9 @@ export function useDataFetching({
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [dataSource, setDataSource] = useState<'live' | 'preview' | 'api'>('live')
+  const [dataSourceName, setDataSourceName] = useState<string>(
+    'NY Dept. of State — business registrations'
+  )
 
   const fetchData = useCallback(
     async ({ signal, silent }: { signal?: AbortSignal; silent?: boolean } = {}) => {
@@ -116,11 +121,24 @@ export function useDataFetching({
           return true
         }
 
-        // Default: real, free public data (USAspending.gov) — no server/auth
-        // required. Prospects are real federal-award recipients; the competitor
-        // view is derived from the same real records. Portfolio is the operator's
-        // own funded book (no public source), so it uses preview data.
-        const liveProspects = await fetchLiveProspects(signal, { limit: 60 })
+        // Default: real, free public records — no server/auth required.
+        // Primary: NY Dept. of State business registrations (official open-data
+        // API). Secondary: USAspending.gov federal-award recipients. The
+        // competitor view is derived from the same real records; portfolio is the
+        // operator's own funded book (no public source) so it uses preview data.
+        let liveProspects: Prospect[]
+        let sourceName: string
+        try {
+          liveProspects = await fetchNYBusinessRecords(signal, { limit: 80 })
+          sourceName = 'NY Dept. of State — business registrations'
+        } catch (primaryError) {
+          if (signal?.aborted) {
+            return false
+          }
+          console.warn('NY open-data unavailable; trying USAspending.', primaryError)
+          liveProspects = await fetchLiveProspects(signal, { limit: 60 })
+          sourceName = 'USAspending.gov — federal award recipients'
+        }
         if (signal?.aborted) {
           return false
         }
@@ -129,6 +147,7 @@ export function useDataFetching({
         setPortfolio(generatePortfolioCompanies(15, { dataTier }))
         setLastDataRefresh(new Date().toISOString())
         setDataSource('live')
+        setDataSourceName(sourceName)
         return true
       } catch (error) {
         if (signal?.aborted) {
@@ -172,6 +191,7 @@ export function useDataFetching({
     isLoading,
     loadError,
     dataSource,
+    dataSourceName,
     lastDataRefresh: lastDataRefresh || new Date().toISOString(),
     setProspects,
     setCompetitors,

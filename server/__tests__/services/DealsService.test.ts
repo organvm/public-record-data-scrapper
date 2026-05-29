@@ -448,6 +448,52 @@ describe('DealsService', () => {
       expect(result.stageId).toBe('stage-2')
     })
 
+    it('records the stage transition with notes/changedBy in deal_stage_history', async () => {
+      const mockStage = {
+        id: 'stage-2',
+        org_id: 'org-1',
+        name: 'In Progress',
+        slug: 'in-progress',
+        stage_order: 2,
+        is_terminal: false,
+        auto_actions: {},
+        created_at: '2024-01-01T00:00:00Z'
+      }
+      const mockDeal = {
+        id: 'deal-1',
+        org_id: 'org-1',
+        stage_id: 'stage-1',
+        priority: 'normal',
+        bank_connected: false,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z'
+      }
+      const mockUpdated = { ...mockDeal, stage_id: 'stage-2' }
+
+      mockQuery
+        .mockResolvedValueOnce([mockStage]) // validate stage
+        .mockResolvedValueOnce([mockDeal]) // getByIdOrThrow
+        .mockResolvedValueOnce([mockUpdated]) // update
+        .mockResolvedValueOnce([]) // deal_stage_history insert
+
+      await service.moveToStage('deal-1', 'org-1', 'stage-2', {
+        notes: 'moved after underwriting review',
+        changedBy: '11111111-1111-1111-1111-111111111111'
+      })
+
+      const historyCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('INSERT INTO deal_stage_history')
+      )
+      expect(historyCall).toBeDefined()
+      expect(historyCall?.[1]).toEqual([
+        'deal-1',
+        'stage-1',
+        'stage-2',
+        '11111111-1111-1111-1111-111111111111',
+        'moved after underwriting review'
+      ])
+    })
+
     it('should set submitted_at when moving to pack-submitted', async () => {
       const mockStage = {
         id: 'stage-2',

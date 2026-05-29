@@ -569,7 +569,7 @@ export class DealsService {
     id: string,
     orgId: string,
     newStageId: string,
-    _options: { notes?: string; changedBy?: string } = {}
+    options: { notes?: string; changedBy?: string } = {}
   ): Promise<Deal> {
     try {
       // Validate stage exists
@@ -622,6 +622,15 @@ export class DealsService {
       if (!results[0]) {
         throw new NotFoundError('Deal', id)
       }
+
+      // Record the transition with its provenance. The API accepts notes/changedBy
+      // and the deal_stage_history table exists for exactly this purpose; both were
+      // previously dropped on the floor (telos invariant: no silent failure).
+      await database.query(
+        `INSERT INTO deal_stage_history (deal_id, from_stage_id, to_stage_id, changed_by, notes)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, deal.stageId ?? null, newStageId, options.changedBy ?? null, options.notes ?? null]
+      )
 
       return this.transformDeal(results[0])
     } catch (error) {

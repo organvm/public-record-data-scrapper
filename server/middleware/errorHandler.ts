@@ -29,7 +29,7 @@ export const errorHandler = (
   err: AppError | ServiceError,
   req: RequestWithCorrelation,
   res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   _next: NextFunction
 ) => {
   const correlationId = req.correlationId
@@ -86,7 +86,9 @@ export const errorHandler = (
   let responseMessage: string
   if (isProduction) {
     responseMessage =
-      statusCode >= 400 && statusCode < 500 ? 'Request could not be processed' : 'Internal Server Error'
+      statusCode >= 400 && statusCode < 500
+        ? 'Request could not be processed'
+        : 'Internal Server Error'
   } else {
     responseMessage = rawMessage
   }

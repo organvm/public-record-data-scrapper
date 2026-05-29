@@ -18,9 +18,7 @@ import {
   CurrencyDollar,
   Clock,
   ArrowRight,
-  Buildings,
-  Funnel,
-  CaretDown
+  Buildings
 } from '@phosphor-icons/react'
 import { cn } from '@public-records/ui/utils'
 
@@ -167,7 +165,9 @@ function DealCard({
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className={cn('w-2 h-2 rounded-full', getPriorityColor(deal.priority))} />
-          <span className="font-medium text-sm truncate">{deal.dealNumber || `Deal-${deal.id.slice(0, 6)}`}</span>
+          <span className="font-medium text-sm truncate">
+            {deal.dealNumber || `Deal-${deal.id.slice(0, 6)}`}
+          </span>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -180,13 +180,16 @@ function DealCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit()
+              }}
+            >
               Edit Deal
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-              Move to
-            </div>
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Move to</div>
             {stages
               .filter((s) => s.id !== currentStage.id)
               .map((stage) => (
@@ -203,7 +206,10 @@ function DealCard({
               ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
               className="text-destructive"
             >
               Delete Deal
@@ -421,7 +427,7 @@ export function DealPipeline({
       {/* Summary Stats */}
       <Card className="p-4">
         <div className="flex flex-wrap gap-6 justify-center">
-          {sortedStages.map((stage, index) => {
+          {sortedStages.map((stage) => {
             const metrics = stageMetrics[stage.id]
             return (
               <div key={stage.id} className="text-center">
@@ -433,7 +439,9 @@ export function DealPipeline({
                   <span className="text-xs text-muted-foreground">{stage.name}</span>
                 </div>
                 <div className="text-lg font-semibold">{metrics.count}</div>
-                <div className="text-xs text-muted-foreground">{formatCurrency(metrics.totalValue)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {formatCurrency(metrics.totalValue)}
+                </div>
               </div>
             )
           })}

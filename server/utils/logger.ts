@@ -78,7 +78,7 @@ function createLogEntry(
     // Extract correlationId if present
     if (context.correlationId) {
       entry.correlationId = context.correlationId as string
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
       const { correlationId: _, ...rest } = context
       if (Object.keys(rest).length > 0) {
         entry.context = rest

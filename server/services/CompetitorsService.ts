@@ -351,7 +351,7 @@ export class CompetitorsService {
    * @param _competitor - The competitor to analyze (unused, for consistency)
    * @returns Array of opportunity statements
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   private calculateOpportunities(_competitor: Competitor): string[] {
     return [
       'Expansion into underserved markets',
@@ -366,7 +366,7 @@ export class CompetitorsService {
    * @param _competitor - The competitor to analyze (unused, for consistency)
    * @returns Array of threat statements
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   private calculateThreats(_competitor: Competitor): string[] {
     return [
       'Increased competition from fintech lenders',

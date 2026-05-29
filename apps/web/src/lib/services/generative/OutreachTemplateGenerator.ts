@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Experimental generative features - disabled strict linting for AI service integration
 /**
  * Generative Outreach Template Generator

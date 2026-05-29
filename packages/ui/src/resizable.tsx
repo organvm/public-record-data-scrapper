@@ -1,6 +1,7 @@
 import { ComponentProps } from 'react'
 import GripVerticalIcon from 'lucide-react/dist/esm/icons/grip-vertical'
-import * as ResizablePrimitive from 'react-resizable-panels'
+import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels'
+const ResizablePrimitive = { PanelGroup, Panel, PanelResizeHandle }
 
 import { cn } from './utils'
 

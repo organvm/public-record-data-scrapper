@@ -4,7 +4,7 @@
  * Service layer for fetching and managing prospect data from PostgreSQL
  */
 
-import { initDatabase, getDatabase, createQueries } from '@/lib/database'
+import { initDatabase, getDatabase, createQueryBuilder } from '@/lib/database'
 import type {
   Prospect,
   GrowthSignal,
@@ -127,7 +127,7 @@ export async function fetchProspects(options?: {
 }): Promise<Prospect[]> {
   try {
     const db = getDatabase()
-    const queries = createQueries(db)
+    const queries = createQueryBuilder(db)
 
     // Get prospects with filters
     const prospectRows = await queries.getProspects(options)
@@ -160,7 +160,7 @@ export async function fetchProspects(options?: {
 export async function fetchProspectById(id: string): Promise<Prospect | null> {
   try {
     const db = getDatabase()
-    const queries = createQueries(db)
+    const queries = createQueryBuilder(db)
 
     const row = await queries.getProspectById(id)
     if (!row) return null
@@ -181,7 +181,7 @@ export async function fetchProspectById(id: string): Promise<Prospect | null> {
 export async function searchProspects(query: string, limit?: number): Promise<Prospect[]> {
   try {
     const db = getDatabase()
-    const queries = createQueries(db)
+    const queries = createQueryBuilder(db)
 
     const prospectRows = await queries.searchProspects(query, limit)
 
@@ -209,7 +209,7 @@ export async function updateProspectStatus(
 ): Promise<Prospect | null> {
   try {
     const db = getDatabase()
-    const queries = createQueries(db)
+    const queries = createQueryBuilder(db)
 
     const updated = await queries.updateProspect(id, {
       status,
@@ -235,7 +235,7 @@ export async function updateProspectStatus(
 export async function fetchDashboardStats() {
   try {
     const db = getDatabase()
-    const queries = createQueries(db)
+    const queries = createQueryBuilder(db)
 
     const stats = await queries.getProspectStats()
     const newSignalsCount = await queries.getNewSignalsCountForToday()
@@ -270,7 +270,7 @@ export async function fetchDashboardStats() {
 export async function fetchCompetitorData(): Promise<CompetitorData[]> {
   try {
     const db = getDatabase()
-    const queries = createQueries(db)
+    const queries = createQueryBuilder(db)
     const competitors = await queries.getCompetitors()
 
     return competitors.map((row: CompetitorRow) => ({
@@ -302,7 +302,7 @@ export async function fetchPortfolioCompanies(): Promise<PortfolioCompany[]> {
 export async function hasDatabaseData(): Promise<boolean> {
   try {
     const db = getDatabase()
-    const queries = createQueries(db)
+    const queries = createQueryBuilder(db)
     const stats = await queries.getProspectStats()
     return stats.total > 0
   } catch (error) {

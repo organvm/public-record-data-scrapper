@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { fetchDashboardStats } from '../databaseService'
-import { getDatabase, createQueries } from '@/lib/database'
+import { getDatabase, createQueryBuilder } from '@/lib/database'
 
 // Mock dependencies
 vi.mock('@/lib/database', () => ({
   initDatabase: vi.fn(),
   getDatabase: vi.fn(),
-  createQueries: vi.fn()
+  createQueryBuilder: vi.fn()
 }))
 
 describe('fetchDashboardStats', () => {
@@ -36,7 +36,7 @@ describe('fetchDashboardStats', () => {
 
     // Setup database mocks
     vi.mocked(getDatabase).mockReturnValue({} as ReturnType<typeof getDatabase>)
-    vi.mocked(createQueries).mockReturnValue(mockQueries as ReturnType<typeof createQueries>)
+    vi.mocked(createQueryBuilder).mockReturnValue(mockQueries as ReturnType<typeof createQueryBuilder>)
   })
 
   it('calculates average health grade correctly', async () => {

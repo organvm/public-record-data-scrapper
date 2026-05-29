@@ -7,6 +7,46 @@
 import { DatabaseClient } from './client'
 import { UCCFiling, Prospect, GrowthSignal, HealthScore } from '@public-records/core'
 
+
+// Database Row Types
+export interface ProspectRow {
+  id: string;
+  company_name: string;
+  industry: string;
+  state: string;
+  status: string;
+  priority_score: number;
+  health_score?: any;
+  default_date: Date;
+  time_since_default: number;
+  last_filing_date?: Date;
+  estimated_revenue?: number;
+  claimed_by?: string;
+  claimed_date?: Date;
+  ml_scoring?: any;
+}
+
+export interface UCCFilingRow {
+  id: string;
+  filing_date: Date;
+  debtor_name: string;
+  secured_party: string;
+  state: string;
+  lien_amount?: number;
+  status: string;
+  filing_type?: string;
+}
+
+export interface GrowthSignalRow {
+  id: string;
+  prospect_id: string;
+  type: string;
+  description: string;
+  detected_date: Date;
+  source_url?: string;
+  confidence: number;
+}
+
 export interface CompetitorRow {
   id: string
   lender_name: string

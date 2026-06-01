@@ -175,7 +175,9 @@ describe('AnalyticsDashboard', () => {
         score: 92,
         sentimentTrend: 'improving',
         reviewCount: 10,
-        violationCount: 0
+        violationCount: 0,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       },
       timeSinceDefault: 730,
       defaultDate: '2022-01-15',
@@ -185,6 +187,7 @@ describe('AnalyticsDashboard', () => {
           id: 's1',
           type: 'hiring',
           description: 'Hiring',
+          score: 75,
           confidence: 0.9,
           detectedDate: recentDate
         }
@@ -210,7 +213,9 @@ describe('AnalyticsDashboard', () => {
         score: 78,
         sentimentTrend: 'stable',
         reviewCount: 8,
-        violationCount: 1
+        violationCount: 1,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       },
       timeSinceDefault: 365,
       defaultDate: '2023-01-15',
@@ -220,6 +225,7 @@ describe('AnalyticsDashboard', () => {
           id: 's2',
           type: 'expansion',
           description: 'Expanding',
+          score: 75,
           confidence: 0.8,
           detectedDate: recentDate
         }
@@ -245,7 +251,9 @@ describe('AnalyticsDashboard', () => {
         score: 55,
         sentimentTrend: 'declining',
         reviewCount: 5,
-        violationCount: 2
+        violationCount: 2,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       },
       timeSinceDefault: 1095,
       defaultDate: '2021-01-15',

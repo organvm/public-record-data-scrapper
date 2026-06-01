@@ -6,6 +6,7 @@ import type {
   DealDocument,
   DealStage,
   DealStats,
+  DealListResponse,
   PipelineView,
   DealWithDocuments,
   DocumentChecklist
@@ -55,36 +56,37 @@ import { toast } from 'sonner'
 
 const createMockDeal = (overrides: Partial<Deal> = {}): Deal => ({
   id: 'deal-1',
-  orgId: 'org-1',
-  stageId: 'lead',
+  org_id: 'org-1',
+  stage_id: 'lead',
   priority: 'normal',
-  bankConnected: false,
-  createdAt: '2024-01-01',
-  updatedAt: '2024-01-01',
+  created_at: '2024-01-01',
+  updated_at: '2024-01-01',
   ...overrides
 })
 
 const createMockStage = (overrides: Partial<DealStage> = {}): DealStage => ({
   id: 'lead',
-  orgId: 'org-1',
+  org_id: 'org-1',
   name: 'Lead',
-  slug: 'lead',
-  stageOrder: 1,
-  isTerminal: false,
-  autoActions: {},
-  createdAt: '2024-01-01',
+  description: undefined,
+  position: 1,
+  is_won: false,
+  is_lost: false,
+  color: undefined,
+  created_at: '2024-01-01',
   ...overrides
 })
 
 const createMockDocument = (overrides: Partial<DealDocument> = {}): DealDocument => ({
   id: 'doc-1',
-  dealId: 'deal-1',
-  documentType: 'application',
-  fileName: 'application.pdf',
-  filePath: '/docs/application.pdf',
-  isRequired: true,
-  uploadedAt: '2024-01-15',
+  deal_id: 'deal-1',
+  document_type: 'application',
+  file_name: 'application.pdf',
+  file_path: '/docs/application.pdf',
+  is_required: true,
+  is_verified: false,
   metadata: {},
+  created_at: '2024-01-15',
   ...overrides
 })
 
@@ -120,11 +122,9 @@ describe('useDealActions', () => {
 
   describe('handleFetchDeals', () => {
     it('should fetch deals successfully', async () => {
-      const mockResponse = {
+      const mockResponse: DealListResponse = {
         deals: [createMockDeal()],
-        total: 1,
-        page: 1,
-        pageSize: 20
+        pagination: { page: 1, limit: 20, total: 1, totalPages: 1 }
       }
       mockFetchDeals.mockResolvedValueOnce(mockResponse)
 
@@ -141,7 +141,10 @@ describe('useDealActions', () => {
     })
 
     it('should pass additional params', async () => {
-      mockFetchDeals.mockResolvedValueOnce({ deals: [], total: 0 })
+      mockFetchDeals.mockResolvedValueOnce({
+        deals: [],
+        pagination: { page: 1, limit: 20, total: 0, totalPages: 0 }
+      })
 
       const { result } = renderUseDealActions()
 
@@ -179,7 +182,8 @@ describe('useDealActions', () => {
     it('should fetch a single deal successfully', async () => {
       const mockDealWithDocuments: DealWithDocuments = {
         ...createMockDeal(),
-        documents: [createMockDocument()]
+        documents: [createMockDocument()],
+        documentChecklist: []
       }
       mockFetchDeal.mockResolvedValueOnce(mockDealWithDocuments)
 
@@ -214,9 +218,9 @@ describe('useDealActions', () => {
   describe('handleFetchPipelineView', () => {
     it('should fetch pipeline view successfully', async () => {
       const mockPipeline: PipelineView = {
-        stages: [createMockStage()],
-        deals: [createMockDeal()],
-        totals: { count: 1, value: 50000 }
+        stages: [{ ...createMockStage(), deals: [createMockDeal()], totalValue: 50000, count: 1 }],
+        totalDeals: 1,
+        totalValue: 50000
       }
       mockFetchPipelineView.mockResolvedValueOnce(mockPipeline)
 
@@ -250,7 +254,7 @@ describe('useDealActions', () => {
 
   describe('handleFetchStages', () => {
     it('should fetch stages successfully', async () => {
-      const mockStages = [createMockStage(), createMockStage({ id: 'contacted', stageOrder: 2 })]
+      const mockStages = [createMockStage(), createMockStage({ id: 'contacted', position: 2 })]
       mockFetchDealStages.mockResolvedValueOnce({ stages: mockStages })
 
       const { result } = renderUseDealActions()
@@ -287,10 +291,13 @@ describe('useDealActions', () => {
         totalDeals: 100,
         totalValue: 5000000,
         avgDealSize: 50000,
+        wonDeals: 75,
+        wonValue: 3750000,
+        lostDeals: 25,
         conversionRate: 0.25,
-        avgDaysInPipeline: 30,
-        byStage: {},
-        byMonth: []
+        avgDaysToClose: 30,
+        byStage: [],
+        byPriority: []
       }
       mockFetchDealStats.mockResolvedValueOnce(mockStats)
 
@@ -324,7 +331,7 @@ describe('useDealActions', () => {
 
   describe('handleCreateDeal', () => {
     it('should create deal successfully', async () => {
-      const newDeal = createMockDeal({ amountRequested: 50000 })
+      const newDeal = createMockDeal({ amount_requested: 50000 })
       mockCreateDeal.mockResolvedValueOnce(newDeal)
 
       const onDealCreated = vi.fn()
@@ -367,7 +374,7 @@ describe('useDealActions', () => {
 
   describe('handleUpdateDeal', () => {
     it('should update deal successfully', async () => {
-      const updatedDeal = createMockDeal({ amountApproved: 45000 })
+      const updatedDeal = createMockDeal({ amount_approved: 45000 })
       mockUpdateDeal.mockResolvedValueOnce(updatedDeal)
 
       const onDealUpdated = vi.fn()
@@ -407,7 +414,7 @@ describe('useDealActions', () => {
 
   describe('handleMoveToStage', () => {
     it('should move deal to stage successfully', async () => {
-      const movedDeal = createMockDeal({ stageId: 'contacted' })
+      const movedDeal = createMockDeal({ stage_id: 'contacted' })
       mockMoveDealToStage.mockResolvedValueOnce(movedDeal)
 
       const onStageMoved = vi.fn()
@@ -458,14 +465,14 @@ describe('useDealActions', () => {
         response = await result.current.handleUploadDocument('deal-1', {
           document_type: 'application',
           file_name: 'application.pdf',
-          file_content: 'base64content'
+          file_path: 'base64content'
         })
       })
 
       expect(mockUploadDealDocument).toHaveBeenCalledWith('deal-1', {
         document_type: 'application',
         file_name: 'application.pdf',
-        file_content: 'base64content'
+        file_path: 'base64content'
       })
       expect(response).toEqual(uploadedDoc)
       expect(toast.success).toHaveBeenCalledWith('Document uploaded', {
@@ -484,7 +491,7 @@ describe('useDealActions', () => {
         response = await result.current.handleUploadDocument('deal-1', {
           document_type: 'application',
           file_name: 'test.pdf',
-          file_content: 'content'
+          file_path: 'content'
         })
       })
 
@@ -531,8 +538,13 @@ describe('useDealActions', () => {
   describe('handleFetchDocumentChecklist', () => {
     it('should fetch document checklist successfully', async () => {
       const mockChecklist: DocumentChecklist[] = [
-        { documentType: 'application', required: true, uploaded: true, verified: false },
-        { documentType: 'bank_statement', required: true, uploaded: false, verified: false }
+        { document_type: 'application', is_required: true, is_uploaded: true, is_verified: false },
+        {
+          document_type: 'bank_statement',
+          is_required: true,
+          is_uploaded: false,
+          is_verified: false
+        }
       ]
       mockFetchDocumentChecklist.mockResolvedValueOnce({ checklist: mockChecklist })
 
@@ -566,7 +578,7 @@ describe('useDealActions', () => {
 
   describe('handleVerifyDocument', () => {
     it('should verify document successfully', async () => {
-      const verifiedDoc = createMockDocument({ verifiedBy: 'user-1', verifiedAt: '2024-01-20' })
+      const verifiedDoc = createMockDocument({ verified_by: 'user-1', verified_at: '2024-01-20' })
       mockVerifyDealDocument.mockResolvedValueOnce(verifiedDoc)
 
       const { result } = renderUseDealActions()
@@ -684,7 +696,7 @@ describe('useDealActions', () => {
       expect(result.current.isLoading).toBe(true)
 
       await act(async () => {
-        resolvePromise!({ deals: [] })
+        resolvePromise!({ deals: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } })
       })
 
       expect(result.current.isLoading).toBe(false)
@@ -715,7 +727,10 @@ describe('useDealActions', () => {
 
       expect(result.current.error).not.toBeNull()
 
-      mockFetchDeals.mockResolvedValueOnce({ deals: [] })
+      mockFetchDeals.mockResolvedValueOnce({
+        deals: [],
+        pagination: { page: 1, limit: 20, total: 0, totalPages: 0 }
+      })
 
       await act(async () => {
         await result.current.handleFetchDeals()

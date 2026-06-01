@@ -236,7 +236,9 @@ describe('EmailComposer', () => {
       score: 92,
       sentimentTrend: 'improving',
       reviewCount: 15,
-      violationCount: 0
+      violationCount: 0,
+      avgSentiment: 0.85,
+      lastUpdated: '2026-01-15T00:00:00Z'
     },
     timeSinceDefault: 730,
     defaultDate: '2022-01-15',
@@ -246,6 +248,7 @@ describe('EmailComposer', () => {
         id: 's1',
         type: 'hiring',
         description: 'Hiring new staff',
+        score: 75,
         confidence: 0.9,
         detectedDate: '2024-01-01'
       }

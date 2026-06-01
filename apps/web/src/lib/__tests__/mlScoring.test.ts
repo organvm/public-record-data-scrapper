@@ -24,24 +24,35 @@ describe('mlScoring', () => {
       grade: 'B',
       score: 75,
       sentimentTrend: 'stable',
+      reviewCount: 15,
+      avgSentiment: 0.85,
       violationCount: 0,
       lastUpdated: '2024-01-15'
     },
     status: 'new',
-    filingDate: '2024-01-01',
-    filingType: 'UCC-1',
-    securedParty: 'Test Bank',
-    collateralDescription: 'Equipment',
-    signals: [],
     uccFilings: [createMockUCCFiling()],
     growthSignals: [
-      { type: 'expansion', description: 'New office', confidence: 85, score: 80 },
-      { type: 'hiring', description: 'Hiring 10 people', confidence: 75, score: 70 }
+      {
+        id: 'sig-1',
+        type: 'expansion',
+        description: 'New office',
+        detectedDate: '2026-01-15',
+        confidence: 85,
+        score: 80
+      },
+      {
+        id: 'sig-2',
+        type: 'hiring',
+        description: 'Hiring 10 people',
+        detectedDate: '2026-01-15',
+        confidence: 75,
+        score: 70
+      }
     ],
     narrative: 'Test narrative',
     defaultDate: '2024-01-01',
     timeSinceDefault: 365, // 1 year
-    estimatedRevenue: '$1M-$5M',
+    estimatedRevenue: 5000000,
     ...overrides
   })
 
@@ -61,6 +72,8 @@ describe('mlScoring', () => {
             grade: 'A',
             score: 95,
             sentimentTrend: 'improving',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 0,
             lastUpdated: '2024-01-15'
           }
@@ -70,6 +83,8 @@ describe('mlScoring', () => {
             grade: 'F',
             score: 20,
             sentimentTrend: 'declining',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 5,
             lastUpdated: '2024-01-15'
           }
@@ -84,8 +99,22 @@ describe('mlScoring', () => {
       it('should return higher confidence for prospects with high-value signals', () => {
         const highValueProspect = createMockProspect({
           growthSignals: [
-            { type: 'contract', description: 'Major contract', confidence: 90, score: 95 },
-            { type: 'expansion', description: 'Market expansion', confidence: 85, score: 90 }
+            {
+              id: 'sig-3',
+              type: 'contract',
+              description: 'Major contract',
+              detectedDate: '2026-01-15',
+              confidence: 90,
+              score: 95
+            },
+            {
+              id: 'sig-4',
+              type: 'expansion',
+              description: 'Market expansion',
+              detectedDate: '2026-01-15',
+              confidence: 85,
+              score: 90
+            }
           ]
         })
         const lowValueProspect = createMockProspect({
@@ -114,11 +143,20 @@ describe('mlScoring', () => {
             grade: 'A',
             score: 100,
             sentimentTrend: 'improving',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 0,
             lastUpdated: '2024-01-15'
           },
           growthSignals: [
-            { type: 'contract', description: 'Major contract', confidence: 100, score: 100 }
+            {
+              id: 'sig-5',
+              type: 'contract',
+              description: 'Major contract',
+              detectedDate: '2026-01-15',
+              confidence: 100,
+              score: 100
+            }
           ],
           timeSinceDefault: 730, // 2 years - optimal range
           uccFilings: [createMockUCCFiling({ status: 'terminated' })]
@@ -180,6 +218,8 @@ describe('mlScoring', () => {
             grade: 'B',
             score: 75,
             sentimentTrend: 'improving',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 0,
             lastUpdated: '2024-01-15'
           }
@@ -189,6 +229,8 @@ describe('mlScoring', () => {
             grade: 'B',
             score: 75,
             sentimentTrend: 'stable',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 0,
             lastUpdated: '2024-01-15'
           }
@@ -208,6 +250,8 @@ describe('mlScoring', () => {
             grade: 'B',
             score: 75,
             sentimentTrend: 'declining',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 0,
             lastUpdated: '2024-01-15'
           }
@@ -217,6 +261,8 @@ describe('mlScoring', () => {
             grade: 'B',
             score: 75,
             sentimentTrend: 'stable',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 0,
             lastUpdated: '2024-01-15'
           }
@@ -234,6 +280,8 @@ describe('mlScoring', () => {
             grade: 'B',
             score: 75,
             sentimentTrend: 'stable',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 0,
             lastUpdated: '2024-01-15'
           }
@@ -243,6 +291,8 @@ describe('mlScoring', () => {
             grade: 'B',
             score: 75,
             sentimentTrend: 'stable',
+            reviewCount: 15,
+            avgSentiment: 0.85,
             violationCount: 5,
             lastUpdated: '2024-01-15'
           }
@@ -266,6 +316,8 @@ describe('mlScoring', () => {
               grade,
               score: 50,
               sentimentTrend: 'stable',
+              reviewCount: 15,
+              avgSentiment: 0.85,
               violationCount: 0,
               lastUpdated: '2024-01-15'
             }
@@ -292,8 +344,22 @@ describe('mlScoring', () => {
       it('should calculate average confidence and score', () => {
         const prospect = createMockProspect({
           growthSignals: [
-            { type: 'hiring', description: 'Test', confidence: 80, score: 80 },
-            { type: 'hiring', description: 'Test', confidence: 60, score: 60 }
+            {
+              id: 'sig-6',
+              type: 'hiring',
+              description: 'Test',
+              detectedDate: '2026-01-15',
+              confidence: 80,
+              score: 80
+            },
+            {
+              id: 'sig-7',
+              type: 'hiring',
+              description: 'Test',
+              detectedDate: '2026-01-15',
+              confidence: 60,
+              score: 60
+            }
           ]
         })
         const result = calculateMLScoring(prospect)
@@ -304,10 +370,28 @@ describe('mlScoring', () => {
 
       it('should boost score for high-value signal types', () => {
         const contractProspect = createMockProspect({
-          growthSignals: [{ type: 'contract', description: 'Contract', confidence: 70, score: 70 }]
+          growthSignals: [
+            {
+              id: 'sig-8',
+              type: 'contract',
+              description: 'Contract',
+              detectedDate: '2026-01-15',
+              confidence: 70,
+              score: 70
+            }
+          ]
         })
         const hiringProspect = createMockProspect({
-          growthSignals: [{ type: 'hiring', description: 'Hiring', confidence: 70, score: 70 }]
+          growthSignals: [
+            {
+              id: 'sig-9',
+              type: 'hiring',
+              description: 'Hiring',
+              detectedDate: '2026-01-15',
+              confidence: 70,
+              score: 70
+            }
+          ]
         })
 
         const contractResult = calculateMLScoring(contractProspect)

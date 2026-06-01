@@ -205,7 +205,9 @@ export class StateAgent extends BaseAgent implements Agent {
     const improvements: ImprovementSuggestion[] = []
 
     // Analyze filings from this state
-    const stateProspects = context.prospects.filter((p) => p.state === this.stateConfig.stateCode)
+    const stateProspects = (
+      context.prospects as Array<{ state?: string; priorityScore: number }>
+    ).filter((p) => p.state === this.stateConfig.stateCode)
 
     if (stateProspects.length > 0) {
       const avgPriorityScore =

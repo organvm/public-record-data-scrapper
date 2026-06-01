@@ -190,7 +190,9 @@ describe('ProspectDetailDialog', () => {
       score: 92,
       sentimentTrend: 'improving',
       reviewCount: 25,
-      violationCount: 0
+      violationCount: 0,
+      avgSentiment: 0.85,
+      lastUpdated: '2026-01-15T00:00:00Z'
     },
     timeSinceDefault: 730,
     defaultDate: '2022-01-15',
@@ -202,6 +204,7 @@ describe('ProspectDetailDialog', () => {
         id: 's1',
         type: 'hiring',
         description: 'Hiring new staff',
+        score: 75,
         confidence: 0.9,
         detectedDate: '2024-01-01'
       }
@@ -209,8 +212,8 @@ describe('ProspectDetailDialog', () => {
     uccFilings: [
       {
         id: 'ucc-1',
-        filingNumber: 'UCC-123',
         filingDate: '2023-06-15',
+        debtorName: 'Test Company LLC',
         filingType: 'UCC-1',
         securedParty: 'Bank of America',
         state: 'CA',
@@ -223,9 +226,11 @@ describe('ProspectDetailDialog', () => {
       recoveryLikelihood: 75,
       modelVersion: '2.1',
       factors: {
-        financialHealth: 85,
-        marketConditions: 72,
-        historicalPerformance: 90
+        healthTrend: 85,
+        signalQuality: 72,
+        industryRisk: 40,
+        timeToRecovery: 55,
+        financialStability: 90
       },
       lastUpdated: '2024-01-15T10:00:00Z'
     }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Tests for Growth Signal Data Sources
  *
@@ -88,8 +89,8 @@ describe('USASpendingSource', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.totalContracts).toBeGreaterThanOrEqual(0)
-    expect(result.data?.totalAmount).toBeGreaterThanOrEqual(0)
+    expect((result.data as any)?.totalContracts).toBeGreaterThanOrEqual(0)
+    expect((result.data as any)?.totalAmount).toBeGreaterThanOrEqual(0)
   })
 
   it('should calculate growth trends', async () => {
@@ -117,7 +118,7 @@ describe('USASpendingSource', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.growthTrend).toBeDefined()
+    expect((result.data as any)?.growthTrend).toBeDefined()
   })
 })
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unit tests for OptimizerAgent
  * Tests performance analysis, optimization opportunities, and improvement suggestions
@@ -47,7 +48,7 @@ describe('OptimizerAgent', () => {
       const perfFinding = result.findings.find((f) => f.description.includes('Performance issues'))
       expect(perfFinding).toBeDefined()
       expect(perfFinding?.severity).toBe('warning')
-      expect(perfFinding?.evidence.avgResponseTime).toBe(1500)
+      expect((perfFinding?.evidence as Record<string, any>).avgResponseTime).toBe(1500)
     })
 
     it('should mark critical performance issues', async () => {
@@ -66,7 +67,7 @@ describe('OptimizerAgent', () => {
 
       const perfFinding = result.findings.find((f) => f.description.includes('Performance issues'))
       expect(perfFinding).toBeDefined()
-      expect(perfFinding?.evidence.errorRate).toBe(0.07)
+      expect((perfFinding?.evidence as Record<string, any>).errorRate).toBe(0.07)
     })
 
     it('should mark critical error rates', async () => {
@@ -96,7 +97,7 @@ describe('OptimizerAgent', () => {
       const paginationFinding = result.findings.find((f) => f.description.includes('Large dataset'))
       expect(paginationFinding).toBeDefined()
       expect(paginationFinding?.severity).toBe('warning')
-      expect(paginationFinding?.evidence.count).toBe(600)
+      expect((paginationFinding?.evidence as Record<string, any>).count).toBe(600)
     })
 
     it('should not flag small datasets', async () => {
@@ -120,7 +121,7 @@ describe('OptimizerAgent', () => {
       const filterFinding = result.findings.find((f) => f.description.includes('filter operations'))
       expect(filterFinding).toBeDefined()
       expect(filterFinding?.severity).toBe('info')
-      expect(filterFinding?.evidence.filterOperations).toBe(150)
+      expect((filterFinding?.evidence as Record<string, any>).filterOperations).toBe(150)
     })
 
     it('should not flag low filter operations', async () => {

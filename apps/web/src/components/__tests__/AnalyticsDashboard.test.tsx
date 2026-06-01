@@ -175,7 +175,9 @@ describe('AnalyticsDashboard', () => {
         score: 92,
         sentimentTrend: 'improving',
         reviewCount: 10,
-        violationCount: 0
+        violationCount: 0,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       },
       timeSinceDefault: 730,
       defaultDate: '2022-01-15',
@@ -185,6 +187,7 @@ describe('AnalyticsDashboard', () => {
           id: 's1',
           type: 'hiring',
           description: 'Hiring',
+          score: 75,
           confidence: 0.9,
           detectedDate: recentDate
         }
@@ -194,7 +197,13 @@ describe('AnalyticsDashboard', () => {
         confidence: 88,
         recoveryLikelihood: 75,
         modelVersion: '1.0',
-        factors: {},
+        factors: {
+          healthTrend: 0.5,
+          signalQuality: 0.7,
+          industryRisk: 0.3,
+          timeToRecovery: 0.6,
+          financialStability: 0.8
+        },
         lastUpdated: '2024-01-15'
       }
     },
@@ -210,7 +219,9 @@ describe('AnalyticsDashboard', () => {
         score: 78,
         sentimentTrend: 'stable',
         reviewCount: 8,
-        violationCount: 1
+        violationCount: 1,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       },
       timeSinceDefault: 365,
       defaultDate: '2023-01-15',
@@ -220,6 +231,7 @@ describe('AnalyticsDashboard', () => {
           id: 's2',
           type: 'expansion',
           description: 'Expanding',
+          score: 75,
           confidence: 0.8,
           detectedDate: recentDate
         }
@@ -229,7 +241,13 @@ describe('AnalyticsDashboard', () => {
         confidence: 75,
         recoveryLikelihood: 68,
         modelVersion: '1.0',
-        factors: {},
+        factors: {
+          healthTrend: 0.5,
+          signalQuality: 0.7,
+          industryRisk: 0.3,
+          timeToRecovery: 0.6,
+          financialStability: 0.8
+        },
         lastUpdated: '2024-01-10'
       }
     },
@@ -245,7 +263,9 @@ describe('AnalyticsDashboard', () => {
         score: 55,
         sentimentTrend: 'declining',
         reviewCount: 5,
-        violationCount: 2
+        violationCount: 2,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       },
       timeSinceDefault: 1095,
       defaultDate: '2021-01-15',

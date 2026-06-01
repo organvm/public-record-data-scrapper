@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * OptimizerAgent Tests
  *
@@ -86,8 +87,8 @@ describe('OptimizerAgent', () => {
         f.description.includes('Performance issues')
       )
 
-      expect(perfFinding?.evidence.avgResponseTime).toBe(1500)
-      expect(perfFinding?.evidence.errorRate).toBe(0.06)
+      expect((perfFinding?.evidence as Record<string, any>).avgResponseTime).toBe(1500)
+      expect((perfFinding?.evidence as Record<string, any>).errorRate).toBe(0.06)
     })
   })
 
@@ -132,7 +133,7 @@ describe('OptimizerAgent', () => {
         f.description.includes('filter operations')
       )
       expect(filterFinding).toBeDefined()
-      expect(filterFinding?.evidence.suggestion).toBe('memoization')
+      expect((filterFinding?.evidence as Record<string, any>).suggestion).toBe('memoization')
     })
 
     it('should not flag normal filter operations', async () => {

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { CompetitorChart } from '../CompetitorChart'
-import type { CompetitorData } from '@public-records/core'
+import type { CompetitorData, IndustryType } from '@public-records/core'
 
 // Mock UI components
 vi.mock('@public-records/ui/card', () => ({
@@ -244,14 +244,14 @@ describe('CompetitorChart', () => {
   describe('data slicing', () => {
     it('shows only top 10 competitors in chart', () => {
       // Create more than 10 competitors
-      const manyCompetitors = Array.from({ length: 15 }, (_, i) => ({
+      const manyCompetitors: CompetitorData[] = Array.from({ length: 15 }, (_, i) => ({
         lenderName: `Lender ${i + 1}`,
         filingCount: 1000 - i * 50,
         avgDealSize: 200000,
         marketShare: 10 - i * 0.5,
         monthlyTrend: i % 2 === 0 ? 2 : -1,
         topState: 'CA',
-        industries: ['construction']
+        industries: ['construction'] as IndustryType[]
       }))
 
       render(<CompetitorChart data={manyCompetitors} />)

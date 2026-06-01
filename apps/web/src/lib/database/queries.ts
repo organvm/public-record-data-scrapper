@@ -5,46 +5,45 @@
  */
 
 import { DatabaseClient } from './client'
-import { UCCFiling, Prospect, GrowthSignal, HealthScore } from '@public-records/core'
-
+import { UCCFiling, Prospect, GrowthSignal } from '@public-records/core'
 
 // Database Row Types
 export interface ProspectRow {
-  id: string;
-  company_name: string;
-  industry: string;
-  state: string;
-  status: string;
-  priority_score: number;
-  health_score?: any;
-  default_date: Date;
-  time_since_default: number;
-  last_filing_date?: Date;
-  estimated_revenue?: number;
-  claimed_by?: string;
-  claimed_date?: Date;
-  ml_scoring?: any;
+  id: string
+  company_name: string
+  industry: string
+  state: string
+  status: string
+  priority_score: number
+  health_score?: unknown
+  default_date: Date
+  time_since_default: number
+  last_filing_date?: Date
+  estimated_revenue?: number
+  claimed_by?: string
+  claimed_date?: Date
+  ml_scoring?: unknown
 }
 
 export interface UCCFilingRow {
-  id: string;
-  filing_date: Date;
-  debtor_name: string;
-  secured_party: string;
-  state: string;
-  lien_amount?: number;
-  status: string;
-  filing_type?: string;
+  id: string
+  filing_date: Date
+  debtor_name: string
+  secured_party: string
+  state: string
+  lien_amount?: number
+  status: string
+  filing_type?: string
 }
 
 export interface GrowthSignalRow {
-  id: string;
-  prospect_id: string;
-  type: string;
-  description: string;
-  detected_date: Date;
-  source_url?: string;
-  confidence: number;
+  id: string
+  prospect_id: string
+  type: string
+  description: string
+  detected_date: Date
+  source_url?: string
+  confidence: number
 }
 
 export interface CompetitorRow {
@@ -74,7 +73,18 @@ export class QueryBuilder {
   /**
    * Create UCC filing
    */
-  async createUCCFiling(filing: Partial<UCCFiling>): Promise<UCCFiling> {
+  async createUCCFiling(
+    filing: Partial<UCCFiling> &
+      Partial<{
+        fileNumber: string
+        debtorAddress: string
+        securedPartyAddress: string
+        collateral: string
+        amount: number
+        lapseDate: string
+        source: string
+      }>
+  ): Promise<UCCFiling> {
     const query = `
       INSERT INTO ucc_filings (
         file_number, filing_date, debtor_name, debtor_address,
@@ -165,18 +175,155 @@ export class QueryBuilder {
       prospect.status || 'new',
       prospect.priorityScore || 0,
       prospect.healthScore?.grade || 'C',
-      prospect.healthScore?.overall || 50,
+      prospect.healthScore?.score || 50,
       prospect.defaultDate,
       prospect.timeSinceDefault,
       prospect.estimatedRevenue,
       null, // assigned_to
       prospect.narrative,
-      prospect.tags || [],
+      ((prospect as Record<string, unknown>).tags as string[]) || [],
       JSON.stringify({})
     ]
 
     const result = await this.client.query<Prospect>(query, values)
     return result.rows[0]
+  }
+
+  /**
+   * Get prospects with optional filters
+   */
+  async getProspects(options?: {
+    status?: string
+    industry?: string
+    state?: string
+    minScore?: number
+    limit?: number
+    offset?: number
+  }): Promise<ProspectRow[]> {
+    const conditions: string[] = ['1=1']
+    const values: unknown[] = []
+    let paramIndex = 1
+
+    if (options?.status) {
+      conditions.push(`p.status = $${paramIndex++}`)
+      values.push(options.status)
+    }
+    if (options?.state) {
+      conditions.push(`c.state = $${paramIndex++}`)
+      values.push(options.state)
+    }
+    if (options?.industry) {
+      conditions.push(`c.industry = $${paramIndex++}`)
+      values.push(options.industry)
+    }
+    if (options?.minScore !== undefined) {
+      conditions.push(`p.priority_score >= $${paramIndex++}`)
+      values.push(options.minScore)
+    }
+
+    const limit = options?.limit || 100
+    const offset = options?.offset || 0
+
+    const query = `
+      SELECT p.*, c.name as company_name, c.industry, c.state
+      FROM prospects p
+      JOIN companies c ON p.company_id = c.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY p.priority_score DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `
+    values.push(limit, offset)
+
+    const result = await this.client.query<ProspectRow>(query, values)
+    return result.rows
+  }
+
+  /**
+   * Get prospect by ID
+   */
+  async getProspectById(id: string): Promise<ProspectRow | null> {
+    const query = `
+      SELECT p.*, c.name as company_name, c.industry, c.state
+      FROM prospects p
+      JOIN companies c ON p.company_id = c.id
+      WHERE p.id = $1
+    `
+    const result = await this.client.query<ProspectRow>(query, [id])
+    return result.rows[0] || null
+  }
+
+  /**
+   * Get UCC filings by prospect ID
+   */
+  async getUCCFilingsByProspect(prospectId: string): Promise<UCCFilingRow[]> {
+    const query = `
+      SELECT * FROM ucc_filings
+      WHERE prospect_id = $1
+      ORDER BY filing_date DESC
+    `
+    const result = await this.client.query<UCCFilingRow>(query, [prospectId])
+    return result.rows
+  }
+
+  /**
+   * Get growth signals by prospect ID (alias)
+   */
+  async getGrowthSignalsByProspect(prospectId: string): Promise<GrowthSignalRow[]> {
+    return this.getGrowthSignalsForProspect(prospectId) as unknown as GrowthSignalRow[]
+  }
+
+  /**
+   * Search prospects by company name
+   */
+  async searchProspects(query: string, limit?: number): Promise<ProspectRow[]> {
+    const sql = `
+      SELECT p.*, c.name as company_name, c.industry, c.state
+      FROM prospects p
+      JOIN companies c ON p.company_id = c.id
+      WHERE c.name ILIKE $1
+      ORDER BY p.priority_score DESC
+      LIMIT $2
+    `
+    const result = await this.client.query<ProspectRow>(sql, [`%${query}%`, limit || 50])
+    return result.rows
+  }
+
+  /**
+   * Update prospect fields
+   */
+  async updateProspect(id: string, updates: Record<string, unknown>): Promise<ProspectRow | null> {
+    const sets: string[] = []
+    const values: unknown[] = [id]
+    const allowedColumns = new Set([
+      'status',
+      'priority_score',
+      'claimed_by',
+      'claimed_date',
+      'health_score',
+      'health_grade',
+      'narrative',
+      'estimated_opportunity',
+      'assigned_to'
+    ])
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (allowedColumns.has(key)) {
+        const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase()
+        values.push(value)
+        sets.push(`${snakeKey} = $${values.length}`)
+      }
+    }
+
+    if (sets.length === 0) return null
+
+    const query = `
+      UPDATE prospects
+      SET ${sets.join(', ')}
+      WHERE id = $1
+      RETURNING *
+    `
+    const result = await this.client.query<ProspectRow>(query, values)
+    return result.rows[0] || null
   }
 
   /**
@@ -296,7 +443,18 @@ export class QueryBuilder {
   /**
    * Create health metric
    */
-  async createHealthMetric(companyId: string, healthScore: HealthScore): Promise<void> {
+  async createHealthMetric(
+    companyId: string,
+    healthScore: {
+      overall: number
+      factors: {
+        paymentHistory: number
+        onlineReputation: number
+        legalCompliance: number
+        financialStability: number
+      }
+    }
+  ): Promise<void> {
     const query = `
       INSERT INTO health_metrics (
         company_id, metric_date, overall_score,
@@ -321,7 +479,7 @@ export class QueryBuilder {
   /**
    * Get latest health metric for company
    */
-  async getLatestHealthMetric(companyId: string): Promise<HealthScore | null> {
+  async getLatestHealthMetric(companyId: string): Promise<Record<string, unknown> | null> {
     const query = `
       SELECT * FROM health_metrics
       WHERE company_id = $1

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unit tests for SecurityAgent
  * Tests security vulnerability detection, data protection, and compliance checking
@@ -50,8 +51,8 @@ describe('SecurityAgent', () => {
       const financialFinding = result.findings.find((f) => f.description.includes('financial data'))
       expect(financialFinding).toBeDefined()
       expect(financialFinding?.severity).toBe('warning')
-      expect(financialFinding?.evidence.count).toBe(2)
-      expect(financialFinding?.evidence.dataTypes).toContain('revenue')
+      expect((financialFinding?.evidence as Record<string, any>).count).toBe(2)
+      expect((financialFinding?.evidence as Record<string, any>).dataTypes).toContain('revenue')
     })
 
     it('should detect prospects with lien amounts', async () => {
@@ -67,7 +68,7 @@ describe('SecurityAgent', () => {
 
       const financialFinding = result.findings.find((f) => f.description.includes('financial data'))
       expect(financialFinding).toBeDefined()
-      expect(financialFinding?.evidence.dataTypes).toContain('lienAmount')
+      expect((financialFinding?.evidence as Record<string, any>).dataTypes).toContain('lienAmount')
     })
 
     it('should not flag prospects without financial data', async () => {
@@ -95,8 +96,8 @@ describe('SecurityAgent', () => {
       const exportFinding = result.findings.find((f) => f.description.includes('export operations'))
       expect(exportFinding).toBeDefined()
       expect(exportFinding?.severity).toBe('warning')
-      expect(exportFinding?.evidence.exportCount).toBe(60)
-      expect(exportFinding?.evidence.threshold).toBe(50)
+      expect((exportFinding?.evidence as Record<string, any>).exportCount).toBe(60)
+      expect((exportFinding?.evidence as Record<string, any>).threshold).toBe(50)
     })
 
     it('should not flag normal export activity', async () => {
@@ -269,7 +270,7 @@ describe('SecurityAgent', () => {
       const result = await agent.analyze(mockContext)
 
       const financialFinding = result.findings.find((f) => f.description.includes('financial data'))
-      expect(financialFinding?.evidence.count).toBe(2)
+      expect((financialFinding?.evidence as Record<string, any>).count).toBe(2)
     })
 
     it('should handle prospects with empty UCC filings array', async () => {

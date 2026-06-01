@@ -3,6 +3,7 @@ import type {
   Prospect,
   CompanyGraph,
   CompetitorData,
+  IndustryType,
   GrowthSignal,
   IndustryTrend,
   PersonalizedRecommendation,
@@ -123,6 +124,7 @@ export function usePersonalizedRecommendations(
 
   useEffect(() => {
     if (prospects.length > 0 && userProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void generateRecommendations()
     }
   }, [prospects, userProfile, generateRecommendations])
@@ -254,7 +256,7 @@ export function useSignalChains(prospects: Prospect[]) {
  */
 export function useGenerativeReports(
   prospects: Prospect[],
-  competitorData?: unknown[],
+  competitorData?: CompetitorData[],
   relationshipGraphs?: Map<string, CompanyGraph>
 ) {
   const [reports, setReports] = useState<GenerativeReport[]>([])
@@ -266,7 +268,7 @@ export function useGenerativeReports(
       type: 'portfolio' | 'market' | 'prospect' | 'competitive',
       options: {
         prospectId?: string
-        industry?: unknown
+        industry?: string
         userId?: string
       } = {}
     ) => {
@@ -292,7 +294,10 @@ export function useGenerativeReports(
             )
             break
           case 'market':
-            report = await builder.generateMarketReport(options.industry, options.userId)
+            report = await builder.generateMarketReport(
+              options.industry as IndustryType | undefined,
+              options.userId
+            )
             break
           case 'prospect':
             if (!options.prospectId) throw new Error('Prospect ID required')

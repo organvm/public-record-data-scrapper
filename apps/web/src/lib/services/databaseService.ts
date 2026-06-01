@@ -9,6 +9,7 @@ import type {
   Prospect,
   GrowthSignal,
   HealthScore,
+  MLScoring,
   CompetitorData,
   PortfolioCompany,
   SignalType,
@@ -27,7 +28,9 @@ import type {
  */
 export async function initDatabaseService(): Promise<void> {
   try {
-    await initDatabase()
+    await initDatabase({
+      connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/public_records'
+    })
     console.log('✅ Database service initialized')
   } catch (error) {
     console.error('❌ Failed to initialize database service:', error)
@@ -55,7 +58,7 @@ function mapProspectRowToProspect(
   }))
 
   // Calculate health score from metadata or use default
-  const healthScore: HealthScore = row.health_score || {
+  const healthScore: HealthScore = (row.health_score as HealthScore) || {
     grade: 'B',
     score: row.priority_score,
     sentimentTrend: 'stable',
@@ -74,7 +77,7 @@ function mapProspectRowToProspect(
     state: f.state,
     lienAmount: f.lien_amount,
     status: f.status as 'active' | 'terminated' | 'lapsed',
-    filingType: f.filing_type
+    filingType: f.filing_type as 'UCC-1' | 'UCC-3'
   }))
 
   // Build narrative
@@ -110,7 +113,7 @@ function mapProspectRowToProspect(
     estimatedRevenue: row.estimated_revenue,
     claimedBy: row.claimed_by || undefined,
     claimedDate: row.claimed_date?.toISOString().split('T')[0],
-    mlScoring: row.ml_scoring || undefined
+    mlScoring: (row.ml_scoring as MLScoring) || undefined
   }
 }
 

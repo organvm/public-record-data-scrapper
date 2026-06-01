@@ -174,7 +174,7 @@ describe('apiRequest', () => {
       // Advance time past the timeout
       await vi.advanceTimersByTimeAsync(150)
 
-      const error = await promise
+      const error = (await promise) as Error
       expect(error).toBeInstanceOf(TimeoutError)
       expect(error.message).toContain('Request timed out')
 

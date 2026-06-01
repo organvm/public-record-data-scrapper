@@ -123,6 +123,7 @@ export function useDataFetching({
 
   useEffect(() => {
     const controller = new AbortController()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchData({ signal: controller.signal })
     return () => controller.abort()
   }, [fetchData])
@@ -135,10 +136,10 @@ export function useDataFetching({
     isLoading,
     loadError,
     lastDataRefresh: lastDataRefresh || new Date().toISOString(),
-    setProspects,
-    setCompetitors,
-    setPortfolio,
-    setUserActions,
+    setProspects: setProspects as UseDataFetchingResult['setProspects'],
+    setCompetitors: setCompetitors as UseDataFetchingResult['setCompetitors'],
+    setPortfolio: setPortfolio as UseDataFetchingResult['setPortfolio'],
+    setUserActions: setUserActions as UseDataFetchingResult['setUserActions'],
     fetchData
   }
 }

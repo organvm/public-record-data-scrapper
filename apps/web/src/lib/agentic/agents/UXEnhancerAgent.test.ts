@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * UXEnhancerAgent Tests
  *
@@ -74,7 +75,7 @@ describe('UXEnhancerAgent', () => {
       const searchFinding = analysis.findings.find((f) =>
         f.description.includes('search operations')
       )
-      expect(searchFinding?.evidence.suggestion).toBe('improve-filtering')
+      expect((searchFinding?.evidence as Record<string, any>).suggestion).toBe('improve-filtering')
     })
 
     it('should not flag normal search frequency', async () => {
@@ -106,7 +107,7 @@ describe('UXEnhancerAgent', () => {
       const searchFinding = analysis.findings.find((f) =>
         f.description.includes('search operations')
       )
-      expect(searchFinding?.evidence.count).toBe(150)
+      expect((searchFinding?.evidence as Record<string, any>).count).toBe(150)
     })
   })
 
@@ -148,7 +149,7 @@ describe('UXEnhancerAgent', () => {
       const satisfactionFinding = analysis.findings.find((f) =>
         f.description.includes('satisfaction score')
       )
-      expect(satisfactionFinding?.evidence.threshold).toBe(7)
+      expect((satisfactionFinding?.evidence as Record<string, any>).threshold).toBe(7)
     })
   })
 

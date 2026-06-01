@@ -369,7 +369,11 @@ export function AnalyticsDashboard({
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                label={
+                  ((entry: { name: string; percent?: number }) =>
+                    `${entry.name} ${((entry.percent ?? 0) * 100).toFixed(0)}%`) as any
+                }
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"

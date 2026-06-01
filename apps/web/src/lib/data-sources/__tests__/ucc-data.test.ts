@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Tests for UCC Data Sources
  */
@@ -50,9 +51,9 @@ describe('CaliforniaUCCSource', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.available).toBe(true)
-    expect(result.data?.state).toBe('CA')
-    expect(result.data?.totalFilings).toBe(1)
+    expect((result.data as any)?.available).toBe(true)
+    expect((result.data as any)?.state).toBe('CA')
+    expect((result.data as any)?.totalFilings).toBe(1)
   })
 
   it('should provide fallback manual search URL when API unavailable', async () => {
@@ -66,8 +67,8 @@ describe('CaliforniaUCCSource', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.available).toBe(false)
-    expect(result.data?.manualSearchUrl).toContain('businesssearch.sos.ca.gov')
+    expect((result.data as any)?.available).toBe(false)
+    expect((result.data as any)?.manualSearchUrl).toContain('businesssearch.sos.ca.gov')
   })
 
   it('should validate query parameters', async () => {
@@ -102,9 +103,9 @@ describe('State UCC Sources', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.available).toBe(false)
-    expect(result.data?.state).toBe('TX')
-    expect(result.data?.note).toContain('web scraping')
+    expect((result.data as any)?.available).toBe(false)
+    expect((result.data as any)?.state).toBe('TX')
+    expect((result.data as any)?.note).toContain('web scraping')
   })
 
   it('NewYorkUCCSource should recommend using scraper', async () => {
@@ -115,9 +116,9 @@ describe('State UCC Sources', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.available).toBe(false)
-    expect(result.data?.state).toBe('NY')
-    expect(result.data?.recommendation).toContain('NYUCCPortalScraper')
+    expect((result.data as any)?.available).toBe(false)
+    expect((result.data as any)?.state).toBe('NY')
+    expect((result.data as any)?.recommendation).toContain('NYUCCPortalScraper')
   })
 
   it('FloridaUCCSource should provide Sunbiz portal URL', async () => {
@@ -128,9 +129,9 @@ describe('State UCC Sources', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.available).toBe(false)
-    expect(result.data?.state).toBe('FL')
-    expect(result.data?.portalUrl).toContain('sunbiz')
+    expect((result.data as any)?.available).toBe(false)
+    expect((result.data as any)?.state).toBe('FL')
+    expect((result.data as any)?.portalUrl).toContain('sunbiz')
   })
 })
 
@@ -245,8 +246,8 @@ describe('UCCAggregatorSource', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.sourcesQueried).toBeGreaterThan(0)
-    expect(result.data?.totalFilings).toBeGreaterThanOrEqual(0)
+    expect((result.data as any)?.sourcesQueried).toBeGreaterThan(0)
+    expect((result.data as any)?.totalFilings).toBeGreaterThanOrEqual(0)
   })
 
   it('should deduplicate filings across sources', async () => {
@@ -258,9 +259,9 @@ describe('UCCAggregatorSource', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data).toHaveProperty('filings')
-    expect(result.data).toHaveProperty('sourcesQueried')
-    expect(result.data).toHaveProperty('sourcesSucceeded')
+    expect(result.data as any).toHaveProperty('filings')
+    expect(result.data as any).toHaveProperty('sourcesQueried')
+    expect(result.data as any).toHaveProperty('sourcesSucceeded')
   })
 
   it('should handle partial failures gracefully', async () => {
@@ -279,8 +280,8 @@ describe('UCCAggregatorSource', () => {
 
     expect(result.success).toBe(true)
     // Should still return data from successful sources
-    expect(result.data?.sourcesSucceeded).toBeGreaterThanOrEqual(0)
-    expect(result.data?.sourcesFailed).toBeGreaterThanOrEqual(0)
+    expect((result.data as any)?.sourcesSucceeded).toBeGreaterThanOrEqual(0)
+    expect((result.data as any)?.sourcesFailed).toBeGreaterThanOrEqual(0)
   })
 
   it('should sort filings by date (most recent first)', async () => {
@@ -303,8 +304,8 @@ describe('UCCAggregatorSource', () => {
     })
 
     expect(result.success).toBe(true)
-    if (result.data?.filings && result.data.filings.length > 1) {
-      const dates = result.data.filings.map((f: { filingDate: string }) =>
+    if ((result.data as any)?.filings && (result.data as any).filings.length > 1) {
+      const dates = (result.data as any).filings.map((f: { filingDate: string }) =>
         new Date(f.filingDate).getTime()
       )
       for (let i = 1; i < dates.length; i++) {
@@ -321,8 +322,8 @@ describe('UCCAggregatorSource', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.searchType).toBe('state')
-    expect(result.data?.state).toBe('CA')
+    expect((result.data as any)?.searchType).toBe('state')
+    expect((result.data as any)?.state).toBe('CA')
   })
 })
 

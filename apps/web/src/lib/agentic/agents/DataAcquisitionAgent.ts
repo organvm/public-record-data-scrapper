@@ -98,11 +98,11 @@ export class DataAcquisitionAgent extends BaseAgent {
     try {
       switch (type) {
         case 'fetch-data':
-          return await this.fetchData(payload as EnrichmentRequest)
+          return await this.fetchData(payload as unknown as EnrichmentRequest)
         case 'fetch-from-source':
           return await this.fetchFromSource(sourcePayload.source, sourcePayload.query)
         case 'check-source-status':
-          return this.checkSourceStatus(sourcePayload.source)
+          return this.checkSourceStatus(sourcePayload.source ?? '')
         default:
           return {
             success: false,

@@ -113,19 +113,26 @@ export class MigrationRunner {
   private async runMigration(migration: Migration): Promise<void> {
     logger.info(`Running migration: ${migration.name}`)
 
-    await this.client.transaction(async (client) => {
+    try {
+      await this.client.query('BEGIN')
+
       // Execute migration SQL
-      await client.query(migration.sql)
+      await this.client.query(migration.sql)
 
       // Record migration along with its checksum so future edits can be
       // detected.
-      await client.query(
+      await this.client.query(
         'INSERT INTO schema_migrations (id, name, checksum) VALUES ($1, $2, $3)',
         [migration.id, migration.name, migration.checksum ?? computeChecksum(migration.sql)]
       )
 
+      await this.client.query('COMMIT')
+
       logger.info(`Migration completed: ${migration.name}`)
-    })
+    } catch (error) {
+      await this.client.query('ROLLBACK')
+      throw error
+    }
   }
 
   /**

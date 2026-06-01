@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unit tests for UXEnhancerAgent
  * Tests user experience analysis, interaction patterns, and usability improvements
@@ -51,8 +52,8 @@ describe('UXEnhancerAgent', () => {
       const searchFinding = result.findings.find((f) => f.description.includes('search operations'))
       expect(searchFinding).toBeDefined()
       expect(searchFinding?.severity).toBe('info')
-      expect(searchFinding?.evidence.count).toBe(120)
-      expect(searchFinding?.evidence.suggestion).toBe('improve-filtering')
+      expect((searchFinding?.evidence as Record<string, any>).count).toBe(120)
+      expect((searchFinding?.evidence as Record<string, any>).suggestion).toBe('improve-filtering')
     })
 
     it('should not flag normal search activity', async () => {
@@ -92,8 +93,8 @@ describe('UXEnhancerAgent', () => {
       )
       expect(satisfactionFinding).toBeDefined()
       expect(satisfactionFinding?.severity).toBe('warning')
-      expect(satisfactionFinding?.evidence.score).toBe(6)
-      expect(satisfactionFinding?.evidence.threshold).toBe(7)
+      expect((satisfactionFinding?.evidence as Record<string, any>).score).toBe(6)
+      expect((satisfactionFinding?.evidence as Record<string, any>).threshold).toBe(7)
     })
 
     it('should not flag good satisfaction scores', async () => {

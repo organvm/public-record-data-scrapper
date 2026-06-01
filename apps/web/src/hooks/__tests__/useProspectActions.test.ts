@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useProspectActions } from '../useProspectActions'
@@ -33,22 +34,30 @@ vi.mock('@/lib/api/prospects', () => ({
 import { toast } from 'sonner'
 import { exportProspects } from '@/lib/exportUtils'
 
-const createMockProspect = (overrides: Partial<Prospect> = {}): Prospect => ({
-  id: 'test-id',
-  companyName: 'Test Company',
-  state: 'CA',
-  industry: 'Technology',
-  priorityScore: 85,
-  healthScore: 75,
-  signalCount: 3,
-  status: 'new' as const,
-  filingDate: '2024-01-01',
-  filingType: 'UCC-1',
-  securedParty: 'Test Bank',
-  collateralDescription: 'Equipment',
-  signals: [],
-  ...overrides
-})
+const createMockProspect = (overrides: Partial<Prospect> = {}): Prospect =>
+  ({
+    id: 'test-id',
+    companyName: 'Test Company',
+    state: 'CA',
+    industry: 'technology' as const,
+    priorityScore: 85,
+    healthScore: {
+      grade: 'B',
+      score: 75,
+      sentimentTrend: 'stable',
+      reviewCount: 15,
+      avgSentiment: 0.85,
+      violationCount: 0,
+      lastUpdated: '2024-01-15'
+    },
+    status: 'new' as const,
+    defaultDate: '2024-01-01',
+    timeSinceDefault: 365,
+    narrative: 'Test narrative',
+    uccFilings: [],
+    growthSignals: [],
+    ...overrides
+  }) as Prospect
 
 describe('useProspectActions', () => {
   let mockProspects: Prospect[]
@@ -75,8 +84,8 @@ describe('useProspectActions', () => {
       useProspectActions({
         useMockData: true,
         prospects: mockProspects,
-        setProspects: mockSetProspects,
-        trackAction: mockTrackAction,
+        setProspects: mockSetProspects as any,
+        trackAction: mockTrackAction as any,
         exportFormat: 'json',
         hasFilters: false,
         ...options

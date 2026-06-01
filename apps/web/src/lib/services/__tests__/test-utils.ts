@@ -22,26 +22,19 @@ import { EnrichmentSource } from '../DataEnrichmentService'
  */
 export const createMockUCCFiling = (overrides?: Partial<UCCFiling>): UCCFiling => ({
   id: `filing-${Date.now()}`,
-  fileNumber: 'CA-UCC-12345',
   filingDate: '2024-01-15',
   debtorName: 'Acme Corporation',
-  debtorAddress: '123 Main St, San Francisco, CA 94102',
   securedParty: 'Big Bank LLC',
-  securedPartyAddress: '456 Financial Plaza, New York, NY 10001',
-  collateral: 'All equipment, inventory, and accounts receivable',
   state: 'CA',
   status: 'active',
-  lapseDate: '2029-01-15',
-  amount: 500000,
+  filingType: 'UCC-1',
   ...overrides
 })
 
 export const createMockUCCFilings = (count: number): UCCFiling[] => {
   return Array.from({ length: count }, (_, i) =>
     createMockUCCFiling({
-      id: `filing-${i}`,
-      fileNumber: `CA-UCC-${10000 + i}`,
-      amount: 100000 + i * 50000
+      id: `filing-${i}`
     })
   )
 }
@@ -50,24 +43,25 @@ export const createMockUCCFilings = (count: number): UCCFiling[] => {
  * Mock Growth Signals
  */
 export const createMockGrowthSignal = (overrides?: Partial<GrowthSignal>): GrowthSignal => ({
+  id: `sig-${Date.now()}`,
   type: 'hiring' as SignalType,
   description: 'Posted 15 new job openings',
-  date: new Date().toISOString(),
-  source: 'Indeed',
+  detectedDate: new Date().toISOString(),
+  sourceUrl: 'https://example.com',
+  score: 75,
   confidence: 0.85,
-  impact: 'high',
   ...overrides
 })
 
 export const createMockGrowthSignals = (): GrowthSignal[] => [
   createMockGrowthSignal({ type: 'hiring', description: 'Posted 15 jobs', confidence: 0.85 }),
   createMockGrowthSignal({
-    type: 'permits',
+    type: 'permit',
     description: 'New construction permit for $2M',
     confidence: 0.9
   }),
   createMockGrowthSignal({
-    type: 'contracts',
+    type: 'contract',
     description: 'Won $500K federal contract',
     confidence: 0.95
   }),
@@ -87,20 +81,12 @@ export const createMockGrowthSignals = (): GrowthSignal[] => [
  * Mock Health Score
  */
 export const createMockHealthScore = (overrides?: Partial<HealthScore>): HealthScore => ({
-  overall: 75,
+  score: 75,
   grade: 'B' as HealthGrade,
-  factors: {
-    paymentHistory: 80,
-    onlineReputation: 70,
-    legalCompliance: 90,
-    financialStability: 60
-  },
-  trends: {
-    improving: true,
-    recentChanges: [
-      { factor: 'onlineReputation', from: 65, to: 70, date: new Date().toISOString() }
-    ]
-  },
+  sentimentTrend: 'stable',
+  reviewCount: 15,
+  avgSentiment: 0.85,
+  violationCount: 0,
   lastUpdated: new Date().toISOString(),
   ...overrides
 })

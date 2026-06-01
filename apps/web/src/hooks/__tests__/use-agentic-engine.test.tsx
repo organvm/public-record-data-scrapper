@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, waitFor, renderHook, act } from '@testing-library/react'
 import { useEffect, useMemo, useState } from 'react'
@@ -200,13 +200,19 @@ describe('useAgenticEngine', () => {
       const mockImprovements: Improvement[] = [
         {
           id: 'imp-1',
-          category: 'ux' as const,
-          title: 'Test Improvement',
-          description: 'Test description',
-          impact: 'medium' as const,
-          safetyScore: 85,
-          status: 'pending' as ImprovementStatus,
-          createdAt: new Date().toISOString()
+          suggestion: {
+            id: 'sug-1',
+            category: 'performance',
+            priority: 'medium',
+            title: 'Test Improvement',
+            description: 'Test description',
+            reasoning: 'Test reasoning',
+            estimatedImpact: 'Medium',
+            automatable: false,
+            safetyScore: 85
+          },
+          status: 'detected' as ImprovementStatus,
+          detectedAt: new Date().toISOString()
         }
       ]
 
@@ -293,7 +299,9 @@ describe('useAgenticEngine', () => {
     })
 
     it('should call engine approveAndExecute', async () => {
-      const approveSpy = vi.spyOn(AgenticEngine.prototype, 'approveAndExecute').mockResolvedValue()
+      const approveSpy = vi
+        .spyOn(AgenticEngine.prototype, 'approveAndExecute')
+        .mockResolvedValue(undefined as any)
 
       const context = createMockContext()
       const { result } = renderHook(() => useAgenticEngine(context, { enabled: false }))
@@ -309,17 +317,24 @@ describe('useAgenticEngine', () => {
       const updatedImprovements: Improvement[] = [
         {
           id: 'imp-1',
-          category: 'ux' as const,
-          title: 'Approved',
-          description: 'Test',
-          impact: 'high' as const,
-          safetyScore: 90,
-          status: 'implemented' as ImprovementStatus,
-          createdAt: new Date().toISOString()
+          suggestion: {
+            id: 'sug-1',
+            category: 'performance',
+            priority: 'high',
+            title: 'Approved',
+            description: 'Test',
+            reasoning: 'Test reasoning',
+            estimatedImpact: 'High',
+            automatable: false,
+            safetyScore: 90
+          },
+          status: 'completed' as ImprovementStatus,
+          detectedAt: new Date().toISOString(),
+          implementedAt: new Date().toISOString()
         }
       ]
 
-      vi.spyOn(AgenticEngine.prototype, 'approveAndExecute').mockResolvedValue()
+      vi.spyOn(AgenticEngine.prototype, 'approveAndExecute').mockResolvedValue(undefined as any)
       vi.spyOn(AgenticEngine.prototype, 'getImprovements').mockReturnValue(updatedImprovements)
 
       const context = createMockContext()
@@ -356,13 +371,19 @@ describe('useAgenticEngine', () => {
       const pendingImprovements: Improvement[] = [
         {
           id: 'imp-1',
-          category: 'performance' as const,
-          title: 'Pending',
-          description: 'Test',
-          impact: 'low' as const,
-          safetyScore: 75,
-          status: 'pending' as ImprovementStatus,
-          createdAt: new Date().toISOString()
+          suggestion: {
+            id: 'sug-1',
+            category: 'performance',
+            priority: 'low',
+            title: 'Pending',
+            description: 'Test',
+            reasoning: 'Test reasoning',
+            estimatedImpact: 'Low',
+            automatable: false,
+            safetyScore: 75
+          },
+          status: 'detected' as ImprovementStatus,
+          detectedAt: new Date().toISOString()
         }
       ]
 
@@ -375,7 +396,7 @@ describe('useAgenticEngine', () => {
       const context = createMockContext()
       const { result } = renderHook(() => useAgenticEngine(context, { enabled: false }))
 
-      const pending = result.current.getImprovementsByStatus('pending')
+      const pending = result.current.getImprovementsByStatus('detected')
 
       expect(pending).toEqual(pendingImprovements)
     })

@@ -123,6 +123,7 @@ describe('CompetitorAnalysis', () => {
       id: 'imp-1',
       status: 'detected',
       suggestion: {
+        id: 'sug-1',
         title: 'Strategic Recommendation',
         description: 'Improve market position',
         category: 'strategic',
@@ -132,13 +133,13 @@ describe('CompetitorAnalysis', () => {
         estimatedImpact: 'Medium',
         automatable: false
       },
-      detectedAt: '2024-01-15T10:00:00Z',
-      agentId: 'agent-1'
+      detectedAt: '2024-01-15T10:00:00Z'
     },
     {
       id: 'imp-2',
       status: 'completed',
       suggestion: {
+        id: 'sug-2',
         title: 'Competitor Intelligence',
         description: 'Track competitor pricing',
         category: 'competitor-intelligence',
@@ -149,9 +150,10 @@ describe('CompetitorAnalysis', () => {
         automatable: true
       },
       detectedAt: '2024-01-14T10:00:00Z',
-      agentId: 'agent-2',
       result: {
         success: true,
+        changes: [],
+        metrics: { before: {}, after: {} },
         feedback: 'Successfully implemented'
       }
     }
@@ -347,6 +349,7 @@ describe('CompetitorAnalysis', () => {
           id: 'imp-1',
           status: 'detected',
           suggestion: {
+            id: 'sug-perf-1',
             title: 'Performance Improvement',
             description: 'Improve speed',
             category: 'performance',
@@ -356,8 +359,7 @@ describe('CompetitorAnalysis', () => {
             estimatedImpact: 'Low',
             automatable: true
           },
-          detectedAt: '2024-01-15T10:00:00Z',
-          agentId: 'agent-1'
+          detectedAt: '2024-01-15T10:00:00Z'
         }
       ]
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * SecurityAgent Tests
  *
@@ -86,7 +87,7 @@ describe('SecurityAgent', () => {
       const sensitiveDataFinding = analysis.findings.find((f) =>
         f.description.includes('financial data')
       )
-      expect(sensitiveDataFinding?.evidence.count).toBe(3)
+      expect((sensitiveDataFinding?.evidence as Record<string, any>).count).toBe(3)
     })
 
     it('should not flag prospects without sensitive data', async () => {
@@ -173,8 +174,8 @@ describe('SecurityAgent', () => {
       const accessPatternFinding = analysis.findings.find((f) =>
         f.description.includes('export operations')
       )
-      expect(accessPatternFinding?.evidence.exportCount).toBe(60)
-      expect(accessPatternFinding?.evidence.threshold).toBe(50)
+      expect((accessPatternFinding?.evidence as Record<string, any>).exportCount).toBe(60)
+      expect((accessPatternFinding?.evidence as Record<string, any>).threshold).toBe(50)
     })
   })
 
@@ -472,8 +473,10 @@ describe('SecurityAgent', () => {
       const sensitiveDataFinding = analysis.findings.find((f) =>
         f.description.includes('financial data')
       )
-      expect(sensitiveDataFinding?.evidence.dataTypes).toContain('revenue')
-      expect(sensitiveDataFinding?.evidence.dataTypes).toContain('lienAmount')
+      expect((sensitiveDataFinding?.evidence as Record<string, any>).dataTypes).toContain('revenue')
+      expect((sensitiveDataFinding?.evidence as Record<string, any>).dataTypes).toContain(
+        'lienAmount'
+      )
     })
   })
 })

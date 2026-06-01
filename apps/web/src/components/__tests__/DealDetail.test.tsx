@@ -392,6 +392,18 @@ describe('DealDetail', () => {
     state: 'CA',
     priorityScore: 85,
     status: 'new',
+    defaultDate: '2024-01-15',
+    timeSinceDefault: 120,
+    healthScore: {
+      grade: 'B',
+      score: 72,
+      sentimentTrend: 'stable',
+      reviewCount: 18,
+      avgSentiment: 0.85,
+      violationCount: 2,
+      lastUpdated: '2026-01-15T00:00:00Z'
+    },
+    narrative: 'Sample company narrative',
     uccFilings: [],
     growthSignals: []
   }

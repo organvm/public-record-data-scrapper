@@ -66,8 +66,9 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       const request: EnrichmentRequest = {
-        prospectId: 'test-id',
-        enrichmentTypes: ['firmographics']
+        companyName: 'Test Corp',
+        state: 'CA',
+        tier: 'free'
       }
 
       act(() => {
@@ -95,8 +96,9 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       const request: EnrichmentRequest = {
-        prospectId: 'prospect-123',
-        enrichmentTypes: ['firmographics', 'financials']
+        companyName: 'prospect-123',
+        state: 'NY',
+        tier: 'professional'
       }
 
       await act(async () => {
@@ -111,12 +113,13 @@ describe('useEnrichment', () => {
 
     it('should set result on successful enrichment', async () => {
       const enrichmentData: EnrichmentResult = {
-        prospectId: 'test-id',
-        enrichedData: {
+        success: true,
+        data: {
           firmographics: { employees: 100, revenue: 1000000 }
         },
-        confidence: 0.95,
-        sources: ['api-source']
+        sources: ['api-source'],
+        cost: 0,
+        timestamp: '2024-01-01'
       }
 
       mockExecuteTask.mockResolvedValue({
@@ -127,7 +130,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.result).toEqual(enrichmentData)
@@ -149,7 +152,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.progress).toEqual(progressData)
@@ -165,7 +168,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.error).toBe('First error')
@@ -177,7 +180,7 @@ describe('useEnrichment', () => {
       })
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id-2', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Other Corp', state: 'TX', tier: 'free' })
       })
 
       expect(result.current.error).toBeNull()
@@ -192,7 +195,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.progress).toEqual([])
@@ -209,7 +212,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.error).toBe('API rate limit exceeded')
@@ -223,7 +226,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.error).toBe('Enrichment failed')
@@ -238,7 +241,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.loading).toBe(false)
@@ -253,7 +256,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.result).toBeNull()
@@ -267,7 +270,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.error).toBe('Network error')
@@ -279,7 +282,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.error).toBe('Unknown error')
@@ -291,7 +294,7 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'test-id', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'Test Corp', state: 'CA', tier: 'free' })
       })
 
       expect(result.current.loading).toBe(false)
@@ -313,16 +316,16 @@ describe('useEnrichment', () => {
       const { result } = renderHook(() => useEnrichment())
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'id-1', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'id-1', state: 'CA', tier: 'free' })
       })
 
-      expect(result.current.result).toMatchObject({ id: 1 })
+      expect(result.current.result?.data).toMatchObject({ id: 1 })
 
       await act(async () => {
-        await result.current.enrich({ prospectId: 'id-2', enrichmentTypes: [] })
+        await result.current.enrich({ companyName: 'id-2', state: 'NY', tier: 'free' })
       })
 
-      expect(result.current.result).toMatchObject({ id: 2 })
+      expect(result.current.result?.data).toMatchObject({ id: 2 })
     })
   })
 })

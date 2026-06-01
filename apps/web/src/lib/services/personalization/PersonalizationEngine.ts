@@ -19,8 +19,10 @@ import type {
   PersonalizedWidget,
   PersonalizedInsight,
   QuickAction,
-  ActivityItem
+  ActivityItem,
+  ChannelMetrics
 } from '@/types/personalization'
+import type { OutreachChannel } from '@/types/generative'
 import type { Prospect } from '@public-records/core'
 
 export class PersonalizationEngine {
@@ -131,8 +133,8 @@ export class PersonalizationEngine {
       lastUpdated: new Date(),
       learnedPreferences,
       conversionPredictorWeights: this.calculateConversionWeights(profile),
-      timingModel,
-      channelModel,
+      timingPredictor: timingModel,
+      channelPredictor: channelModel,
       userSegment,
       similarUsers,
       modelConfidence: this.calculateModelConfidence(profile),
@@ -186,9 +188,9 @@ export class PersonalizationEngine {
         personalizedScore: score,
         matchReasons,
         recommendedApproach,
-        predictedConversionProbability: predictions.conversionProbability,
-        predictedDealSize: predictions.dealSize,
-        predictedTimeToClose: predictions.timeToClose,
+        predictedConversionProbability: predictions.conversionProbability ?? 0,
+        predictedDealSize: predictions.dealSize ?? 0,
+        predictedTimeToClose: predictions.timeToClose ?? 0,
         similarSuccessfulDeals: this.findSimilarSuccesses(prospect, profile),
         warnings: this.generateWarnings(prospect, profile)
       }
@@ -275,7 +277,7 @@ export class PersonalizationEngine {
           minimumPriority: 'medium'
         },
         preferredOutreachChannel: 'email',
-        communicationStyle: 'professional',
+        communicationStyle: 'casual',
         followUpCadence: 5,
         autoFollowUp: false,
         templateTonality: 'professional',
@@ -321,12 +323,12 @@ export class PersonalizationEngine {
         lastUpdated: new Date(),
         learnedPreferences: [],
         conversionPredictorWeights: {},
-        timingModel: {
+        timingPredictor: {
           optimalContactTime: { hourOfDay: 10, dayOfWeek: 2, confidence: 0 },
           optimalFollowUpInterval: 3,
           responsePatterns: []
         },
-        channelModel: {
+        channelPredictor: {
           channelPreferences: {
             email: 0.5,
             sms: 0.5,
@@ -334,7 +336,7 @@ export class PersonalizationEngine {
             linkedin: 0.5,
             direct_mail: 0.5
           },
-          channelEffectiveness: {},
+          channelEffectiveness: {} as Record<OutreachChannel, ChannelMetrics>,
           contextualPreferences: []
         },
         userSegment: 'new_user',
@@ -378,7 +380,7 @@ export class PersonalizationEngine {
         // Track search patterns
         behavior.searchPatterns.push({
           keywords: [],
-          filters: action.data.filters,
+          filters: (action.data as Record<string, unknown>).filters as Record<string, unknown>,
           frequency: 1,
           resultsQuality: 0.7,
           leadToAction: false
@@ -387,12 +389,13 @@ export class PersonalizationEngine {
       case 'outcome':
         // Track conversion patterns from actual outcome data
         if (action.outcome === 'success' && action.data) {
+          const ad = action.data as Record<string, unknown>
           behavior.conversionPatterns.push({
-            prospectCharacteristics: action.data.characteristics || {},
-            timeToConversion: action.data.timeToConversion || 0,
-            dealSize: action.data.dealSize || 0,
-            successFactors: action.data.successFactors || [],
-            touchpoints: action.data.touchpoints || 0
+            prospectCharacteristics: (ad.characteristics as Record<string, unknown>) || {},
+            timeToConversion: (ad.timeToConversion as number) || 0,
+            dealSize: (ad.dealSize as number) || 0,
+            successFactors: (ad.successFactors as string[]) || [],
+            touchpoints: (ad.touchpoints as number) || 0
           })
         }
         break
@@ -518,12 +521,30 @@ export class PersonalizationEngine {
       [
         profile.preferences.preferredIndustries.length > 0,
         profile.preferences.preferredStates.length > 0,
-        profile.preferences.preferredDealSizes.length > 0,
-        profile.preferences.preferredChannels.length > 0
+        (profile.preferences as unknown as Record<string, unknown>).preferredDealSizes &&
+          ((profile.preferences as unknown as Record<string, unknown>)
+            .preferredDealSizes as unknown[]) &&
+          (
+            (profile.preferences as unknown as Record<string, unknown>)
+              .preferredDealSizes as unknown[]
+          ).length > 0,
+        (profile.preferences as unknown as Record<string, unknown>).preferredChannels &&
+          ((profile.preferences as unknown as Record<string, unknown>)
+            .preferredChannels as unknown[]) &&
+          (
+            (profile.preferences as unknown as Record<string, unknown>)
+              .preferredChannels as unknown[]
+          ).length > 0
       ].filter(Boolean).length / 4
 
     const behaviorCoverage = Math.min(profile.behavior.conversionPatterns.length / 25, 1)
-    const feedbackCoverage = Math.min(profile.feedback.totalInteractions / 20, 1)
+    const feedbackCoverage = Math.min(
+      (profile as unknown as Record<string, unknown>).feedback
+        ? (((profile as unknown as Record<string, unknown>).feedback as Record<string, unknown>)
+            .totalInteractions as number) / 20
+        : 0,
+      1
+    )
 
     return Number(
       (preferenceCoverage * 0.4 + behaviorCoverage * 0.4 + feedbackCoverage * 0.2).toFixed(2)
@@ -538,7 +559,7 @@ export class PersonalizationEngine {
     profile: UserProfile,
     model: PersonalizationModel
   ): number {
-    let score = prospect.priority || 50
+    let score = prospect.priorityScore || 50
 
     // Adjust based on learned preferences
     if (profile.preferences.preferredIndustries.includes(prospect.industry)) {
@@ -566,8 +587,8 @@ export class PersonalizationEngine {
       reasons.push(`Strong growth signals (${prospect.growthSignals.length} detected)`)
     }
 
-    if (prospect.healthGrade === 'A' || prospect.healthGrade === 'B') {
-      reasons.push(`Excellent health grade: ${prospect.healthGrade}`)
+    if (prospect.healthScore?.grade === 'A' || prospect.healthScore?.grade === 'B') {
+      reasons.push(`Excellent health grade: ${prospect.healthScore?.grade}`)
     }
 
     return reasons
@@ -698,7 +719,7 @@ export class PersonalizationEngine {
       description: `${action.actionType} action`,
       timestamp: action.timestamp,
       prospectId: action.prospectId,
-      metadata: action.data
+      metadata: (action.data as Record<string, unknown>) || {}
     }))
   }
 

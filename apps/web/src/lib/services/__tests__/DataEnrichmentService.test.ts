@@ -271,11 +271,7 @@ describe('DataEnrichmentService', () => {
         })
       )
 
-      const filings = [
-        createMockUCCFiling({ fileNumber: 'CA-001' }),
-        createMockUCCFiling({ fileNumber: 'CA-002' }),
-        createMockUCCFiling({ fileNumber: 'CA-003' })
-      ]
+      const filings = [createMockUCCFiling({}), createMockUCCFiling({}), createMockUCCFiling({})]
 
       const results = await Promise.all(filings.map((f) => service.enrichProspect(f)))
 
@@ -401,11 +397,7 @@ describe('DataEnrichmentService', () => {
 
   describe('enrichProspects batch', () => {
     it('should enrich multiple prospects', async () => {
-      const filings = [
-        createMockUCCFiling({ fileNumber: 'CA-001' }),
-        createMockUCCFiling({ fileNumber: 'CA-002' }),
-        createMockUCCFiling({ fileNumber: 'CA-003' })
-      ]
+      const filings = [createMockUCCFiling({}), createMockUCCFiling({}), createMockUCCFiling({})]
 
       const { prospects, results } = await service.enrichProspects(filings)
 
@@ -416,7 +408,7 @@ describe('DataEnrichmentService', () => {
     it('should respect concurrency limit', async () => {
       const filings = Array(10)
         .fill(null)
-        .map((_, i) => createMockUCCFiling({ fileNumber: `CA-${i}` }))
+        .map(() => createMockUCCFiling({}))
 
       const { prospects, results } = await service.enrichProspects(filings, 2)
 

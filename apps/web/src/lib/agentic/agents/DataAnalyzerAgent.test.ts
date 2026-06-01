@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * DataAnalyzerAgent Tests
  *
@@ -92,8 +93,8 @@ describe('DataAnalyzerAgent', () => {
       const staleFinding = analysis.findings.find((f) => f.description.includes('stale'))
 
       if (staleFinding) {
-        expect(staleFinding.evidence.percentage).toBeDefined()
-        expect(parseFloat(staleFinding.evidence.percentage)).toBe(50.0)
+        expect((staleFinding.evidence as Record<string, any>).percentage).toBeDefined()
+        expect(parseFloat((staleFinding.evidence as Record<string, any>).percentage)).toBe(50.0)
       }
     })
 
@@ -126,7 +127,7 @@ describe('DataAnalyzerAgent', () => {
         f.description.includes('revenue estimates')
       )
       expect(revenueFinding).toBeDefined()
-      expect(revenueFinding?.evidence.incompleteCount).toBe(2)
+      expect((revenueFinding?.evidence as Record<string, any>).incompleteCount).toBe(2)
     })
 
     it('should detect missing growth signals', async () => {
@@ -175,7 +176,9 @@ describe('DataAnalyzerAgent', () => {
         f.description.includes('completeness')
       )
       expect(completenessFinding).toBeDefined()
-      expect(completenessFinding?.evidence.avgCompleteness).toBeLessThan(80)
+      expect((completenessFinding?.evidence as Record<string, any>).avgCompleteness).toBeLessThan(
+        80
+      )
     })
 
     it('should set critical severity for very low completeness', async () => {

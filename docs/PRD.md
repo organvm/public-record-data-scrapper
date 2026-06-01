@@ -2,9 +2,10 @@
 
 A comprehensive merchant cash advance intelligence platform that transforms UCC filing data into actionable business opportunities through automated scraping, real-time health monitoring, growth signal detection, and ML-powered lead qualification.
 
-
 This is a sophisticated B2B SaaS platform managing multiple data pipelines (UCC scraping, growth signals, health scores, competitor intelligence), ML model outputs, portfolio mo
+
 ## Essential Features
+
 ### 1. Prospect Dashboard
 
 **Complexity Level**: Complex Application (advanced functionality, accounts)
@@ -13,6 +14,7 @@ This is a sophisticated B2B SaaS platform managing multiple data pipelines (UCC 
 ## Essential Features
 
 ### 1. Prospect Dashboard
+
 - **Functionality**: Displays prioritized list of UCC default prospects with scores, growth signals, and health grades
 - **Purpose**: Central hub for sales teams to identify and claim high-value "whale" opportunities
 - **Trigger**: User navigates to main dashboard after login
@@ -20,20 +22,15 @@ This is a sophisticated B2B SaaS platform managing multiple data pipelines (UCC 
 - **Trigger**: User accesses intelligence dashboard
 
 ### 5. Lead Re-qualification
+
 - **Purpose**: Maximize ROI on past prospecting efforts by recycling leads when conditions improve
 - **Progression**: Import leads → Scrape new signals → ML scoring → Net opportu
-
 
 - **CAPTCHA blocks**: Log occurrence and trigger manual review queue; implement rate-limiting adjustments
 
 - **API rate limits**: Implemen
 
-
-
-
-
-
-- **Foreground/Background Pair
+- \*\*Foreground/Background Pair
 - **Functionality**: Aggregates UCC filings by secured party to reveal lender market share, deal sizes, and industry focus
 - **Purpose**: Competitive intelligence and market opportunity identification
 - **Trigger**: User accesses intelligence dashboard
@@ -41,6 +38,7 @@ This is a sophisticated B2B SaaS platform managing multiple data pipelines (UCC 
 - **Success criteria**: Visualize top 20 competitors across 5 industries with monthly trend analysis
 
 ### 5. Lead Re-qualification Engine
+
 - **Functionality**: Resurrects "dead" leads by detecting new growth/risk signals and recomputing opportunity scores
 - **Purpose**: Maximize ROI on past prospecting efforts by recycling leads when conditions improve
 - **Trigger**: User uploads dead lead list or system runs monthly batch job
@@ -76,8 +74,6 @@ The design should evoke **trust, precision, and sophistication** – resembling 
   - Accent (Amber `oklch(0.70 0.15 60)`): Accent-Foreground Navy `oklch(0.20 0.05 250)` – Ratio 7.2:1 ✓
   - Muted (Light Gray `oklch(0.92 0.01 90)`): Muted-Foreground Gray `oklch(0.50 0.02 270)` – Ratio 5.1:1 ✓
 
-
-
 Typography should balance **data density with readability**, using a geometric sans-serif for UI (clarity, modernity) and tabular figures for numerical data (alignment, scanability). IBM Plex Sans provides the technical credibility required for financial software.
 
 - **Typographic Hierarchy**:
@@ -87,9 +83,6 @@ Typography should balance **data density with readability**, using a geometric s
 
   - Small (Metadata): IBM Plex Sans Regular / 13px / 0em letter-spacing / 1.4 line-height
 
-
-
-
 Animations should be **subtle and purposeful**, reinforcing state changes and data updates without distracting from analysis. Think "financial terminal" – quick, precise, professional.
 
 - **Purposeful Meaning**: Micro-animations communicate data freshness (pulse on new signals), risk state transitions (color shifts for health grade changes), and loading states (skeleton screens for data fetching)
@@ -97,7 +90,7 @@ Animations should be **subtle and purposeful**, reinforcing state changes and da
 
 ## Component Selection
 
-- **Components**: 
+- **Components**:
   - `Card` with `Badge` overlays for prospect tiles showing scores and health grades
   - `Table` with sortable columns for main prospect list; `DataTable` with pagination for large datasets
 
@@ -107,20 +100,15 @@ Animations should be **subtle and purposeful**, reinforcing state changes and da
 
   - `Select` and `Checkbox` groups for multi-dimensional filtering (state, industry, score range)
 
-  
-
   - Custom `ProspectCard` component combining Card + Avatar + Badge + Button with density optimizations
 
   - `SignalTimeline` component showing chronological growth indicators with icons
 
-  
-- **States**: 
+- **States**:
   - Buttons: Default (navy), Hover (lighter navy + shadow), Active (pressed inset), Disabled (30% opacity)
   - Inputs: Default (gray border), Focus (navy ring + cyan glow), Error (red border + shake), Success (green check icon)
   - Cards: Default (white bg), Hover (subtle shadow lift), Selected (navy border), Claimed (muted bg + checkmark)
-  
-- **Icon Selection**: 
-
+- **Icon Selection**:
   - `TrendUp` / `TrendDown` for growth signals and health trends
   - `Warning` / `WarningCircle` for DEWS alerts
   - `ChartBar` / `ChartLineUp` for analytics and intelligence
@@ -129,17 +117,16 @@ Animations should be **subtle and purposeful**, reinforcing state changes and da
   - `Export` for CRM export actions
   - `MagnifyingGlass` for search
 
-- **Spacing**: 
+- **Spacing**:
   - Card padding: `p-6` (24px) for comfortable data breathing room
   - Grid gaps: `gap-4` (16px) for prospect tiles; `gap-6` (24px) between major sections
 
   - Section margins: `mb-8` (32px) between dashboard zones
 
-- **Mobile**: 
+- **Mobile**:
   - Mobile-first responsive design with touch-optimized controls (minimum 44px touch targets)
   - Below 768px: Single-column card layout; tabs show icons with abbreviated text; controls stack vertically
   - Below 640px: Stats grid becomes 2 columns; prospect cards go full width; filters move to slide-out sheet
   - Touch targets expand to 44px minimum; hover states become tap highlights with visual feedback
   - Charts adapt to vertical orientation maintaining readability on small screens
   - Translucent glass effects with backdrop blur work seamlessly on mobile with performance optimization
-

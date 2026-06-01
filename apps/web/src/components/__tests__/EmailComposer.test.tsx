@@ -236,7 +236,9 @@ describe('EmailComposer', () => {
       score: 92,
       sentimentTrend: 'improving',
       reviewCount: 15,
-      violationCount: 0
+      violationCount: 0,
+      avgSentiment: 0.85,
+      lastUpdated: '2026-01-15T00:00:00Z'
     },
     timeSinceDefault: 730,
     defaultDate: '2022-01-15',
@@ -246,6 +248,7 @@ describe('EmailComposer', () => {
         id: 's1',
         type: 'hiring',
         description: 'Hiring new staff',
+        score: 75,
         confidence: 0.9,
         detectedDate: '2024-01-01'
       }
@@ -255,7 +258,13 @@ describe('EmailComposer', () => {
       confidence: 88,
       recoveryLikelihood: 75,
       modelVersion: '1.0',
-      factors: {},
+      factors: {
+        healthTrend: 0.5,
+        signalQuality: 0.7,
+        industryRisk: 0.3,
+        timeToRecovery: 0.6,
+        financialStability: 0.8
+      },
       lastUpdated: '2024-01-15'
     }
   }

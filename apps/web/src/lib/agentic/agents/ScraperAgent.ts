@@ -13,10 +13,21 @@ import {
   Finding,
   ImprovementSuggestion
 } from '../types'
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - scripts directory not in tsconfig include; import resolved by bundler
 import { CaliforniaScraper } from '../../../../scripts/scrapers/states/california'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - scripts directory not in tsconfig include; import resolved by bundler
 import { TexasScraper } from '../../../../scripts/scrapers/states/texas'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - scripts directory not in tsconfig include; import resolved by bundler
 import { FloridaScraper } from '../../../../scripts/scrapers/states/florida'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - scripts directory not in tsconfig include; import resolved by bundler
 import { NewYorkScraper } from '../../../../scripts/scrapers/states/newyork'
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - scripts directory not in tsconfig include; import resolved by bundler
 import { BaseScraper } from '../../../../scripts/scrapers/base-scraper'
 
 export class ScraperAgent extends BaseAgent {
@@ -47,7 +58,6 @@ export class ScraperAgent extends BaseAgent {
     const findings: Finding[] = []
     const improvements: ImprovementSuggestion[] = []
 
-    // Check scraper availability
     const states = ['CA', 'TX', 'FL', 'NY']
     const unavailable = states.filter((state) => !this.scrapers.has(state))
 
@@ -65,9 +75,6 @@ export class ScraperAgent extends BaseAgent {
     return this.createAnalysis(findings, improvements)
   }
 
-  /**
-   * Execute a scraping task
-   */
   async executeTask(task: AgentTask): Promise<AgentTaskResult> {
     const { type, payload } = task
     const data = payload as { companyName?: string; state?: string }
@@ -119,9 +126,6 @@ export class ScraperAgent extends BaseAgent {
     }
   }
 
-  /**
-   * Scrape UCC filings for a company in a state
-   */
   private async scrapeUCC(companyName: string, state: string): Promise<AgentTaskResult> {
     const scraper = this.scrapers.get(state.toUpperCase())
 
@@ -154,9 +158,6 @@ export class ScraperAgent extends BaseAgent {
     }
   }
 
-  /**
-   * Get manual search URL for a state
-   */
   private getManualSearchUrl(companyName: string, state: string): AgentTaskResult {
     const scraper = this.scrapers.get(state.toUpperCase())
 
@@ -181,9 +182,6 @@ export class ScraperAgent extends BaseAgent {
     }
   }
 
-  /**
-   * Check if scraper is available for a state
-   */
   private checkScraperStatus(state: string): AgentTaskResult {
     const available = this.scrapers.has(state.toUpperCase())
 
@@ -200,9 +198,6 @@ export class ScraperAgent extends BaseAgent {
     }
   }
 
-  /**
-   * List all available states
-   */
   private listAvailableStates(): AgentTaskResult {
     const states = Array.from(this.scrapers.keys())
 
@@ -220,16 +215,10 @@ export class ScraperAgent extends BaseAgent {
     }
   }
 
-  /**
-   * Add a new scraper for a state
-   */
   addScraper(state: string, scraper: BaseScraper): void {
     this.scrapers.set(state.toUpperCase(), scraper)
   }
 
-  /**
-   * Check if state is supported
-   */
   isStateSupported(state: string): boolean {
     return this.scrapers.has(state.toUpperCase())
   }

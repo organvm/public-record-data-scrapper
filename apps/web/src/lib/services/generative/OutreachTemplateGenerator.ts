@@ -304,7 +304,7 @@ CTA: [improved call to action]`
 Company: ${prospectData.companyName}
 Industry: ${prospectData.industry}
 Location: ${prospectData.state}
-Health Grade: ${prospectData.healthGrade}
+Health Grade: ${prospectData.healthScore?.grade || 'N/A'}
 Revenue Estimate: $${prospectData.estimatedRevenue?.toLocaleString()}
 
 Growth Signals:

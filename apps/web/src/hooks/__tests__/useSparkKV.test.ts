@@ -175,7 +175,7 @@ describe('useSparkKV (useSafeKV)', () => {
         key: 'sync-key',
         newValue: JSON.stringify('from-other-tab'),
         storageArea: mockLocalStorage
-      } as StorageEvent
+      } as unknown as StorageEvent
 
       act(() => {
         storageEventHandlers.forEach((handler) => handler(event))
@@ -191,7 +191,7 @@ describe('useSparkKV (useSafeKV)', () => {
         key: 'other-key',
         newValue: JSON.stringify('other-value'),
         storageArea: mockLocalStorage
-      } as StorageEvent
+      } as unknown as StorageEvent
 
       act(() => {
         storageEventHandlers.forEach((handler) => handler(event))
@@ -207,7 +207,7 @@ describe('useSparkKV (useSafeKV)', () => {
         key: null,
         newValue: null,
         storageArea: mockLocalStorage
-      } as StorageEvent
+      } as unknown as StorageEvent
 
       act(() => {
         storageEventHandlers.forEach((handler) => handler(event))
@@ -226,7 +226,7 @@ describe('useSparkKV (useSafeKV)', () => {
         key: 'delete-sync',
         newValue: null,
         storageArea: mockLocalStorage
-      } as StorageEvent
+      } as unknown as StorageEvent
 
       act(() => {
         storageEventHandlers.forEach((handler) => handler(event))
@@ -354,7 +354,7 @@ describe('useSparkKV (useSafeKV)', () => {
         key: 'sync-key',
         newValue: 'invalid-json',
         storageArea: mockLocalStorage
-      } as StorageEvent
+      } as unknown as StorageEvent
 
       act(() => {
         storageEventHandlers.forEach((handler) => handler(event))

@@ -72,7 +72,7 @@ describe('DataIngestionService', () => {
             filing_type: 'UCC-1'
           }
         ]
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData()
       await vi.runAllTimersAsync()
@@ -87,7 +87,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData()
       await vi.runAllTimersAsync()
@@ -101,7 +101,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData(['TX'])
       await vi.runAllTimersAsync()
@@ -128,7 +128,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData()
       await vi.runAllTimersAsync()
@@ -147,7 +147,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData()
       await vi.runAllTimersAsync()
@@ -167,7 +167,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData(['NY'])
       await vi.runAllTimersAsync()
@@ -193,7 +193,7 @@ describe('DataIngestionService', () => {
             filing_type: 'UCC-1'
           }
         ]
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData(['NY'])
       await vi.runAllTimersAsync()
@@ -216,7 +216,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => ({ error: 'Invalid response' })
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData(['NY'])
       await vi.runAllTimersAsync()
@@ -234,7 +234,7 @@ describe('DataIngestionService', () => {
         .mockResolvedValue({
           ok: true,
           json: async () => []
-        } as Response)
+        } as unknown as Response)
 
       const promise = service.ingestData(['NY'])
       await vi.runAllTimersAsync()
@@ -249,7 +249,7 @@ describe('DataIngestionService', () => {
         ok: false,
         status: 404,
         json: async () => ({})
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData(['NY'])
       await vi.runAllTimersAsync()
@@ -265,11 +265,11 @@ describe('DataIngestionService', () => {
           ok: false,
           status: 429,
           json: async () => ({})
-        } as Response)
+        } as unknown as Response)
         .mockResolvedValue({
           ok: true,
           json: async () => []
-        } as Response)
+        } as unknown as Response)
 
       const promise = service.ingestData(['NY'])
       await vi.runAllTimersAsync()
@@ -302,7 +302,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData(['NY'])
       await vi.runAllTimersAsync()
@@ -348,7 +348,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = limitedService.ingestData()
 
@@ -388,7 +388,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = multiService.ingestData()
       await vi.runAllTimersAsync()
@@ -417,7 +417,7 @@ describe('DataIngestionService', () => {
             filing_type: 'UCC-1'
           }
         ]
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.findLapsedFilings(1095) // 3 years
       await vi.runAllTimersAsync()
@@ -443,7 +443,7 @@ describe('DataIngestionService', () => {
             filing_type: 'UCC-1'
           }
         ]
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.findLapsedFilings(1095) // 3 years
       await vi.runAllTimersAsync()
@@ -468,7 +468,7 @@ describe('DataIngestionService', () => {
             filing_type: 'UCC-1'
           }
         ]
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.findLapsedFilings()
       await vi.runAllTimersAsync()
@@ -481,7 +481,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.findLapsedFilings()
       await vi.runAllTimersAsync()
@@ -640,7 +640,7 @@ describe('DataIngestionService', () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         json: async () => []
-      } as Response)
+      } as unknown as Response)
 
       const promise = mixedService.ingestData(['NY'])
       await vi.runAllTimersAsync()
@@ -659,7 +659,7 @@ describe('DataIngestionService', () => {
         json: async () => {
           throw new Error('Invalid JSON')
         }
-      } as Response)
+      } as unknown as Response)
 
       const promise = service.ingestData(['NY'])
       await vi.runAllTimersAsync()

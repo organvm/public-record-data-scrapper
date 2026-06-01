@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Tests for StateAgent
  */
@@ -136,7 +137,7 @@ describe('StateAgent', () => {
         (f) => f.severity === 'info' && f.description.includes('prospects')
       )
       expect(trendFinding).toBeDefined()
-      expect(trendFinding?.evidence.count).toBe(2) // NY prospects in context
+      expect((trendFinding?.evidence as Record<string, any>).count).toBe(2) // NY prospects in context
     })
 
     it('should suggest increased focus for high-value states', async () => {

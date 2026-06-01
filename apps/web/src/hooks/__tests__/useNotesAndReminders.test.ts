@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
@@ -84,7 +85,7 @@ vi.mock('@/hooks/useSparkKV', async () => {
           return
         }
 
-        setValue((current) =>
+        setValue((current: unknown) =>
           typeof updater === 'function'
             ? (updater as (current: unknown) => unknown)(current)
             : updater
@@ -281,9 +282,9 @@ describe('useNotesAndReminders', () => {
       act(() => {
         result.current.handleAddReminder({
           prospectId: 'prospect-1',
-          reminderDate: '2024-12-01',
+          dueDate: '2024-12-01',
           message: 'Follow up call'
-        })
+        } as any)
       })
 
       expect(mockSetReminders).toHaveBeenCalled()
@@ -442,7 +443,7 @@ describe('useNotesAndReminders', () => {
             templateId: 'template-1',
             subject: 'Test Subject',
             body: 'Test body content'
-          },
+          } as any,
           mockTrackAction
         )
       })

@@ -32,12 +32,13 @@ export function useEnrichment(): UseEnrichmentResult {
       const orchestrator = new EnrichmentOrchestratorAgent()
       const taskResult = await orchestrator.executeTask({
         type: 'enrich-prospect',
-        payload: request
+        payload: request as unknown as Record<string, unknown>
       })
 
       if (taskResult.success) {
-        setResult(taskResult.data as EnrichmentResult)
-        setProgress(taskResult.data?.progress || [])
+        setResult(taskResult.data as unknown as EnrichmentResult)
+        const data = taskResult.data as Record<string, unknown> | undefined
+        setProgress((data?.progress as unknown[]) || [])
       } else {
         setError(taskResult.error || 'Enrichment failed')
       }

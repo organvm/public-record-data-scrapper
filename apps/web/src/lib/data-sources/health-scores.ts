@@ -116,8 +116,8 @@ export class YelpSource extends BaseDataSource {
 
       // Calculate health score (0-100)
       const healthScore = this.calculateHealthScore(
-        business.rating,
-        business.review_count,
+        business.rating || 0,
+        business.review_count || 0,
         avgRating
       )
 
@@ -369,8 +369,8 @@ export class GoogleReviewsSource extends BaseDataSource {
 
       // Calculate health score (0-100)
       const healthScore = this.calculateHealthScore(
-        place.rating,
-        place.user_ratings_total,
+        place.rating || 0,
+        place.user_ratings_total || 0,
         avgRating,
         sentimentScore
       )

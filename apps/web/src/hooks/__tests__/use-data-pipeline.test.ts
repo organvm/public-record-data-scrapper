@@ -8,16 +8,23 @@ function createMockProspect(overrides: Partial<Prospect> = {}): Prospect {
     id: crypto.randomUUID(),
     companyName: 'Test Company',
     state: 'CA',
-    filingType: 'UCC1',
-    filingDate: '2024-01-15',
-    expirationDate: '2029-01-15',
-    securedParty: 'Test Bank',
+    industry: 'technology',
+    status: 'new',
     priorityScore: 75,
-    industry: 'Technology',
-    collateralDescription: 'All assets',
-    signals: [],
-    isClaimed: false,
-    claimedBy: null,
+    defaultDate: '2024-01-15',
+    timeSinceDefault: 180,
+    uccFilings: [],
+    growthSignals: [],
+    healthScore: {
+      grade: 'C',
+      score: 65,
+      sentimentTrend: 'stable',
+      reviewCount: 10,
+      avgSentiment: 3.2,
+      violationCount: 2,
+      lastUpdated: '2024-01-15'
+    },
+    narrative: 'Test company narrative',
     ...overrides
   }
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -158,7 +159,8 @@ describe('AgenticDashboard', () => {
     isRunning: false,
     runCycle: vi.fn().mockResolvedValue(undefined),
     approveImprovement: vi.fn().mockResolvedValue(undefined),
-    rejectImprovement: vi.fn().mockResolvedValue(undefined)
+    engine: null as any,
+    getImprovementsByStatus: vi.fn(() => [])
   }
 
   const defaultProps = {

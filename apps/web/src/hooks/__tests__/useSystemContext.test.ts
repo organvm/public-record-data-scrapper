@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useSystemContext } from '../useSystemContext'
-import type { Prospect, Competitor, PortfolioCompany, UserAction } from '@public-records/core'
+import type { Prospect, PortfolioCompany } from '@public-records/core'
 
 // Helper function to create mock prospect
 function createMockProspect(overrides: Partial<Prospect> = {}): Prospect {
@@ -9,22 +9,30 @@ function createMockProspect(overrides: Partial<Prospect> = {}): Prospect {
     id: crypto.randomUUID(),
     companyName: 'Test Company',
     state: 'CA',
-    filingType: 'UCC1',
-    filingDate: '2024-01-15',
-    expirationDate: '2029-01-15',
-    securedParty: 'Test Bank',
     priorityScore: 75,
-    industry: 'Technology',
-    collateralDescription: 'All assets',
-    signals: [],
-    isClaimed: false,
-    claimedBy: null,
+    industry: 'technology' as const,
+    status: 'new' as const,
+    defaultDate: '2024-01-15',
+    timeSinceDefault: 365,
+    narrative: 'Test narrative',
+    uccFilings: [],
+    growthSignals: [],
+    healthScore: {
+      score: 80,
+      grade: 'B',
+      sentimentTrend: 'stable',
+      reviewCount: 15,
+      avgSentiment: 0.85,
+      violationCount: 0,
+      lastUpdated: '2024-01-15'
+    },
     ...overrides
-  }
+  } as Prospect
 }
 
 // Helper function to create mock competitor
-function createMockCompetitor(overrides: Partial<Competitor> = {}): Competitor {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createMockCompetitor(overrides: Record<string, any> = {}): any {
   return {
     id: crypto.randomUUID(),
     name: 'Competitor Inc',
@@ -43,19 +51,25 @@ function createMockPortfolioCompany(overrides: Partial<PortfolioCompany> = {}): 
   return {
     id: crypto.randomUUID(),
     companyName: 'Portfolio Corp',
-    industry: 'Finance',
-    fundedAmount: 500000,
-    fundedDate: '2023-06-15',
-    currentHealthScore: 85,
-    healthGrade: 'B',
-    healthTrend: 'stable',
-    lastAssessmentDate: '2024-01-01',
+    fundingAmount: 500000,
+    fundingDate: '2023-06-15',
+    currentStatus: 'performing' as const,
+    healthScore: {
+      score: 85,
+      grade: 'B',
+      sentimentTrend: 'stable',
+      reviewCount: 5,
+      avgSentiment: 0.7,
+      violationCount: 0,
+      lastUpdated: '2024-01-15'
+    },
     ...overrides
   }
 }
 
 // Helper function to create mock user action
-function createMockUserAction(overrides: Partial<UserAction> = {}): UserAction {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createMockUserAction(overrides: Record<string, any> = {}): any {
   return {
     id: crypto.randomUUID(),
     action: 'view',

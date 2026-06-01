@@ -30,9 +30,9 @@ vi.mock('@phosphor-icons/react', () => ({
 }))
 
 describe('SignalTimeline', () => {
-  const createSignal = (overrides: Partial<GrowthSignal> & { type: SignalType }): GrowthSignal => ({
+  const createSignal = (overrides: Partial<GrowthSignal>): GrowthSignal => ({
     id: `signal-${Math.random()}`,
-    type: overrides.type,
+    type: 'hiring',
     description: 'Test signal description',
     score: 75,
     confidence: 0.85,
@@ -145,6 +145,7 @@ describe('SignalTimeline', () => {
           type: 'hiring' as SignalType,
           description: 'Test',
           score: 75,
+          confidence: 0,
           detectedDate: new Date().toISOString()
         }
       ]

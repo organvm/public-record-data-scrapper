@@ -250,7 +250,7 @@ export class DataNormalizationAgent extends BaseAgent {
     if (typeof companyName === 'string') {
       const result = this.normalizeCompanyName(companyName)
       if (result.success && result.data) {
-        normalized.companyName = result.data.normalized
+        normalized.companyName = (result.data as Record<string, unknown>).normalized
       }
     }
 
@@ -259,7 +259,7 @@ export class DataNormalizationAgent extends BaseAgent {
     if (typeof address === 'string') {
       const result = this.normalizeAddress(address)
       if (result.success && result.data) {
-        normalized.address = result.data.normalized
+        normalized.address = (result.data as Record<string, unknown>).normalized
       }
     }
 
@@ -270,7 +270,7 @@ export class DataNormalizationAgent extends BaseAgent {
       if (typeof value === 'string' || value instanceof Date) {
         const result = this.normalizeDate(value)
         if (result.success && result.data) {
-          normalized[field] = result.data.normalized
+          normalized[field] = (result.data as Record<string, unknown>).normalized
         }
       }
     })

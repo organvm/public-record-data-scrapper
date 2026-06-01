@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unit tests for DataAnalyzerAgent
  * Tests data quality assessment, freshness monitoring, and completeness checks
@@ -94,7 +95,7 @@ describe('DataAnalyzerAgent', () => {
       const staleFinding = result.findings.find((f) => f.description.includes('stale'))
       expect(staleFinding).toBeDefined()
       expect(staleFinding?.severity).toBe('warning') // 1/5 = 20% < 30% threshold
-      expect(staleFinding?.evidence.staleCount).toBe(1)
+      expect((staleFinding?.evidence as Record<string, any>).staleCount).toBe(1)
     })
 
     it('should mark as critical when >30% data is stale', async () => {
@@ -111,7 +112,7 @@ describe('DataAnalyzerAgent', () => {
       const staleFinding = result.findings.find((f) => f.description.includes('stale'))
 
       expect(staleFinding?.severity).toBe('critical')
-      expect(staleFinding?.evidence.percentage).toBe('66.7')
+      expect((staleFinding?.evidence as Record<string, any>).percentage).toBe('66.7')
     })
 
     it('should not flag fresh data', async () => {
@@ -143,7 +144,7 @@ describe('DataAnalyzerAgent', () => {
 
       const revenueFinding = result.findings.find((f) => f.description.includes('revenue'))
       expect(revenueFinding).toBeDefined()
-      expect(revenueFinding?.evidence.incompleteCount).toBe(1)
+      expect((revenueFinding?.evidence as Record<string, any>).incompleteCount).toBe(1)
     })
 
     it('should detect missing growth signals', async () => {
@@ -157,7 +158,7 @@ describe('DataAnalyzerAgent', () => {
       const signalsFinding = result.findings.find((f) => f.description.includes('growth signals'))
       expect(signalsFinding).toBeDefined()
       expect(signalsFinding?.severity).toBe('warning')
-      expect(signalsFinding?.evidence.missingSignalsCount).toBe(1)
+      expect((signalsFinding?.evidence as Record<string, any>).missingSignalsCount).toBe(1)
     })
   })
 
@@ -205,7 +206,9 @@ describe('DataAnalyzerAgent', () => {
       )
       expect(completenessFinding).toBeDefined()
       expect(completenessFinding?.severity).toBe('critical')
-      expect(completenessFinding?.evidence.avgCompleteness).toBeLessThan(60)
+      expect((completenessFinding?.evidence as Record<string, any>).avgCompleteness).toBeLessThan(
+        60
+      )
     })
   })
 

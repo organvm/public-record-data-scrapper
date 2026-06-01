@@ -429,7 +429,7 @@ export interface UserPreferences {
 
   // Communication preferences
   preferredOutreachChannel: OutreachChannel
-  communicationStyle: 'formal' | 'casual'
+  communicationStyle: 'formal' | 'casual' | 'consultative'
   followUpCadence: number // days
 
   // Generation preferences

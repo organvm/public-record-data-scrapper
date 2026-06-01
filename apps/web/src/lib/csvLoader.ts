@@ -8,8 +8,8 @@ export async function loadProspects() {
     header: true,
     skipEmptyLines: true,
     dynamicTyping: false,
-    transformHeader: (h) => h.trim(),
-    transform: (v) => (typeof v === 'string' ? v.trim() : v)
+    transformHeader: (h: string) => h.trim(),
+    transform: (v: unknown) => (typeof v === 'string' ? v.trim() : v)
   })
 
   return parsed.data

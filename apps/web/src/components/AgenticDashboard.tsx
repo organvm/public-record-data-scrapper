@@ -36,7 +36,9 @@ interface AgenticDashboardProps {
 export function AgenticDashboard({
   agentic,
   competitors,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   competitorsLoading = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   competitorLastUpdated
 }: AgenticDashboardProps) {
   const [selectedTab, setSelectedTab] = useState('overview')
@@ -50,7 +52,7 @@ export function AgenticDashboard({
     low: 'bg-blue-500'
   }
 
-  const categoryDetails: Record<ImprovementCategory, { icon: ReactNode; label: string }> = {
+  const categoryDetails = {
     performance: { icon: <TrendUp className="w-4 h-4" />, label: 'Performance' },
     security: { icon: <Shield className="w-4 h-4" />, label: 'Security' },
     usability: { icon: <Sparkle className="w-4 h-4" />, label: 'Usability' },
@@ -182,7 +184,12 @@ export function AgenticDashboard({
                   improvement={improvement}
                   onApprove={approveImprovement}
                   priorityColors={priorityColors}
-                  categoryDetails={categoryDetails}
+                  categoryDetails={
+                    categoryDetails as Record<
+                      ImprovementCategory,
+                      { icon: ReactNode; label: string }
+                    >
+                  }
                 />
               ))
             )}
@@ -202,7 +209,12 @@ export function AgenticDashboard({
                   improvement={improvement}
                   onApprove={approveImprovement}
                   priorityColors={priorityColors}
-                  categoryDetails={categoryDetails}
+                  categoryDetails={
+                    categoryDetails as Record<
+                      ImprovementCategory,
+                      { icon: ReactNode; label: string }
+                    >
+                  }
                   showActions
                 />
               ))
@@ -210,9 +222,12 @@ export function AgenticDashboard({
           </TabsContent>
           <TabsContent value="competitor">
             <CompetitorAnalysis
-              data={competitors}
-              isLoading={competitorsLoading}
-              lastUpdated={competitorLastUpdated}
+              competitors={competitors}
+              improvements={improvements.filter(
+                (i) =>
+                  i.suggestion.category === 'competitor-analysis' ||
+                  i.suggestion.category === 'competitor-intelligence'
+              )}
             />
           </TabsContent>
         </Tabs>

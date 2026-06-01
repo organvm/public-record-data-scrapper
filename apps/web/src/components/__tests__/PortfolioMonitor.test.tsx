@@ -92,7 +92,9 @@ describe('PortfolioMonitor', () => {
         score: 92,
         sentimentTrend: 'improving',
         reviewCount: 25,
-        violationCount: 0
+        violationCount: 0,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       }
     },
     {
@@ -106,7 +108,9 @@ describe('PortfolioMonitor', () => {
         score: 58,
         sentimentTrend: 'stable',
         reviewCount: 12,
-        violationCount: 1
+        violationCount: 1,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       }
     },
     {
@@ -120,7 +124,9 @@ describe('PortfolioMonitor', () => {
         score: 35,
         sentimentTrend: 'declining',
         reviewCount: 8,
-        violationCount: 3
+        violationCount: 3,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       },
       lastAlertDate: '2024-01-10'
     },
@@ -135,7 +141,9 @@ describe('PortfolioMonitor', () => {
         score: 15,
         sentimentTrend: 'declining',
         reviewCount: 5,
-        violationCount: 7
+        violationCount: 7,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       },
       lastAlertDate: '2024-01-15'
     },
@@ -150,7 +158,9 @@ describe('PortfolioMonitor', () => {
         score: 78,
         sentimentTrend: 'stable',
         reviewCount: 20,
-        violationCount: 0
+        violationCount: 0,
+        avgSentiment: 0.85,
+        lastUpdated: '2026-01-15T00:00:00Z'
       }
     }
   ]
@@ -247,7 +257,9 @@ describe('PortfolioMonitor', () => {
           score: 90,
           sentimentTrend: 'stable' as const,
           reviewCount: 10,
-          violationCount: 0
+          violationCount: 0,
+          avgSentiment: 0.85,
+          lastUpdated: '2026-01-15T00:00:00Z'
         }
       }))
       render(<PortfolioMonitor companies={manyPerforming} />)

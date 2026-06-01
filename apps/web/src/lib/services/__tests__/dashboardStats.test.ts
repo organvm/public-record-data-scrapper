@@ -36,7 +36,9 @@ describe('fetchDashboardStats', () => {
 
     // Setup database mocks
     vi.mocked(getDatabase).mockReturnValue({} as ReturnType<typeof getDatabase>)
-    vi.mocked(createQueryBuilder).mockReturnValue(mockQueries as ReturnType<typeof createQueryBuilder>)
+    vi.mocked(createQueryBuilder).mockReturnValue(
+      mockQueries as unknown as ReturnType<typeof createQueryBuilder>
+    )
   })
 
   it('calculates average health grade correctly', async () => {

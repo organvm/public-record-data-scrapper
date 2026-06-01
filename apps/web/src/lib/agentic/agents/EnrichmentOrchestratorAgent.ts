@@ -82,7 +82,7 @@ export class EnrichmentOrchestratorAgent extends BaseAgent {
     try {
       switch (type) {
         case 'enrich-prospect':
-          return await this.enrichProspect(payload as EnrichmentRequest)
+          return await this.enrichProspect(payload as unknown as EnrichmentRequest)
         case 'get-enrichment-status':
           if (!payloadData.enrichmentId) {
             return {
@@ -163,8 +163,8 @@ export class EnrichmentOrchestratorAgent extends BaseAgent {
       } else {
         progress[progress.length - 1].status = 'completed'
         progress[progress.length - 1].data = {
-          sources: dataResult.data?.sources || [],
-          cost: dataResult.data?.totalCost || 0
+          sources: (dataResult.data as Record<string, unknown>)?.sources || [],
+          cost: (dataResult.data as Record<string, unknown>)?.totalCost || 0
         }
       }
 
@@ -188,8 +188,8 @@ export class EnrichmentOrchestratorAgent extends BaseAgent {
         } else {
           progress[progress.length - 1].status = 'completed'
           progress[progress.length - 1].data = {
-            filingCount: uccResult.data?.filingCount || 0,
-            searchUrl: uccResult.data?.searchUrl
+            filingCount: (uccResult.data as Record<string, unknown>)?.filingCount || 0,
+            searchUrl: (uccResult.data as Record<string, unknown>)?.searchUrl
           }
         }
       } else {
@@ -212,7 +212,10 @@ export class EnrichmentOrchestratorAgent extends BaseAgent {
           data: {
             companyName,
             state,
-            ...dataResult.data?.results
+            ...(((dataResult.data as Record<string, unknown>)?.results as Record<
+              string,
+              unknown
+            >) ?? {})
           }
         }
       })
@@ -231,12 +234,12 @@ export class EnrichmentOrchestratorAgent extends BaseAgent {
           payload: {
             userId,
             action: 'enrichment',
-            cost: dataResult.data?.totalCost || 0,
+            cost: (dataResult.data as Record<string, unknown>)?.totalCost || 0,
             success: true,
             metadata: {
               companyName,
               state,
-              sources: dataResult.data?.sources || []
+              sources: (dataResult.data as Record<string, unknown>)?.sources || []
             }
           }
         })
@@ -248,16 +251,22 @@ export class EnrichmentOrchestratorAgent extends BaseAgent {
         data: {
           companyName,
           state,
-          normalizedName: normalizeResult.data?.normalized?.companyName || companyName,
-          dataAcquisition: dataResult.data?.results || {},
-          uccFilings: uccResult?.data?.filings || [],
-          sources: dataResult.data?.sources || [],
+          normalizedName:
+            (
+              (normalizeResult.data as Record<string, unknown>)?.normalized as Record<
+                string,
+                unknown
+              >
+            )?.companyName || companyName,
+          dataAcquisition: (dataResult.data as Record<string, unknown>)?.results || {},
+          uccFilings: ((uccResult?.data as Record<string, unknown>)?.filings as unknown[]) || [],
+          sources: ((dataResult.data as Record<string, unknown>)?.sources as string[]) || [],
           searchUrls: {
-            ucc: uccResult?.data?.searchUrl
+            ucc: (uccResult?.data as Record<string, unknown>)?.searchUrl
           }
         },
-        sources: dataResult.data?.sources || [],
-        cost: dataResult.data?.totalCost || 0,
+        sources: ((dataResult.data as Record<string, unknown>)?.sources as string[]) || [],
+        cost: ((dataResult.data as Record<string, unknown>)?.totalCost as number) || 0,
         timestamp: new Date().toISOString()
       }
 

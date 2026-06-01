@@ -332,10 +332,14 @@ export function validateScheduleConfig(data: unknown): ScheduleConfigOutput {
  * Get validation errors in human-readable format
  */
 export function formatValidationErrors(error: z.ZodError): string[] {
-  return error.errors.map((err) => {
-    const path = err.path.join('.')
-    return `${path}: ${err.message}`
-  })
+  return (
+    (error as { issues?: Array<{ path: (string | number)[]; message: string }> }).issues?.map(
+      (err) => {
+        const path = err.path.join('.')
+        return `${path}: ${err.message}`
+      }
+    ) || []
+  )
 }
 
 /**
@@ -355,9 +359,10 @@ export function createProspectValidator(options: {
   let schema = ProspectSchema
 
   if (options.requireRevenue) {
-    schema = schema.extend({
-      estimatedRevenue: z.number().positive()
-    })
+    schema = schema.refine(
+      (data) => typeof data.estimatedRevenue === 'number' && data.estimatedRevenue > 0,
+      { message: 'Estimated revenue must be a positive number' }
+    ) as typeof schema
   }
 
   if (options.minPriorityScore !== undefined) {

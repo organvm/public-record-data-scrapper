@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useContactActions } from '../useContactActions'
-import type { Contact, ContactActivity, ContactWithActivities } from '@public-records/core'
+import type { Contact, ContactActivity } from '@public-records/core'
 
 // Mock toast
 vi.mock('sonner', () => ({
@@ -176,12 +176,12 @@ describe('useContactActions', () => {
 
   describe('handleFetchContact', () => {
     it('should fetch a single contact successfully', async () => {
-      const mockContactWithActivities: ContactWithActivities = {
+      const mockContactWithActivities = {
         ...createMockContact(),
         activities: [createMockActivity()],
         first_name: 'John',
         last_name: 'Doe'
-      }
+      } as Contact
       mockFetchContact.mockResolvedValueOnce(mockContactWithActivities)
 
       const { result } = renderUseContactActions()

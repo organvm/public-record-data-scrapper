@@ -8,7 +8,7 @@
  * - Growth signal detection
  */
 
-import { DataIngestionService, IngestionConfig } from './DataIngestionService'
+import { DataIngestionService, IngestionConfig, IngestionResult } from './DataIngestionService'
 import { DataEnrichmentService, EnrichmentSource } from './DataEnrichmentService'
 import { Prospect } from '@public-records/core'
 
@@ -55,6 +55,12 @@ export interface SchedulerEventData {
   enrichmentResults?: { prospectId: string; success: boolean }[]
   refreshedCount?: number
   prospectIds?: string[]
+  filingsFound?: number
+  prospectsCreated?: number
+  sources?: number
+  prospectsEnriched?: number
+  remaining?: number
+  prospectsRefreshed?: number
 }
 
 export interface SchedulerEvent {

@@ -19,7 +19,7 @@ export interface LogMetadata {
   correlationId?: string
   userId?: string
   service?: string
-  duration?: number
+  duration?: number | string
   statusCode?: number
   [key: string]: unknown
 }
@@ -40,7 +40,7 @@ const customFormat = winston.format.combine(
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.printf((info) => {
+  winston.format.printf((info: Record<string, unknown>) => {
     const { timestamp, level, message, metadata, ...rest } = info as {
       timestamp?: unknown
       level?: unknown
@@ -74,7 +74,7 @@ function createLogger(): winston.Logger {
   const env = process.env.NODE_ENV || 'development'
   const logLevel = process.env.LOG_LEVEL || (env === 'production' ? 'info' : 'debug')
 
-  const transports: winston.transport[] = []
+  const transports: winston.Transport[] = []
 
   // Console transport (always enabled)
   transports.push(

@@ -83,8 +83,8 @@ describe('retry', () => {
       await vi.waitFor(() => expect(caughtError).not.toBeNull())
 
       expect(caughtError).toBeInstanceOf(RetryError)
-      expect(caughtError?.attempts).toBe(3)
-      expect(caughtError?.lastError).toBe(error)
+      expect((caughtError as unknown as RetryError).attempts).toBe(3)
+      expect((caughtError as unknown as RetryError).lastError).toBe(error)
       expect(fn).toHaveBeenCalledTimes(3)
     })
   })
@@ -234,7 +234,7 @@ describe('retryIf', () => {
     // Wait for the promise to settle
     await vi.waitFor(() => expect(caughtError).not.toBeNull())
 
-    expect(caughtError?.message).toBe('Bad Request')
+    expect((caughtError as unknown as Error).message).toBe('Bad Request')
     expect(fn).toHaveBeenCalledTimes(2) // Retried once, then failed
   })
 

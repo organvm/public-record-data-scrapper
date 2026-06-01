@@ -132,7 +132,7 @@ export class GenerativeIntelligenceHub {
 
     const results = await this.vectorStore.findSimilar('prospects', prospectId, limit)
 
-    return results.map((r) => r.document.metadata as Prospect)
+    return results.map((r) => r.document.metadata as unknown as Prospect)
   }
 
   /**
@@ -145,7 +145,7 @@ export class GenerativeIntelligenceHub {
 
     const results = await this.vectorStore.search('prospects', query, limit)
 
-    return results.map((r) => r.document.metadata as Prospect)
+    return results.map((r) => r.document.metadata as unknown as Prospect)
   }
 
   // ==================== PERSONALIZATION ====================
@@ -266,9 +266,9 @@ Provide 3-5 key insights in bullet points. Focus on:
       llm: this.llm.getUsageStats(),
       vectorStore: this.vectorStore
         ? {
-            indices: this.vectorStore.listIndices().map((name) => ({
-              name,
-              ...this.vectorStore!.getIndexStats(name)
+            indices: this.vectorStore.listIndices().map((indexName) => ({
+              ...this.vectorStore!.getIndexStats(indexName),
+              name: indexName
             }))
           }
         : null,

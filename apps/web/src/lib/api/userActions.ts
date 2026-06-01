@@ -13,7 +13,7 @@ export async function fetchUserActions(
 export async function logUserAction(action: UserAction, signal?: AbortSignal): Promise<UserAction> {
   return apiRequest<UserAction>('/user-actions', {
     method: 'POST',
-    body: action,
+    body: action as unknown as Record<string, unknown>,
     signal
   })
 }

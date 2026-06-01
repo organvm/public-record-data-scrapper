@@ -205,7 +205,9 @@ export class NYUCCPortalScraper {
         })
 
         if (parsedFilings.length === 0) {
-          const noResults = await page.locator('text=/No records found/i').count()
+          const noResults = await (
+            page.locator('text=/No records found/i') as { count(): Promise<number> }
+          ).count()
           if (noResults === 0) {
             errors.push('NY results page did not contain expected filing tables.')
           }

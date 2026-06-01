@@ -48,8 +48,8 @@ export class PersonalizedRecommendationEngine {
       candidates = candidates.filter((p) => !p.claimedBy)
     }
 
-    if (filters?.minScore) {
-      candidates = candidates.filter((p) => p.priorityScore >= filters.minScore)
+    if (filters?.minScore !== undefined) {
+      candidates = candidates.filter((p) => p.priorityScore >= filters.minScore!)
     }
 
     if (filters?.industries && filters.industries.length > 0) {

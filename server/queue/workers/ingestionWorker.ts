@@ -3,6 +3,7 @@ import { redisConnection } from '../connection'
 import { IngestionJobData } from '../queues'
 import { database } from '../../database/connection'
 import { DataQualityService } from '../../services/DataQualityService'
+import { ScoringService } from '../../services/ScoringService'
 import { listEnabledIntegrations, resolveUccProvider } from '../../config/tieredIntegrations'
 import type {
   StateCollector,
@@ -70,8 +71,12 @@ async function processIngestion(job: Job<IngestionJobData>): Promise<void> {
     await job.updateProgress(60)
 
     console.log(`[Ingestion Worker] Persisting ${filings.length} live filings to database...`)
-    await persistCollectedFilings(state, currentStrategy, filings)
+    const upsertedFilingIds = await persistCollectedFilings(state, currentStrategy, filings)
     await job.updateProgress(85)
+
+    // Recompute live priority scores for prospects touched by these filings.
+    // Error-isolated (see scoreAffectedProspects) so scoring never fails the job.
+    await scoreAffectedProspects(state, upsertedFilingIds)
 
     const dqService = new DataQualityService(database)
     const dqReport = dqService.validateBatch(job.data.state, job.id ?? 'unknown', filings)
@@ -303,7 +308,8 @@ async function persistCollectedFilings(
   state: string,
   strategy: IngestionJobData['strategy'],
   filings: CollectedUCCFiling[]
-): Promise<void> {
+): Promise<string[]> {
+  const upsertedFilingIds: string[] = []
   for (const filing of filings) {
     const amendmentCount = filing.amendments?.length ?? 0
     const lastAmendmentDate = resolveLastAmendmentDate(filing.amendments)
@@ -362,6 +368,10 @@ async function persistCollectedFilings(
 
     const filingId: string | undefined = (result as { rows?: { id: string }[] })?.rows?.[0]?.id
 
+    if (filingId) {
+      upsertedFilingIds.push(filingId)
+    }
+
     if (filingId && filing.amendments && filing.amendments.length > 0) {
       for (let i = 0; i < filing.amendments.length; i++) {
         const amendment = filing.amendments[i]
@@ -391,6 +401,70 @@ async function persistCollectedFilings(
       }
     }
   }
+
+  return upsertedFilingIds
+}
+
+/**
+ * Recompute and persist priority_score for every prospect linked to the filings
+ * just upserted in this ingestion run, so the dashboard's score reflects real
+ * filing data on each run instead of whatever stale value sits in the row.
+ *
+ * Error-isolated to match the worker's existing DataQualityService pattern: a
+ * scoring failure (per-prospect or for the whole step) is logged and swallowed
+ * so it can never fail the ingestion job.
+ */
+async function scoreAffectedProspects(state: string, filingIds: string[]): Promise<void> {
+  if (filingIds.length === 0) {
+    return
+  }
+
+  let affectedProspectIds: string[]
+  try {
+    const rows = await database.query<{ prospect_id: string }>(
+      `SELECT DISTINCT prospect_id
+       FROM prospect_ucc_filings
+       WHERE ucc_filing_id = ANY($1::uuid[])`,
+      [filingIds]
+    )
+    affectedProspectIds = rows.map((r) => r.prospect_id)
+  } catch (err) {
+    console.error(
+      `[ingestion] Failed to resolve affected prospects for ${state} scoring:`,
+      (err as Error).message
+    )
+    return
+  }
+
+  if (affectedProspectIds.length === 0) {
+    return
+  }
+
+  const scoringService = new ScoringService()
+  let scored = 0
+  for (const prospectId of affectedProspectIds) {
+    try {
+      const result = await scoringService.scoreProspect(prospectId)
+      await database.query(
+        `UPDATE prospects
+         SET priority_score = $2, narrative = $3, updated_at = NOW()
+         WHERE id = $1`,
+        [prospectId, result.compositeScore, result.narrative]
+      )
+      scored++
+    } catch (err) {
+      // Isolate per-prospect failures: log and continue so one bad prospect
+      // never aborts scoring for the rest or the ingestion job itself.
+      console.error(
+        `[ingestion] Failed to score prospect ${prospectId} for ${state}:`,
+        (err as Error).message
+      )
+    }
+  }
+
+  console.log(
+    `[ingestion] Recomputed scores for ${scored}/${affectedProspectIds.length} prospects affected by ${state} ingestion`
+  )
 }
 
 function filingSafeId(filingNumber: string): string {

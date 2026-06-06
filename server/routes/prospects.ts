@@ -3,6 +3,10 @@ import { z } from 'zod'
 import { validateRequest } from '../middleware/validateRequest'
 import { asyncHandler } from '../middleware/errorHandler'
 import { ProspectsService } from '../services/ProspectsService'
+import { ScoringService } from '../services/ScoringService'
+import { QualificationService } from '../services/QualificationService'
+import { UnderwritingService } from '../services/UnderwritingService'
+import type { UnderwritingFeatures } from '../services/UnderwritingService'
 import { getResolvedDataTier, type ResolvedDataTier } from '../middleware/dataTier'
 
 const router = Router()
@@ -65,6 +69,58 @@ const batchClaimBodySchema = z.object({
 
 const batchDeleteBodySchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(MAX_BATCH_SIZE)
+})
+
+// Optional scoring modifiers. The scoring service falls back to the prospect's
+// own industry/state when these are omitted, so the body is fully optional.
+const scoreBodySchema = z
+  .object({
+    industry: z.string().optional(),
+    state: z.string().length(2).optional()
+  })
+  .optional()
+
+// Revenue-trend sub-shape required by UnderwritingFeatures.
+const revenueTrendSchema = z.object({
+  direction: z.enum(['increasing', 'stable', 'decreasing', 'volatile']),
+  percentageChange: z.number(),
+  averageMonthlyRevenue: z.number(),
+  medianMonthlyRevenue: z.number(),
+  seasonalityScore: z.number(),
+  monthlyData: z.array(z.unknown()).default([])
+})
+
+// The fields QualificationService.qualify actually reads off UnderwritingFeatures.
+// These are the genuine inputs the engine needs; anything not supplied makes the
+// qualification non-deterministic, so we fail closed (422) rather than fabricate.
+const REQUIRED_BANK_FEATURE_FIELDS = [
+  'averageDailyBalance',
+  'nsfCount',
+  'negativeDaysPercentage',
+  'estimatedPositionCount',
+  'averageMonthlyDeposits',
+  'depositConsistencyScore',
+  'daysSinceLastDeposit',
+  'estimatedPaymentObligations',
+  'totalTransactionsAnalyzed',
+  'totalDaysAnalyzed',
+  'revenueTrend'
+] as const
+
+const qualifyBodySchema = z.object({
+  bankFeatures: z.record(z.string(), z.unknown()).optional(),
+  timeInBusinessMonths: z.number().int().nonnegative().optional(),
+  industry: z.string().optional(),
+  state: z.string().length(2).optional()
+})
+
+// Underwriting (feature extraction) requires a Plaid access token for the
+// prospect's linked bank account. No token => no bank data => fail closed.
+const underwriteBodySchema = z.object({
+  accessToken: z.string().min(1).optional(),
+  monthsToAnalyze: z.number().int().positive().max(24).optional(),
+  timeInBusinessMonths: z.number().int().nonnegative().optional(),
+  qualify: z.boolean().optional()
 })
 
 type ProspectsQuery = z.infer<typeof querySchema>
@@ -219,6 +275,207 @@ router.post(
     const prospect = await prospectsService.unclaim(req.params.id)
 
     res.json(prospect)
+  })
+)
+
+// Validate that a supplied bank-features object carries every input the
+// QualificationService genuinely needs. Returns the list of missing field
+// names (empty when complete). A field counts as missing if it is absent, null,
+// or — for numeric inputs — not a finite number; we never coerce or default
+// underwriting inputs.
+function findMissingBankFeatureFields(bankFeatures: Record<string, unknown> | undefined): string[] {
+  if (!bankFeatures) {
+    return [...REQUIRED_BANK_FEATURE_FIELDS]
+  }
+
+  const missing: string[] = []
+  for (const field of REQUIRED_BANK_FEATURE_FIELDS) {
+    const value = bankFeatures[field]
+    if (value === undefined || value === null) {
+      missing.push(field)
+      continue
+    }
+    if (field === 'revenueTrend') {
+      const parsed = revenueTrendSchema.safeParse(value)
+      if (!parsed.success) {
+        missing.push(field)
+      }
+      continue
+    }
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      missing.push(field)
+    }
+  }
+  return missing
+}
+
+// POST /api/prospects/:id/score - Compute the prospect's MCA score from live
+// UCC-filing and health data and persist it.
+//
+// ScoringService.scoreProspect reads the prospect row plus its linked
+// ucc_filings (status/recency/volume) and latest health_scores row, derives
+// intent/health/position sub-scores, applies industry + state modifiers, and
+// returns a composite 0-100 score with grade, confidence, factors, narrative,
+// and recommendation. We persist the composite as priority_score (the column
+// the dashboard reads) and the generated narrative, then return the full result.
+router.post(
+  '/:id/score',
+  validateRequest({ params: idParamSchema, body: scoreBodySchema }),
+  asyncHandler(async (req, res) => {
+    const prospectsService = new ProspectsService()
+    const prospect = await prospectsService.getById(req.params.id)
+
+    if (!prospect) {
+      return res.status(404).json({
+        error: {
+          message: `Prospect ${req.params.id} not found`,
+          code: 'NOT_FOUND',
+          statusCode: 404
+        }
+      })
+    }
+
+    const body = (req.body ?? {}) as { industry?: string; state?: string }
+    const scoringService = new ScoringService()
+    const result = await scoringService.scoreProspect(req.params.id, {
+      industry: body.industry,
+      state: body.state
+    })
+
+    // Persist the live-computed composite as the canonical priority_score plus
+    // the narrative so the dashboard and list/sort reflect real filing data.
+    const updated = await prospectsService.update(req.params.id, {
+      priorityScore: result.compositeScore,
+      narrative: result.narrative
+    })
+
+    res.json({ prospect: updated, scoring: result })
+  })
+)
+
+// POST /api/prospects/:id/qualify - Run the pre-qualification rules engine.
+//
+// QualificationService.qualify needs extracted bank-data features
+// (UnderwritingFeatures): average daily balance, NSF count, negative-days %,
+// estimated existing positions, average monthly deposits, deposit-consistency
+// score, days-since-last-deposit, payment obligations, transaction/day counts,
+// and a revenue-trend object. These do not exist on the prospect record, so the
+// caller must supply `bankFeatures` (typically produced by the underwrite
+// endpoint). If any required input is missing we fail closed with a 422 naming
+// exactly which inputs are absent rather than fabricating them.
+router.post(
+  '/:id/qualify',
+  validateRequest({ params: idParamSchema, body: qualifyBodySchema }),
+  asyncHandler(async (req, res) => {
+    const prospectsService = new ProspectsService()
+    const prospect = await prospectsService.getById(req.params.id)
+
+    if (!prospect) {
+      return res.status(404).json({
+        error: {
+          message: `Prospect ${req.params.id} not found`,
+          code: 'NOT_FOUND',
+          statusCode: 404
+        }
+      })
+    }
+
+    const body = req.body as {
+      bankFeatures?: Record<string, unknown>
+      timeInBusinessMonths?: number
+      industry?: string
+      state?: string
+    }
+
+    const missing = findMissingBankFeatureFields(body.bankFeatures)
+    if (missing.length > 0) {
+      return res.status(422).json({
+        error: {
+          message:
+            'Qualification requires complete bank-data features; the following inputs are missing or invalid',
+          code: 'MISSING_QUALIFICATION_INPUTS',
+          statusCode: 422,
+          details: { missing }
+        }
+      })
+    }
+
+    const qualificationService = new QualificationService()
+    const result = await qualificationService.qualify(
+      req.params.id,
+      body.bankFeatures as unknown as UnderwritingFeatures,
+      {
+        timeInBusinessMonths: body.timeInBusinessMonths,
+        industry: body.industry,
+        state: body.state
+      }
+    )
+
+    res.json({ qualification: result })
+  })
+)
+
+// POST /api/prospects/:id/underwrite - Extract underwriting features from the
+// prospect's linked bank account.
+//
+// UnderwritingService.extractFeatures needs a Plaid `accessToken` for the
+// prospect's connected bank — it fetches transactions and derives the full
+// UnderwritingFeatures set (ADB, NSF, negative days, lender-payment/stack
+// detection, revenue trend, deposit consistency). Without a token there is no
+// bank data, so we fail closed with a 422 naming the missing input rather than
+// inventing financials. Pass `qualify: true` to chain straight into the rules
+// engine using the freshly extracted features.
+router.post(
+  '/:id/underwrite',
+  validateRequest({ params: idParamSchema, body: underwriteBodySchema }),
+  asyncHandler(async (req, res) => {
+    const prospectsService = new ProspectsService()
+    const prospect = await prospectsService.getById(req.params.id)
+
+    if (!prospect) {
+      return res.status(404).json({
+        error: {
+          message: `Prospect ${req.params.id} not found`,
+          code: 'NOT_FOUND',
+          statusCode: 404
+        }
+      })
+    }
+
+    const body = req.body as {
+      accessToken?: string
+      monthsToAnalyze?: number
+      timeInBusinessMonths?: number
+      qualify?: boolean
+    }
+
+    if (!body.accessToken) {
+      return res.status(422).json({
+        error: {
+          message: 'Underwriting requires a Plaid access token for the prospect bank connection',
+          code: 'MISSING_UNDERWRITING_INPUTS',
+          statusCode: 422,
+          details: { missing: ['accessToken'] }
+        }
+      })
+    }
+
+    const underwritingService = new UnderwritingService()
+    const features = await underwritingService.extractFeatures(body.accessToken, {
+      monthsToAnalyze: body.monthsToAnalyze
+    })
+
+    if (!body.qualify) {
+      return res.json({ features })
+    }
+
+    // Convenience chaining: qualify with the just-extracted features.
+    const qualificationService = new QualificationService()
+    const qualification = await qualificationService.qualify(req.params.id, features, {
+      timeInBusinessMonths: body.timeInBusinessMonths
+    })
+
+    res.json({ features, qualification })
   })
 )
 

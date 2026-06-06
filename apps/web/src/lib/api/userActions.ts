@@ -7,7 +7,17 @@ export async function fetchUserActions(
   options: { dataTier?: DataTier } = {}
 ): Promise<UserAction[]> {
   const headers = options.dataTier ? { 'x-data-tier': options.dataTier } : undefined
-  return apiRequest<UserAction[]>('/user-actions', { signal, headers })
+  try {
+    const res = await apiRequest<
+      UserAction[] | { userActions?: UserAction[]; actions?: UserAction[] }
+    >('/user-actions', { signal, headers })
+    return Array.isArray(res) ? res : (res?.userActions ?? res?.actions ?? [])
+  } catch (error) {
+    if (signal?.aborted) throw error
+    // The /user-actions route may not be mounted yet. User actions are
+    // non-critical telemetry — never let a 404 here sink the dashboard load.
+    return []
+  }
 }
 
 export async function logUserAction(action: UserAction, signal?: AbortSignal): Promise<UserAction> {

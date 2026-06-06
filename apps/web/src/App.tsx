@@ -8,7 +8,8 @@ import { QuickAccessBanner } from '@/components/QuickAccessBanner'
 import { DemoTour } from '@/components/DemoTour'
 
 // Layout components
-import { Header, LoadingAndErrorState, TabNavigation, MobileBottomNav } from '@/components/layout'
+import { Header, LoadingAndErrorState, MobileBottomNav } from '@/components/layout'
+import { CommandRail } from '@/components/layout/CommandRail'
 
 // Feature tabs
 import { ProspectsTab } from '@/features/prospects'
@@ -45,9 +46,12 @@ function App() {
   const [tourOpen, setTourOpen] = useState(false)
   const { dataTier } = useDataTier()
 
-  const useDemoData =
-    import.meta.env.DEV &&
-    ['1', 'true', 'yes'].includes(String(import.meta.env.VITE_USE_MOCK_DATA ?? '').toLowerCase())
+  // Real, free public data (USAspending.gov) is the default source. Preview
+  // (synthetic) data is opt-in via VITE_USE_MOCK_DATA=true, and is also used
+  // automatically as a fallback if a live load fails — so the deck is never an
+  // empty shell, but shows REAL data whenever it can.
+  const mockFlag = String(import.meta.env.VITE_USE_MOCK_DATA ?? '').toLowerCase()
+  const useDemoData = ['1', 'true', 'yes'].includes(mockFlag)
 
   // Data fetching
   const data = useDataFetching({ useMockData: useDemoData, dataTier })
@@ -166,100 +170,108 @@ function App() {
   )
 
   return (
-    <div className="min-h-screen">
-      <Header onRefresh={handleRefreshData} />
-      <QuickAccessBanner />
-      <DemoTour isOpen={tourOpen} onClose={() => setTourOpen(false)} />
-
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 pb-20 md:pb-8">
-        <div className="space-y-4 sm:space-y-6 md:space-y-8">
-          <LoadingAndErrorState
-            isLoading={data.isLoading}
-            loadError={data.loadError}
-            onRetry={() => void data.fetchData()}
+    <Tabs defaultValue="prospects" className="min-h-screen">
+      <div className="flex min-h-screen">
+        <CommandRail />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Header
+            onRefresh={handleRefreshData}
+            dataSource={data.dataSource}
+            dataSourceName={data.dataSourceName}
           />
+          <QuickAccessBanner />
+          <DemoTour isOpen={tourOpen} onClose={() => setTourOpen(false)} />
 
-          {stats ? (
-            <StatsOverview stats={stats} />
-          ) : (
-            !data.isLoading && (
-              <div className="glass-effect border border-white/10 rounded-lg p-4 text-sm text-white/70">
-                No aggregated metrics are available yet. Refresh to pull the latest insights.
-              </div>
-            )
-          )}
-
-          {data.lastDataRefresh && (
-            <StaleDataWarning lastUpdated={data.lastDataRefresh} onRefresh={handleRefreshData} />
-          )}
-
-          <Tabs defaultValue="prospects" className="w-full">
-            <TabNavigation />
-
-            <TabsContent value="prospects" className="space-y-4 sm:space-y-6">
-              <ProspectsTab
-                prospects={data.prospects}
-                filteredProspects={sorting.sortedProspects}
-                totalCount={data.prospects.length}
-                searchQuery={filters.searchQuery}
-                industryFilter={filters.industryFilter}
-                stateFilter={filters.stateFilter}
-                minScore={filters.minScore}
-                advancedFilters={filters.advancedFilters}
-                activeFilterCount={filters.activeFilterCount}
-                industries={filters.industries}
-                states={filters.states}
-                sortField={sorting.sortField}
-                sortDirection={sorting.sortDirection}
-                selectedIds={selection.selectedIds}
-                exportFormat={exportFormat || 'json'}
-                onSearchChange={filters.setSearchQuery}
-                onIndustryChange={filters.setIndustryFilter}
-                onStateChange={filters.setStateFilter}
-                onMinScoreChange={filters.setMinScore}
-                onAdvancedFiltersChange={filters.setAdvancedFilters}
-                onSortChange={sorting.handleSortChange}
-                onSelectionChange={selection.setSelectedIds}
-                onExportFormatChange={(format) => setExportFormat(format)}
-                onProspectSelect={handleProspectSelect}
-                onBatchClaim={prospectActions.handleBatchClaim}
-                onBatchExport={prospectActions.handleBatchExport}
-                onBatchDelete={prospectActions.handleBatchDelete}
+          <main className="flex-1 px-3 py-4 pb-24 sm:px-4 sm:py-6 md:px-6 md:py-8 md:pb-8 lg:px-8">
+            <div className="mx-auto max-w-[1600px] space-y-4 sm:space-y-6 md:space-y-8">
+              <LoadingAndErrorState
+                isLoading={data.isLoading}
+                loadError={data.loadError}
+                onRetry={() => void data.fetchData()}
               />
-            </TabsContent>
 
-            <TabsContent value="portfolio" className="space-y-4 sm:space-y-6">
-              <PortfolioTab portfolio={data.portfolio} />
-            </TabsContent>
+              {stats ? (
+                <StatsOverview stats={stats} />
+              ) : (
+                !data.isLoading && (
+                  <div className="glass-effect border border-white/10 rounded-lg p-4 text-sm text-white/70">
+                    No aggregated metrics are available yet. Refresh to pull the latest insights.
+                  </div>
+                )
+              )}
 
-            <TabsContent value="intelligence" className="space-y-4 sm:space-y-6">
-              <IntelligenceTab competitors={data.competitors} />
-            </TabsContent>
+              {data.lastDataRefresh && (
+                <StaleDataWarning
+                  lastUpdated={data.lastDataRefresh}
+                  onRefresh={handleRefreshData}
+                />
+              )}
 
-            <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
-              <AnalyticsTab
-                prospects={data.prospects}
-                portfolio={data.portfolio}
-                dataTier={dataTier}
-                usePreviewData={useDemoData}
-              />
-            </TabsContent>
+              <TabsContent value="prospects" className="space-y-4 sm:space-y-6">
+                <ProspectsTab
+                  prospects={data.prospects}
+                  filteredProspects={sorting.sortedProspects}
+                  totalCount={data.prospects.length}
+                  searchQuery={filters.searchQuery}
+                  industryFilter={filters.industryFilter}
+                  stateFilter={filters.stateFilter}
+                  minScore={filters.minScore}
+                  advancedFilters={filters.advancedFilters}
+                  activeFilterCount={filters.activeFilterCount}
+                  industries={filters.industries}
+                  states={filters.states}
+                  sortField={sorting.sortField}
+                  sortDirection={sorting.sortDirection}
+                  selectedIds={selection.selectedIds}
+                  exportFormat={exportFormat || 'json'}
+                  onSearchChange={filters.setSearchQuery}
+                  onIndustryChange={filters.setIndustryFilter}
+                  onStateChange={filters.setStateFilter}
+                  onMinScoreChange={filters.setMinScore}
+                  onAdvancedFiltersChange={filters.setAdvancedFilters}
+                  onSortChange={sorting.handleSortChange}
+                  onSelectionChange={selection.setSelectedIds}
+                  onExportFormatChange={(format) => setExportFormat(format)}
+                  onProspectSelect={handleProspectSelect}
+                  onBatchClaim={prospectActions.handleBatchClaim}
+                  onBatchExport={prospectActions.handleBatchExport}
+                  onBatchDelete={prospectActions.handleBatchDelete}
+                />
+              </TabsContent>
 
-            <TabsContent value="requalification" className="space-y-4 sm:space-y-6">
-              <RequalificationTab />
-            </TabsContent>
+              <TabsContent value="portfolio" className="space-y-4 sm:space-y-6">
+                <PortfolioTab portfolio={data.portfolio} />
+              </TabsContent>
 
-            <TabsContent value="coverage" className="space-y-4 sm:space-y-6">
-              <CoverageTab />
-            </TabsContent>
+              <TabsContent value="intelligence" className="space-y-4 sm:space-y-6">
+                <IntelligenceTab competitors={data.competitors} />
+              </TabsContent>
 
-            <TabsContent value="agentic" className="space-y-4 sm:space-y-6">
-              <AgenticTab agentic={agentic} competitors={data.competitors} />
-            </TabsContent>
-            <MobileBottomNav />
-          </Tabs>
+              <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
+                <AnalyticsTab
+                  prospects={data.prospects}
+                  portfolio={data.portfolio}
+                  dataTier={dataTier}
+                  usePreviewData={useDemoData}
+                />
+              </TabsContent>
+
+              <TabsContent value="requalification" className="space-y-4 sm:space-y-6">
+                <RequalificationTab />
+              </TabsContent>
+
+              <TabsContent value="coverage" className="space-y-4 sm:space-y-6">
+                <CoverageTab />
+              </TabsContent>
+
+              <TabsContent value="agentic" className="space-y-4 sm:space-y-6">
+                <AgenticTab agentic={agentic} competitors={data.competitors} />
+              </TabsContent>
+            </div>
+          </main>
+          <MobileBottomNav />
         </div>
-      </main>
+      </div>
 
       <ProspectDetailDialog
         prospect={selectedProspect}
@@ -277,7 +289,7 @@ function App() {
         onDeleteReminder={notesAndReminders.handleDeleteReminder}
         onSendEmail={(email) => notesAndReminders.handleSendEmail(email, trackAction)}
       />
-    </div>
+    </Tabs>
   )
 }
 

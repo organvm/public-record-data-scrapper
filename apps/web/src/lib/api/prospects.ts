@@ -6,7 +6,13 @@ export async function fetchProspects(
   options: { dataTier?: DataTier } = {}
 ): Promise<Prospect[]> {
   const headers = options.dataTier ? { 'x-data-tier': options.dataTier } : undefined
-  return apiRequest<Prospect[]>('/prospects', { signal, headers })
+  // The server wraps list results as { prospects, pagination }; tolerate both
+  // a bare array and the wrapped object so the UI always receives an array.
+  const res = await apiRequest<Prospect[] | { prospects?: Prospect[] }>('/prospects', {
+    signal,
+    headers
+  })
+  return Array.isArray(res) ? res : (res?.prospects ?? [])
 }
 
 export async function claimProspect(

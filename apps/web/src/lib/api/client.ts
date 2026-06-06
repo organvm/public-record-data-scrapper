@@ -56,6 +56,12 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   const headers = new Headers(rawHeaders ?? {})
   headers.set('Accept', 'application/json')
 
+  // Attach a bearer token when one is configured (data routes are JWT-gated).
+  const authToken = import.meta.env.VITE_API_TOKEN as string | undefined
+  if (authToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${authToken}`)
+  }
+
   let body: BodyInit | null | undefined = rawBody as BodyInit | null | undefined
 
   if (body && typeof body !== 'string' && !(body instanceof FormData)) {

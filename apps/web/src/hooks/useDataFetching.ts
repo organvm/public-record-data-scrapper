@@ -11,6 +11,11 @@ import { fetchProspects } from '@/lib/api/prospects'
 import { fetchCompetitors } from '@/lib/api/competitors'
 import { fetchPortfolio } from '@/lib/api/portfolio'
 import { fetchUserActions } from '@/lib/api/userActions'
+import {
+  fetchLiveProspects,
+  fetchMultiStatePublicRecords,
+  deriveCompetitorsFromProspects
+} from '@/lib/data-sources/live-prospects'
 
 export interface UseDataFetchingOptions {
   useMockData: boolean
@@ -24,6 +29,8 @@ export interface UseDataFetchingResult {
   userActions: UserAction[]
   isLoading: boolean
   loadError: string | null
+  dataSource: 'live' | 'preview' | 'api'
+  dataSourceName: string
   lastDataRefresh: string
   setProspects: (updater: Prospect[] | ((prev: Prospect[]) => Prospect[])) => void
   setCompetitors: (
@@ -51,6 +58,10 @@ export function useDataFetching({
 
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [dataSource, setDataSource] = useState<'live' | 'preview' | 'api'>('live')
+  const [dataSourceName, setDataSourceName] = useState<string>(
+    'NY Dept. of State — business registrations'
+  )
 
   const fetchData = useCallback(
     async ({ signal, silent }: { signal?: AbortSignal; silent?: boolean } = {}) => {
@@ -59,51 +70,97 @@ export function useDataFetching({
       }
       setLoadError(null)
 
+      const loadPreviewData = () => {
+        setProspects(generateProspects(24, { dataTier }))
+        setCompetitors(generateCompetitorData({ dataTier }))
+        setPortfolio(generatePortfolioCompanies(15, { dataTier }))
+        setLastDataRefresh(new Date().toISOString())
+      }
+
       try {
         if (useMockData) {
-          const [mockProspects, mockCompetitors, mockPortfolio] = [
-            generateProspects(24, { dataTier }),
-            generateCompetitorData({ dataTier }),
-            generatePortfolioCompanies(15, { dataTier })
-          ]
+          if (signal?.aborted) {
+            return false
+          }
+          loadPreviewData()
+          setDataSource('preview')
+          return true
+        }
+
+        // When a real backend is configured (VITE_API_BASE_URL), use it.
+        if (import.meta.env.VITE_API_BASE_URL) {
+          const [liveProspects, liveCompetitors, livePortfolio, liveUserActions] =
+            await Promise.all([
+              fetchProspects(signal, { dataTier }),
+              fetchCompetitors(signal, { dataTier }),
+              fetchPortfolio(signal, { dataTier }),
+              fetchUserActions(signal, { dataTier })
+            ])
 
           if (signal?.aborted) {
             return false
           }
 
-          setProspects(mockProspects)
-          setCompetitors(mockCompetitors)
-          setPortfolio(mockPortfolio)
+          const hasLiveData =
+            liveProspects.length > 0 || liveCompetitors.length > 0 || livePortfolio.length > 0
+
+          if (!hasLiveData) {
+            // Backend reachable but empty (e.g. an unseeded DB) — show preview.
+            loadPreviewData()
+            setDataSource('preview')
+            setLoadError(null)
+            return true
+          }
+
+          setProspects(liveProspects)
+          setCompetitors(liveCompetitors)
+          setPortfolio(livePortfolio)
+          setUserActions(liveUserActions)
           setLastDataRefresh(new Date().toISOString())
+          setDataSource('api')
           return true
         }
 
-        const [liveProspects, liveCompetitors, livePortfolio, liveUserActions] = await Promise.all([
-          fetchProspects(signal, { dataTier }),
-          fetchCompetitors(signal, { dataTier }),
-          fetchPortfolio(signal, { dataTier }),
-          fetchUserActions(signal, { dataTier })
-        ])
-
+        // Default: real, free public records — no server/auth required.
+        // Primary: NY Dept. of State business registrations (official open-data
+        // API). Secondary: USAspending.gov federal-award recipients. The
+        // competitor view is derived from the same real records; portfolio is the
+        // operator's own funded book (no public source) so it uses preview data.
+        let liveProspects: Prospect[]
+        let sourceName: string
+        try {
+          const multi = await fetchMultiStatePublicRecords(signal, { perState: 18 })
+          liveProspects = multi.prospects
+          sourceName = `${multi.states.length}-state public records · ${multi.states.join(', ')}`
+        } catch (primaryError) {
+          if (signal?.aborted) {
+            return false
+          }
+          console.warn('State open-data unavailable; trying USAspending.', primaryError)
+          liveProspects = await fetchLiveProspects(signal, { limit: 60 })
+          sourceName = 'USAspending.gov — federal award recipients'
+        }
         if (signal?.aborted) {
           return false
         }
-
         setProspects(liveProspects)
-        setCompetitors(liveCompetitors)
-        setPortfolio(livePortfolio)
-        setUserActions(liveUserActions)
+        setCompetitors(deriveCompetitorsFromProspects(liveProspects))
+        setPortfolio(generatePortfolioCompanies(15, { dataTier }))
         setLastDataRefresh(new Date().toISOString())
+        setDataSource('live')
+        setDataSourceName(sourceName)
         return true
       } catch (error) {
         if (signal?.aborted) {
           return false
         }
 
-        const message = error instanceof Error ? error.message : 'Failed to load data'
-        setLoadError(message)
-        console.error('Failed to load datasets', error)
-        return false
+        // Live load failed (no API/proxy/auth wired yet). Fall back to preview
+        // data so the redesigned UI stays populated and demonstrable.
+        console.warn('Live data unavailable; using preview dataset.', error)
+        loadPreviewData()
+        setDataSource('preview')
+        return true
       } finally {
         if (!silent && !signal?.aborted) {
           setIsLoading(false)
@@ -135,6 +192,8 @@ export function useDataFetching({
     userActions: userActions || [],
     isLoading,
     loadError,
+    dataSource,
+    dataSourceName,
     lastDataRefresh: lastDataRefresh || new Date().toISOString(),
     setProspects: setProspects as UseDataFetchingResult['setProspects'],
     setCompetitors: setCompetitors as UseDataFetchingResult['setCompetitors'],

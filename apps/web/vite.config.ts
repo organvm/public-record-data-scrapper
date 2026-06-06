@@ -33,12 +33,75 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     allowedHosts: true,
+    // Proxy API calls to the Express server (default :3000) so the SPA's
+    // relative `/api` base resolves to the backend in local dev instead of
+    // hitting the Vite static server (which would return index.html as HTML).
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+        changeOrigin: true
+      },
+      // Real free public-data sources, proxied to avoid browser CORS in dev.
+      // In production, point the app at a deployed proxy or the direct API.
+      '/ext/usaspending': {
+        target: 'https://api.usaspending.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/usaspending/, '')
+      },
+      // State open-data (Socrata) domains — real state public records, no key.
+      '/ext/nyopendata': {
+        target: 'https://data.ny.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/nyopendata/, '')
+      },
+      '/ext/data-tx': {
+        target: 'https://data.texas.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/data-tx/, '')
+      },
+      '/ext/data-pa': {
+        target: 'https://data.pa.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/data-pa/, '')
+      },
+      '/ext/data-co': {
+        target: 'https://data.colorado.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/data-co/, '')
+      },
+      '/ext/data-or': {
+        target: 'https://data.oregon.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/data-or/, '')
+      },
+      '/ext/data-ct': {
+        target: 'https://data.ct.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/data-ct/, '')
+      },
+      '/ext/data-ia': {
+        target: 'https://mydata.iowa.gov',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/ext\/data-ia/, '')
+      },
+      '/ext/sec': {
+        target: 'https://www.sec.gov',
+        changeOrigin: true,
+        secure: true,
+        headers: { 'User-Agent': 'UCC-MCA-Intelligence research@example.com' },
+        rewrite: (p) => p.replace(/^\/ext\/sec/, '')
+      }
+    },
     fs: {
-      allow: [
-        appRoot,
-        resolve(appRoot, '../../packages'),
-        resolve(appRoot, '../../node_modules')
-      ]
+      allow: [appRoot, resolve(appRoot, '../../packages'), resolve(appRoot, '../../node_modules')]
     }
   }
 })

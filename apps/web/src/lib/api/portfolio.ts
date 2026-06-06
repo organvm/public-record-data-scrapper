@@ -6,5 +6,9 @@ export async function fetchPortfolio(
   options: { dataTier?: DataTier } = {}
 ): Promise<PortfolioCompany[]> {
   const headers = options.dataTier ? { 'x-data-tier': options.dataTier } : undefined
-  return apiRequest<PortfolioCompany[]>('/portfolio', { signal, headers })
+  // The server wraps list results as { companies, pagination } (note the key).
+  const res = await apiRequest<
+    PortfolioCompany[] | { companies?: PortfolioCompany[]; portfolio?: PortfolioCompany[] }
+  >('/portfolio', { signal, headers })
+  return Array.isArray(res) ? res : (res?.companies ?? res?.portfolio ?? [])
 }

@@ -6,5 +6,10 @@ export async function fetchCompetitors(
   options: { dataTier?: DataTier } = {}
 ): Promise<CompetitorData[]> {
   const headers = options.dataTier ? { 'x-data-tier': options.dataTier } : undefined
-  return apiRequest<CompetitorData[]>('/competitors', { signal, headers })
+  // The server wraps list results as { competitors, pagination }.
+  const res = await apiRequest<CompetitorData[] | { competitors?: CompetitorData[] }>(
+    '/competitors',
+    { signal, headers }
+  )
+  return Array.isArray(res) ? res : (res?.competitors ?? [])
 }

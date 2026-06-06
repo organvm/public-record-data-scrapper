@@ -1,0 +1,367 @@
+/* =============================================================================
+   SIGNAL COMMAND DECK — design tokens (authoritative)
+   See docs/design/REDESIGN-2027-SIGNAL-COMMAND-DECK.md
+
+   This file is the single source of truth for the redesign's visual language.
+   It is imported LAST (main.tsx) so it cleanly overrides the legacy token
+   sprawl in main.css / index.css / styles/theme.css. The legacy theme classes
+   (.dark, .dark-professional, .dark-green, .current-fixed, .hacker) are all
+   mapped onto the one coherent Signal Dark theme until the switcher UI is
+   consolidated (Phase 1); .light / .light-clean map to Signal Light.
+
+   Palette: a cool "void" neutral ground + three signal hues —
+     signal (mint-teal)  = the system is alive / primary
+     intelligence (indigo) = AI reasoning / predictions / the Council
+     opportunity (amber)   = money / hot leads / growth
+   ========================================================================== */
+
+/* ---- Signal Dark (default) ------------------------------------------------ */
+:root,
+.dark,
+.dark-professional,
+.dark-green,
+.current-fixed,
+.hacker {
+  color-scheme: dark;
+
+  /* Brand signal hues (raw) */
+  --signal: oklch(0.79 0.14 178);
+  --signal-foreground: oklch(0.17 0.03 200);
+  --signal-muted: oklch(0.79 0.14 178 / 0.14);
+  --intelligence: oklch(0.7 0.15 280);
+  --intelligence-foreground: oklch(0.98 0.01 280);
+  --intelligence-muted: oklch(0.7 0.15 280 / 0.16);
+  --opportunity: oklch(0.81 0.13 78);
+  --opportunity-foreground: oklch(0.2 0.04 70);
+  --opportunity-muted: oklch(0.81 0.13 78 / 0.16);
+
+  /* Void neutral ground (page → elevated surfaces) */
+  --background: oklch(0.16 0.011 256);
+  --foreground: oklch(0.96 0.004 250);
+
+  --card: oklch(0.2 0.013 256);
+  --card-foreground: oklch(0.96 0.004 250);
+  --popover: oklch(0.22 0.014 256);
+  --popover-foreground: oklch(0.96 0.004 250);
+
+  /* Surfaces (composed-component elevation scale) */
+  --surface-0: oklch(0.16 0.011 256);
+  --surface-1: oklch(0.2 0.013 256);
+  --surface-2: oklch(0.24 0.015 256);
+  --surface-3: oklch(0.28 0.016 256);
+
+  --primary: oklch(0.79 0.14 178);
+  --primary-foreground: oklch(0.17 0.03 200);
+  --secondary: oklch(0.27 0.015 256);
+  --secondary-foreground: oklch(0.96 0.004 250);
+  --muted: oklch(0.24 0.013 256);
+  --muted-foreground: oklch(0.71 0.014 256);
+  --accent: oklch(0.7 0.15 280);
+  --accent-foreground: oklch(0.98 0.01 280);
+
+  --destructive: oklch(0.64 0.2 22);
+  --destructive-foreground: oklch(0.98 0.01 20);
+  --success: oklch(0.74 0.16 158);
+  --success-foreground: oklch(0.17 0.03 160);
+  --warning: oklch(0.82 0.14 85);
+  --warning-foreground: oklch(0.2 0.04 80);
+  --info: oklch(0.71 0.13 232);
+  --info-foreground: oklch(0.98 0.01 230);
+
+  /* Hairline luminous borders + faint input fills */
+  --border: oklch(0.99 0 0 / 0.1);
+  --input: oklch(0.99 0 0 / 0.06);
+  --ring: oklch(0.79 0.14 178);
+
+  /* Data-viz ramp: signal · intelligence · opportunity · info · magenta */
+  --chart-1: oklch(0.79 0.14 178);
+  --chart-2: oklch(0.7 0.15 280);
+  --chart-3: oklch(0.81 0.13 78);
+  --chart-4: oklch(0.71 0.13 232);
+  --chart-5: oklch(0.72 0.16 330);
+
+  /* Command rail (sidebar) sits below the page for depth */
+  --sidebar: oklch(0.13 0.011 256);
+  --sidebar-foreground: oklch(0.92 0.005 250);
+  --sidebar-primary: oklch(0.79 0.14 178);
+  --sidebar-primary-foreground: oklch(0.17 0.03 200);
+  --sidebar-accent: oklch(0.22 0.014 256);
+  --sidebar-accent-foreground: oklch(0.96 0.004 250);
+  --sidebar-border: oklch(0.99 0 0 / 0.08);
+  --sidebar-ring: oklch(0.79 0.14 178);
+
+  /* Shape & type */
+  --radius: 0.7rem;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Inter', ui-serif, Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Elevation (cool shadows on the void) */
+  --elevation-1: 0 1px 2px oklch(0 0 0 / 0.4), 0 1px 1px oklch(0 0 0 / 0.3);
+  --elevation-2: 0 4px 16px oklch(0 0 0 / 0.42), 0 1px 3px oklch(0 0 0 / 0.3);
+  --elevation-3: 0 12px 40px oklch(0 0 0 / 0.5), 0 2px 8px oklch(0 0 0 / 0.35);
+  --glow-signal: 0 0 0 1px oklch(0.79 0.14 178 / 0.25), 0 0 24px oklch(0.79 0.14 178 / 0.18);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 420ms;
+}
+
+/* ---- Signal Light (derived) ----------------------------------------------- */
+.light,
+.light-clean {
+  color-scheme: light;
+
+  --signal: oklch(0.62 0.13 180);
+  --signal-foreground: oklch(0.99 0.005 180);
+  --signal-muted: oklch(0.62 0.13 180 / 0.12);
+  --intelligence: oklch(0.55 0.18 280);
+  --intelligence-foreground: oklch(0.99 0.005 280);
+  --intelligence-muted: oklch(0.55 0.18 280 / 0.12);
+  --opportunity: oklch(0.7 0.14 70);
+  --opportunity-foreground: oklch(0.2 0.04 70);
+  --opportunity-muted: oklch(0.7 0.14 70 / 0.14);
+
+  --background: oklch(0.98 0.004 250);
+  --foreground: oklch(0.2 0.014 256);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.014 256);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.014 256);
+
+  --surface-0: oklch(0.98 0.004 250);
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.97 0.005 250);
+  --surface-3: oklch(0.95 0.006 250);
+
+  --primary: oklch(0.6 0.13 180);
+  --primary-foreground: oklch(0.99 0.005 180);
+  --secondary: oklch(0.96 0.005 250);
+  --secondary-foreground: oklch(0.2 0.014 256);
+  --muted: oklch(0.96 0.005 250);
+  --muted-foreground: oklch(0.48 0.014 256);
+  --accent: oklch(0.55 0.18 280);
+  --accent-foreground: oklch(0.99 0.005 280);
+
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0.005 20);
+  --success: oklch(0.6 0.15 158);
+  --success-foreground: oklch(0.99 0.005 160);
+  --warning: oklch(0.72 0.15 80);
+  --warning-foreground: oklch(0.2 0.04 80);
+  --info: oklch(0.58 0.15 232);
+  --info-foreground: oklch(0.99 0.005 230);
+
+  --border: oklch(0.2 0.02 256 / 0.12);
+  --input: oklch(0.2 0.02 256 / 0.08);
+  --ring: oklch(0.6 0.13 180);
+
+  --chart-1: oklch(0.6 0.13 180);
+  --chart-2: oklch(0.55 0.18 280);
+  --chart-3: oklch(0.7 0.14 70);
+  --chart-4: oklch(0.58 0.15 232);
+  --chart-5: oklch(0.6 0.18 330);
+
+  --sidebar: oklch(0.96 0.005 250);
+  --sidebar-foreground: oklch(0.2 0.014 256);
+  --sidebar-primary: oklch(0.6 0.13 180);
+  --sidebar-primary-foreground: oklch(0.99 0.005 180);
+  --sidebar-accent: oklch(0.94 0.006 250);
+  --sidebar-accent-foreground: oklch(0.2 0.014 256);
+  --sidebar-border: oklch(0.2 0.02 256 / 0.1);
+  --sidebar-ring: oklch(0.6 0.13 180);
+
+  --elevation-1: 0 1px 2px oklch(0.5 0.05 256 / 0.08), 0 1px 1px oklch(0.5 0.05 256 / 0.06);
+  --elevation-2: 0 4px 16px oklch(0.5 0.05 256 / 0.1), 0 1px 3px oklch(0.5 0.05 256 / 0.08);
+  --elevation-3: 0 12px 40px oklch(0.5 0.05 256 / 0.14), 0 2px 8px oklch(0.5 0.05 256 / 0.1);
+  --glow-signal: 0 0 0 1px oklch(0.6 0.13 180 / 0.25), 0 0 24px oklch(0.6 0.13 180 / 0.12);
+}
+
+/* ---- Expose Signal hues as Tailwind color utilities ----------------------- */
+@theme {
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-muted: var(--signal-muted);
+  --color-intelligence: var(--intelligence);
+  --color-intelligence-foreground: var(--intelligence-foreground);
+  --color-intelligence-muted: var(--intelligence-muted);
+  --color-opportunity: var(--opportunity);
+  --color-opportunity-foreground: var(--opportunity-foreground);
+  --color-opportunity-muted: var(--opportunity-muted);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ---- Page ground: a calm void with a faint signal/intelligence aura -------
+   Unlayered so it overrides the legacy animated purple gradient in index.css. */
+body {
+  background:
+    radial-gradient(1200px 760px at 12% -12%, oklch(0.79 0.14 178 / 0.06), transparent 58%),
+    radial-gradient(1000px 680px at 100% -4%, oklch(0.7 0.15 280 / 0.06), transparent 54%),
+    var(--background);
+  background-attachment: fixed;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  animation: none; /* kill legacy gradient-shift */
+}
+
+.light body,
+.light-clean body {
+  background:
+    radial-gradient(1100px 700px at 12% -12%, oklch(0.6 0.13 180 / 0.06), transparent 58%),
+    radial-gradient(900px 620px at 100% -4%, oklch(0.55 0.18 280 / 0.05), transparent 54%),
+    var(--background);
+}
+
+/* Monospace = the instrument/terminal texture for all numerics & logs */
+.font-mono,
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Glass & Mica retuned to the Signal language (unlayered → wins) ------- */
+.glass-effect {
+  background: oklch(0.22 0.014 256 / 0.55);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid oklch(0.99 0 0 / 0.08);
+  box-shadow:
+    var(--elevation-2),
+    inset 0 1px 0 0 oklch(0.99 0 0 / 0.05);
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+}
+
+.glass-effect:hover {
+  border-color: oklch(0.79 0.14 178 / 0.28);
+  box-shadow:
+    var(--elevation-3),
+    inset 0 1px 0 0 oklch(0.99 0 0 / 0.07);
+  transform: translateY(-2px);
+}
+
+.light .glass-effect,
+.light-clean .glass-effect {
+  background: oklch(1 0 0 / 0.72);
+  border-color: oklch(0.2 0.02 256 / 0.1);
+  box-shadow:
+    var(--elevation-2),
+    inset 0 1px 0 0 oklch(1 0 0 / 0.6);
+}
+
+.mica-effect {
+  background: linear-gradient(
+    135deg,
+    oklch(0.2 0.014 256 / 0.72) 0%,
+    oklch(0.18 0.013 256 / 0.68) 100%
+  );
+  backdrop-filter: blur(36px) saturate(140%);
+  -webkit-backdrop-filter: blur(36px) saturate(140%);
+  border: 1px solid oklch(0.99 0 0 / 0.08);
+  border-bottom: 1px solid oklch(0.79 0.14 178 / 0.18);
+  box-shadow: var(--elevation-2);
+}
+
+.light .mica-effect,
+.light-clean .mica-effect {
+  background: linear-gradient(135deg, oklch(1 0 0 / 0.86) 0%, oklch(0.98 0.004 250 / 0.8) 100%);
+  border-color: oklch(0.2 0.02 256 / 0.1);
+  border-bottom-color: oklch(0.6 0.13 180 / 0.2);
+}
+
+/* ---- Signal helpers ------------------------------------------------------- */
+.gradient-text {
+  background: linear-gradient(
+    100deg,
+    var(--signal) 0%,
+    var(--intelligence) 60%,
+    var(--opportunity) 120%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.text-signal {
+  color: var(--signal);
+}
+.text-intelligence {
+  color: var(--intelligence);
+}
+.text-opportunity {
+  color: var(--opportunity);
+}
+
+.hairline {
+  border: 1px solid var(--border);
+}
+
+/* A small "live" status dot that breathes */
+.pulse-dot {
+  position: relative;
+}
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: var(--signal);
+  opacity: 0.5;
+  animation: signal-ping 1.8s var(--ease-out) infinite;
+}
+
+@keyframes signal-ping {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Retune the legacy pulse-glow keyframe to the signal hue */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 18px oklch(0.79 0.14 178 / 0.25);
+  }
+  50% {
+    box-shadow: 0 0 34px oklch(0.79 0.14 178 / 0.45);
+  }
+}
+
+/* Disable the legacy hacker scan-line overlay (theme consolidated) */
+.hacker body::before {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot::after,
+  .glass-effect {
+    animation: none;
+    transition: none;
+  }
+}

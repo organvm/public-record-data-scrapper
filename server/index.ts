@@ -33,6 +33,10 @@ import billingRouter from './routes/billing'
 import statusRouter from './routes/status'
 import competitiveRouter from './routes/competitive'
 import outreachRouter from './routes/outreach'
+import communicationsRouter from './routes/communications'
+import complianceRouter from './routes/compliance'
+import discoveryRouter from './routes/discovery'
+import metricsRouter from './routes/metrics'
 
 // Import queue infrastructure
 import {
@@ -134,6 +138,10 @@ export class Server {
     // Webhook routes (signature verification, no JWT auth)
     this.app.use('/api/webhooks', webhooksRouter)
 
+    // Metrics (self-protecting: valid JWT OR METRICS_TOKEN; 401 when neither —
+    // must NOT sit behind the global authMiddleware or the token scrape path breaks)
+    this.app.use('/api/metrics', metricsRouter)
+
     // Billing routes (Stripe). The webhook is authenticated via Stripe signature
     // verification on the raw body (mounted above), not JWT.
     this.app.use('/api/billing', billingRouter)
@@ -151,6 +159,9 @@ export class Server {
     this.app.use('/api/deals', authMiddleware, orgContextMiddleware, dealsRouter)
     this.app.use('/api/competitive', authMiddleware, orgContextMiddleware, competitiveRouter)
     this.app.use('/api/outreach', authMiddleware, orgContextMiddleware, outreachRouter)
+    this.app.use('/api/communications', authMiddleware, orgContextMiddleware, communicationsRouter)
+    this.app.use('/api/compliance', authMiddleware, orgContextMiddleware, complianceRouter)
+    this.app.use('/api/discovery', authMiddleware, orgContextMiddleware, discoveryRouter)
 
     // Root endpoint
     this.app.get('/', (req, res) => {
@@ -170,6 +181,10 @@ export class Server {
           deals: '/api/deals',
           competitive: '/api/competitive',
           outreach: '/api/outreach',
+          communications: '/api/communications',
+          compliance: '/api/compliance',
+          discovery: '/api/discovery',
+          metrics: '/api/metrics',
           webhooks: '/api/webhooks'
         }
       })

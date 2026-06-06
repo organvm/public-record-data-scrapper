@@ -35,9 +35,9 @@ export interface PreCallBriefing {
 // ---------------------------------------------------------------------------
 // Prospect narrative — mirrors server NarrativeService.ProspectNarrative
 // Endpoint: GET /api/outreach/narrative/:prospectId
-// (NOTE: this route is NOT yet mounted server-side — see lib report. Until the
-// integration step mounts it, fetchNarrative will surface the server error
-// verbatim, which is the intended fail-closed behavior.)
+// (Mounted server-side in server/routes/outreach.ts. An unknown prospect
+// returns 404 and generation failures return 500; fetchNarrative surfaces the
+// server error verbatim — no placeholder narrative is invented client-side.)
 // ---------------------------------------------------------------------------
 
 export interface NarrativeTalkingPoint {
@@ -128,9 +128,10 @@ export async function fetchBriefing(
 
 /**
  * Fetch the full sales narrative for a prospect.
- * NOTE: requires GET /api/outreach/narrative/:prospectId to be mounted server-side
- * (NarrativeService is currently unrouted — see report). Until then this rejects
- * with the server's error, which is surfaced verbatim (fail-closed).
+ * Calls GET /api/outreach/narrative/:prospectId (mounted server-side, backed by
+ * NarrativeService). Throws ApiError (404 "Prospect not found", 500 "Failed to
+ * generate narrative") which callers surface verbatim — fail-closed, no
+ * placeholder narrative is invented client-side.
  */
 export async function fetchNarrative(
   prospectId: string,

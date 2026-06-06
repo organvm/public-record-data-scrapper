@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { Deal, Contact, Disclosure, ConsentRecord, AuditLog } from '@public-records/core'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@public-records/ui/tabs'
@@ -14,6 +14,7 @@ import {
 } from '@/lib/api/compliance'
 import { fetchDeals, type Deal as ApiDeal } from '@/lib/api/deals'
 import { fetchContacts, type Contact as ApiContact } from '@/lib/api/contacts'
+import { fetchProspect } from '@/lib/api/prospects'
 
 // The compliance REST client returns canonical camelCase types from
 // @public-records/core for disclosures / consents / audit logs, so those need
@@ -83,6 +84,12 @@ export function ComplianceTab() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
 
+  // Disclosure regulation is selected by the deal's *prospect* state, which the
+  // deal row does not carry. We resolve it lazily via the prospects client and
+  // cache the result per prospectId so a second disclosure generation for the
+  // same prospect does not refetch. The cache lives for the tab's lifetime.
+  const prospectStateCache = useRef(new Map<string, string>())
+
   // org_id is intentionally omitted on every call: the server derives the
   // tenant from the authenticated token. Failures surface as named toasts and
   // leave the surface in its genuine empty state — never invented data.
@@ -146,15 +153,47 @@ export function ComplianceTab() {
   const handleGenerateDisclosure = useCallback(
     async (dealId: string) => {
       const deal = deals.find((d) => d.id === dealId)
-      // Disclosure state derives from the deal's prospect; without it we cannot
-      // know the required regulation, so fail closed with a named reason rather
-      // than guessing a state. The deal's amountRequested/factorRate are also
-      // validated server-side.
-      const state = (deal as (Deal & { state?: string }) | undefined)?.state
+      if (!deal) {
+        toast.error('Cannot generate disclosure', {
+          description: 'Deal not found in the current view.'
+        })
+        return
+      }
+      const prospectId = deal.prospectId
+      if (!prospectId) {
+        toast.error('Cannot generate disclosure', {
+          description:
+            'This deal is not linked to a prospect, so its state cannot be resolved to select a disclosure regulation.'
+        })
+        return
+      }
+      // Disclosure regulation is selected by the prospect's state. The deal row
+      // does not carry it, so resolve it from the deal's prospect (cached per
+      // prospectId). We only fail closed once the prospect genuinely has no
+      // state — never by guessing one. amountRequested/factorRate are validated
+      // server-side.
+      let state = prospectStateCache.current.get(prospectId)
+      if (!state) {
+        try {
+          const prospect = await fetchProspect(prospectId)
+          if (prospect.state) {
+            state = prospect.state
+            prospectStateCache.current.set(prospectId, prospect.state)
+          }
+        } catch (err) {
+          toast.error('Cannot generate disclosure', {
+            description:
+              err instanceof Error
+                ? `Could not resolve the prospect's state: ${err.message}`
+                : "Could not resolve the prospect's state."
+          })
+          return
+        }
+      }
       if (!state) {
         toast.error('Cannot generate disclosure', {
           description:
-            'This deal has no associated state. A state is required to select the disclosure regulation.'
+            "This deal's prospect has no associated state. A state is required to select the disclosure regulation."
         })
         return
       }
@@ -281,6 +320,14 @@ export function ComplianceTab() {
     // Derive the export window from the visible logs and trigger a CSV download
     // against the server export endpoint (which streams a text/csv buffer).
     const times = logs.map((l) => new Date(l.createdAt).getTime()).filter((t) => !Number.isNaN(t))
+    if (times.length === 0) {
+      // Every visible log has an unparseable createdAt — Math.min(...[]) would be
+      // Infinity and produce an invalid date range. Fail closed with a reason.
+      toast.error('Cannot export audit log', {
+        description: 'The visible logs have no parseable timestamps to build an export window.'
+      })
+      return
+    }
     const start = new Date(Math.min(...times)).toISOString()
     const end = new Date(Math.max(...times) + 1000).toISOString()
     const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api'

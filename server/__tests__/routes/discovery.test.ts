@@ -160,6 +160,108 @@ describe('Discovery API', () => {
       expect(response.status).toBe(401)
       expect(mockRun).not.toHaveBeenCalled()
     })
+
+    it('fails closed (502) when EVERY attempted channel errored and nothing was collected', async () => {
+      mockRun.mockResolvedValueOnce({
+        candidates_found: 0,
+        inserted: 0,
+        duplicates: 0,
+        per_channel: [
+          {
+            channel: 'sec-edgar-registrants',
+            configured: true,
+            candidates_found: 0,
+            error: 'sec-edgar-registrants: SEC EDGAR unreachable'
+          },
+          {
+            channel: 'sba-7a-loans',
+            configured: true,
+            candidates_found: 0,
+            error: 'sba-7a-loans: SBA CSV returned HTTP 503 Service Unavailable'
+          }
+        ]
+      })
+
+      const response = await request(app)
+        .post('/api/discovery/run')
+        .set('Authorization', authHeader)
+        .send({})
+
+      expect(response.status).toBe(502)
+      expect(response.body.error.code).toBe('DISCOVERY_ALL_CHANNELS_FAILED')
+      // The per-channel errors are surfaced in the envelope, not swallowed.
+      expect(response.body.per_channel).toHaveLength(2)
+      expect(
+        response.body.per_channel.every((c: { error: string | null }) => c.error !== null)
+      ).toBe(true)
+    })
+
+    it('treats an unconfigured-only run as all-channels-failed (502)', async () => {
+      mockRun.mockResolvedValueOnce({
+        candidates_found: 0,
+        inserted: 0,
+        duplicates: 0,
+        per_channel: [
+          {
+            channel: 'sba-7a-loans',
+            configured: false,
+            candidates_found: 0,
+            error: 'sba-7a-loans: not configured'
+          }
+        ]
+      })
+
+      const response = await request(app)
+        .post('/api/discovery/run')
+        .set('Authorization', authHeader)
+        .send({ channels: ['sba-7a-loans'] })
+
+      expect(response.status).toBe(502)
+      expect(response.body.error.code).toBe('DISCOVERY_ALL_CHANNELS_FAILED')
+    })
+
+    it('keeps a PARTIAL failure at 200 (some channels answered)', async () => {
+      mockRun.mockResolvedValueOnce({
+        candidates_found: 2,
+        inserted: 2,
+        duplicates: 0,
+        per_channel: [
+          { channel: 'sec-edgar-registrants', configured: true, candidates_found: 2, error: null },
+          {
+            channel: 'sba-7a-loans',
+            configured: true,
+            candidates_found: 0,
+            error: 'sba-7a-loans: SBA CSV returned HTTP 503 Service Unavailable'
+          }
+        ]
+      })
+
+      const response = await request(app)
+        .post('/api/discovery/run')
+        .set('Authorization', authHeader)
+        .send({})
+
+      expect(response.status).toBe(200)
+      expect(response.body.inserted).toBe(2)
+      expect(response.body.per_channel).toHaveLength(2)
+    })
+
+    it('returns 200 when no channels were attempted (empty per_channel)', async () => {
+      mockRun.mockResolvedValueOnce({
+        candidates_found: 0,
+        inserted: 0,
+        duplicates: 0,
+        per_channel: []
+      })
+
+      const response = await request(app)
+        .post('/api/discovery/run')
+        .set('Authorization', authHeader)
+        .send({ channels: ['nonexistent-channel'] })
+
+      expect(response.status).toBe(200)
+      expect(response.body.inserted).toBe(0)
+    })
   })
 
   describe('GET /api/discovery/channels', () => {

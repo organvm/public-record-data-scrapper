@@ -92,6 +92,28 @@ router.post(
       limit: body.limit
     })
 
+    // Fail closed: if channels were attempted and EVERY one errored (zero
+    // candidates collected AND no per-channel entry succeeded), the run
+    // produced nothing usable — surface a 502 with the per-channel errors so a
+    // caller is not misled by a 200 {inserted:0}. A PARTIAL failure (at least
+    // one channel answered) stays 200.
+    const everyChannelErrored =
+      result.per_channel.length > 0 && result.per_channel.every((c) => c.error !== null)
+    if (everyChannelErrored && result.candidates_found === 0) {
+      res.status(502).json({
+        error: {
+          message: 'All discovery channels failed',
+          code: 'DISCOVERY_ALL_CHANNELS_FAILED',
+          statusCode: 502
+        },
+        candidates_found: result.candidates_found,
+        inserted: result.inserted,
+        duplicates: result.duplicates,
+        per_channel: result.per_channel
+      })
+      return
+    }
+
     res.json({
       candidates_found: result.candidates_found,
       inserted: result.inserted,

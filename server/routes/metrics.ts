@@ -168,6 +168,40 @@ async function collectQueueDepths(): Promise<{
   return { depths, unavailable }
 }
 
+interface QueueDepthSnapshot {
+  depths: QueueDepth[]
+  unavailable: { queue: string; reason: string }[]
+}
+
+/** TTL (ms) for the queue-depth cache. A scrape within this window reuses the
+ *  last snapshot rather than re-firing ~40 Redis count calls. */
+const QUEUE_DEPTH_CACHE_TTL_MS = 5000
+
+// Module-level cache. Only the queue-depth collection (the expensive Redis
+// fan-out) is cached; process/ingestion-telemetry metrics are recomputed live
+// on every scrape. The cached snapshot carries the fail-closed `unavailable`
+// list verbatim, so omission semantics survive a cache hit unchanged.
+let queueDepthCache: { at: number; snapshot: QueueDepthSnapshot } | null = null
+
+/**
+ * Queue depths with a short TTL cache. Within {@link QUEUE_DEPTH_CACHE_TTL_MS}
+ * of the last collection, the cached snapshot is returned and NO Redis calls
+ * are made; otherwise the live collection runs and refreshes the cache.
+ */
+async function getQueueDepths(now: number = Date.now()): Promise<QueueDepthSnapshot> {
+  if (queueDepthCache && now - queueDepthCache.at < QUEUE_DEPTH_CACHE_TTL_MS) {
+    return queueDepthCache.snapshot
+  }
+  const snapshot = await collectQueueDepths()
+  queueDepthCache = { at: now, snapshot }
+  return snapshot
+}
+
+/** Test-only: drop the cached queue-depth snapshot. */
+export function __resetQueueDepthCache(): void {
+  queueDepthCache = null
+}
+
 /**
  * Build the full metric set. Pure given the inputs so the route stays thin.
  * Exposed for unit testing of the assembled metric/sample shapes.
@@ -257,7 +291,7 @@ router.get(
   '/',
   metricsAuthMiddleware,
   asyncHandler(async (_req, res) => {
-    const { depths, unavailable } = await collectQueueDepths()
+    const { depths, unavailable } = await getQueueDepths()
 
     const metrics = buildMetrics({
       uptimeSeconds: process.uptime(),

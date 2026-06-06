@@ -29,7 +29,9 @@ export type DiscoverySignalType = 'hiring' | 'permit' | 'contract' | 'expansion'
 /**
  * A single business surfaced by a channel. Channels return these; the service
  * dedupes and persists them. `raw` carries the upstream payload verbatim for
- * auditability (stored in prospects.raw_data / growth_signals.raw_data).
+ * auditability — `prospects` has NO raw_data column, so the full payload is
+ * stored on the companion `growth_signals.raw_data` (JSONB) row, with a concise
+ * human-readable provenance note on `prospects.narrative`.
  */
 export interface DiscoveryCandidate {
   /** Business legal/common name exactly as the source reports it. */

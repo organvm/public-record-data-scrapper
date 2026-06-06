@@ -66,9 +66,7 @@ export class SBALoansChannel implements DiscoveryChannel {
     const csvUrl = await this.resolveRecentCsvUrl()
 
     await rateLimiterManager.waitForTokens(RATE_BUCKET)
-    const csvText = await this.fetchCsv(csvUrl)
-
-    return this.parseCsv(csvText, wantState, limit)
+    return this.streamCsvCandidates(csvUrl, wantState, limit)
   }
 
   /** Resolve the rotating recent-7(a) CSV resource URL via CKAN. */
@@ -124,10 +122,26 @@ export class SBALoansChannel implements DiscoveryChannel {
     return match.url
   }
 
-  private async fetchCsv(url: string): Promise<string> {
+  /**
+   * Stream the SBA CSV line-by-line and map matching rows to candidates,
+   * filtered to the requested state. The FOIA CSV is multi-hundred-MB, so the
+   * body is consumed INCREMENTALLY via its reader — never buffered whole into a
+   * string. Once `limit` candidates are collected the fetch is ABORTED (the
+   * remaining bytes are never downloaded). Fails closed if the header lost a
+   * required column (the schema check runs on the first non-empty line before
+   * any data row is processed).
+   */
+  private async streamCsvCandidates(
+    url: string,
+    wantState: string | null,
+    limit: number
+  ): Promise<DiscoveryCandidate[]> {
+    // Dedicated controller so we can abort the in-flight stream the moment we
+    // have enough rows (distinct from the per-request timeout controller).
+    const abort = new AbortController()
     let response: Response
     try {
-      response = await fetchWithTimeout(url, { headers: { Accept: 'text/csv' } })
+      response = await fetchWithTimeout(url, { headers: { Accept: 'text/csv' } }, abort.signal)
     } catch (err) {
       throw new DiscoveryChannelError(
         CHANNEL,
@@ -140,72 +154,155 @@ export class SBALoansChannel implements DiscoveryChannel {
         `SBA CSV returned HTTP ${response.status} ${response.statusText}`
       )
     }
-    return response.text()
-  }
-
-  /**
-   * Parse the SBA CSV, filter to the requested state and most-recent rows,
-   * and map to candidates. Fails closed if the header lost a required column.
-   */
-  private parseCsv(csvText: string, wantState: string | null, limit: number): DiscoveryCandidate[] {
-    const lines = csvText.split(/\r?\n/)
-    const headerLine = lines.find((l) => l.trim().length > 0)
-    if (!headerLine) {
-      throw new DiscoveryChannelError(CHANNEL, 'SBA CSV was empty')
+    if (!response.body) {
+      throw new DiscoveryChannelError(CHANNEL, 'SBA CSV response had no body')
     }
 
-    const header = parseCsvLine(headerLine).map((h) => h.trim().toLowerCase())
-    const idx: Record<string, number> = {}
-    for (const col of REQUIRED_COLUMNS) {
-      const at = header.indexOf(col)
-      if (at === -1) {
-        throw new DiscoveryChannelError(
-          CHANNEL,
-          `SBA CSV schema changed: required column '${col}' missing from header`
-        )
-      }
-      idx[col] = at
-    }
-    // Optional enrichment columns (absence is tolerated, not fatal).
-    const naicsDescIdx = header.indexOf('naicsdescription')
-    const cityIdx = header.indexOf('borrcity')
-    const grossIdx = header.indexOf('grossapproval')
-
-    const headerPos = lines.indexOf(headerLine)
-    const dataRows = lines.slice(headerPos + 1).filter((l) => l.trim().length > 0)
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder('utf-8')
 
     const out: DiscoveryCandidate[] = []
     const seen = new Set<string>()
+    let buffer = ''
+    let header: Header | null = null
+    let done = false
 
-    for (const line of dataRows) {
-      const cells = parseCsvLine(line)
-      const company = (cells[idx.borrname] ?? '').trim()
-      const state = (cells[idx.borrstate] ?? '').trim().toUpperCase()
-      if (!company || state.length !== 2) continue
-      if (wantState && state !== wantState) continue
+    const handleLine = (rawLine: string): boolean => {
+      const line = rawLine.replace(/\r$/, '')
+      if (line.trim().length === 0) return false // skip blank lines
 
-      const key = `${company.toLowerCase()}|${state}`
-      if (seen.has(key)) continue
-      seen.add(key)
+      if (!header) {
+        // First non-empty line is the header — validate schema, fail closed.
+        header = parseHeader(line)
+        return false
+      }
 
-      out.push({
-        company_name: company,
-        state,
-        signal_type: 'contract',
-        signal_strength: 75,
-        source: CHANNEL,
-        raw: {
-          approval_date: cells[idx.approvaldate] ?? null,
-          borr_city: cityIdx >= 0 ? (cells[cityIdx] ?? null) : null,
-          naics_description: naicsDescIdx >= 0 ? (cells[naicsDescIdx] ?? null) : null,
-          gross_approval: grossIdx >= 0 ? (cells[grossIdx] ?? null) : null
+      const candidate = rowToCandidate(line, header, wantState, seen)
+      if (candidate) {
+        out.push(candidate)
+        return out.length >= limit
+      }
+      return false
+    }
+
+    try {
+      while (!done) {
+        const { value, done: streamDone } = await reader.read()
+        if (streamDone) break
+        buffer += decoder.decode(value, { stream: true })
+
+        let newlineAt: number
+        while ((newlineAt = buffer.indexOf('\n')) !== -1) {
+          const rawLine = buffer.slice(0, newlineAt)
+          buffer = buffer.slice(newlineAt + 1)
+          if (handleLine(rawLine)) {
+            done = true
+            break
+          }
         }
-      })
+      }
 
-      if (out.length >= limit) break
+      // Flush any trailing line (no terminating newline) if we still need rows.
+      if (!done) {
+        const tail = buffer + decoder.decode()
+        if (tail.length > 0) handleLine(tail)
+      }
+    } catch (err) {
+      // A fail-closed schema/empty error from the parser is already a precise
+      // DiscoveryChannelError — propagate it unchanged. Only genuine stream/IO
+      // faults get the generic wrapper.
+      if (err instanceof DiscoveryChannelError) throw err
+      throw new DiscoveryChannelError(
+        CHANNEL,
+        `SBA CSV stream failed: ${err instanceof Error ? err.message : String(err)}`
+      )
+    } finally {
+      // Stop the download and free the reader. cancel() rejects the underlying
+      // stream so the remaining (potentially hundreds of MB) bytes are never
+      // pulled; abort() tears down the connection for good measure.
+      try {
+        await reader.cancel()
+      } catch {
+        // Reader may already be closed/errored — nothing to release.
+      }
+      abort.abort()
+    }
+
+    if (!header) {
+      throw new DiscoveryChannelError(CHANNEL, 'SBA CSV was empty')
     }
 
     return out
+  }
+}
+
+/** Resolved header: required column positions + optional enrichment positions. */
+interface Header {
+  borrname: number
+  borrstate: number
+  approvaldate: number
+  naicsDescIdx: number
+  cityIdx: number
+  grossIdx: number
+}
+
+/** Parse + validate the CSV header, failing closed on a missing required column. */
+function parseHeader(headerLine: string): Header {
+  const cols = parseCsvLine(headerLine).map((h) => h.trim().toLowerCase())
+  const idx: Record<string, number> = {}
+  for (const col of REQUIRED_COLUMNS) {
+    const at = cols.indexOf(col)
+    if (at === -1) {
+      throw new DiscoveryChannelError(
+        CHANNEL,
+        `SBA CSV schema changed: required column '${col}' missing from header`
+      )
+    }
+    idx[col] = at
+  }
+  return {
+    borrname: idx.borrname,
+    borrstate: idx.borrstate,
+    approvaldate: idx.approvaldate,
+    // Optional enrichment columns (absence is tolerated, not fatal).
+    naicsDescIdx: cols.indexOf('naicsdescription'),
+    cityIdx: cols.indexOf('borrcity'),
+    grossIdx: cols.indexOf('grossapproval')
+  }
+}
+
+/**
+ * Map one data row to a candidate, applying the state filter and per-stream
+ * dedupe. Returns null when the row is unusable, filtered out, or a duplicate.
+ */
+function rowToCandidate(
+  line: string,
+  header: Header,
+  wantState: string | null,
+  seen: Set<string>
+): DiscoveryCandidate | null {
+  const cells = parseCsvLine(line)
+  const company = (cells[header.borrname] ?? '').trim()
+  const state = (cells[header.borrstate] ?? '').trim().toUpperCase()
+  if (!company || state.length !== 2) return null
+  if (wantState && state !== wantState) return null
+
+  const key = `${company.toLowerCase()}|${state}`
+  if (seen.has(key)) return null
+  seen.add(key)
+
+  return {
+    company_name: company,
+    state,
+    signal_type: 'contract',
+    signal_strength: 75,
+    source: CHANNEL,
+    raw: {
+      approval_date: cells[header.approvaldate] ?? null,
+      borr_city: header.cityIdx >= 0 ? (cells[header.cityIdx] ?? null) : null,
+      naics_description: header.naicsDescIdx >= 0 ? (cells[header.naicsDescIdx] ?? null) : null,
+      gross_approval: header.grossIdx >= 0 ? (cells[header.grossIdx] ?? null) : null
+    }
   }
 }
 
@@ -255,12 +352,24 @@ function clampLimit(limit?: number): number {
   return Math.min(Math.floor(limit), 200)
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  externalSignal?: AbortSignal
+): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  // Forward an external abort (e.g. "limit reached" on a stream) into the
+  // timeout controller so a single signal tears the fetch down either way.
+  const onExternalAbort = () => controller.abort()
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort()
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true })
+  }
   try {
     return await fetch(url, { ...init, signal: controller.signal })
   } finally {
     clearTimeout(timer)
+    if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort)
   }
 }

@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-// Mock the database module — every query is a controllable spy.
+// Mock the database module — `query` (existence checks) and a pooled client
+// (transactional inserts) are controllable spies.
 vi.mock('../../database/connection', () => ({
   database: {
-    query: vi.fn()
+    query: vi.fn(),
+    getPoolClient: vi.fn()
   }
 }))
 
@@ -20,7 +22,40 @@ import {
 } from '../../services/discovery-channels'
 
 const mockQuery = database.query as ReturnType<typeof vi.fn>
+const mockGetPoolClient = database.getPoolClient as ReturnType<typeof vi.fn>
 const ORG_ID = 'org-1'
+
+// ── Pooled-client mock ──────────────────────────────────────────────────────
+// insertCandidate() runs its two INSERTs (+ BEGIN/COMMIT) on a pooled client
+// from database.getPoolClient(). We model that client as a single `query` spy
+// plus a `release` spy, and route getPoolClient() to it. `clientQuery` is the
+// spy the insert/signal assertions inspect.
+let clientQuery: ReturnType<typeof vi.fn>
+let clientRelease: ReturnType<typeof vi.fn>
+
+/** Reset the pooled client, defaulting INSERT INTO prospects → fabricated id. */
+function wirePoolClient(
+  queryImpl?: (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }>
+) {
+  clientQuery = vi.fn(
+    queryImpl ??
+      ((text: string) => {
+        if (/INSERT INTO prospects/.test(text)) {
+          return Promise.resolve({ rows: [{ id: 'prospect-new' }] })
+        }
+        return Promise.resolve({ rows: [] })
+      })
+  )
+  clientRelease = vi.fn()
+  mockGetPoolClient.mockResolvedValue({ query: clientQuery, release: clientRelease })
+}
+
+/** All INSERT INTO <table> SQL strings issued on the pooled client. */
+function clientInserts(table: string): string[] {
+  return clientQuery.mock.calls
+    .map((c) => String(c[0]))
+    .filter((q) => new RegExp(`INSERT INTO ${table}`).test(q))
+}
 
 // ── Test channel helpers ───────────────────────────────────────────────────
 function candidate(overrides: Partial<DiscoveryCandidate> = {}): DiscoveryCandidate {
@@ -66,24 +101,25 @@ class FailingChannel implements DiscoveryChannel {
 }
 
 /**
- * Default query wiring: existence check returns empty (no dupes), inserts
- * return a fabricated id. Tests override per-case.
+ * Default query wiring: existence check (database.query) returns empty (no
+ * dupes); inserts run on the pooled client and return a fabricated prospect id.
+ * Tests override per-case.
  */
 function wireInsertsFresh() {
   mockQuery.mockImplementation((text: string) => {
     if (/SELECT id FROM prospects/.test(text)) {
       return Promise.resolve([]) // nothing exists yet
     }
-    if (/INSERT INTO prospects/.test(text)) {
-      return Promise.resolve([{ id: 'prospect-new' }])
-    }
     return Promise.resolve([])
   })
+  wirePoolClient()
 }
 
 describe('LeadDiscoveryService', () => {
   beforeEach(() => {
     mockQuery.mockReset()
+    mockGetPoolClient.mockReset()
+    wirePoolClient()
   })
 
   describe('run() fan-out + insert', () => {
@@ -104,10 +140,10 @@ describe('LeadDiscoveryService', () => {
         { channel: 'socrata', configured: true, candidates_found: 1, error: null }
       ])
 
-      // Each insert writes a prospects row AND a growth_signals row.
-      const queries = mockQuery.mock.calls.map((c) => String(c[0]))
-      expect(queries.filter((q) => /INSERT INTO prospects/.test(q)).length).toBe(2)
-      expect(queries.filter((q) => /INSERT INTO growth_signals/.test(q)).length).toBe(2)
+      // Each insert writes a prospects row AND a growth_signals row (on the
+      // pooled client, inside a transaction).
+      expect(clientInserts('prospects').length).toBe(2)
+      expect(clientInserts('growth_signals').length).toBe(2)
     })
 
     it('inserts prospects with status new, unscored priority, and org scoping', async () => {
@@ -118,7 +154,7 @@ describe('LeadDiscoveryService', () => {
 
       await service.run({ orgId: ORG_ID })
 
-      const insertCall = mockQuery.mock.calls.find((c) =>
+      const insertCall = clientQuery.mock.calls.find((c) =>
         /INSERT INTO prospects/.test(String(c[0]))
       )
       expect(insertCall).toBeDefined()
@@ -151,7 +187,7 @@ describe('LeadDiscoveryService', () => {
 
       await service.run({ orgId: ORG_ID })
 
-      const signalCall = mockQuery.mock.calls.find((c) =>
+      const signalCall = clientQuery.mock.calls.find((c) =>
         /INSERT INTO growth_signals/.test(String(c[0]))
       )
       expect(signalCall).toBeDefined()
@@ -163,6 +199,54 @@ describe('LeadDiscoveryService', () => {
       const raw = JSON.parse(String(params[6]))
       expect(raw.source).toBe('sba')
       expect(raw.raw).toEqual({ foo: 'bar' })
+    })
+
+    it('wraps the two inserts in a transaction: a signal-insert failure rolls back the prospect', async () => {
+      // SELECT existence → empty (no dupe). Pooled client: prospect insert
+      // succeeds, growth_signals insert REJECTS → the transaction must ROLLBACK.
+      mockQuery.mockImplementation((text: string) => {
+        if (/SELECT id FROM prospects/.test(text)) return Promise.resolve([])
+        return Promise.resolve([])
+      })
+      wirePoolClient((text: string) => {
+        if (/INSERT INTO prospects/.test(text)) {
+          return Promise.resolve({ rows: [{ id: 'prospect-new' }] })
+        }
+        if (/INSERT INTO growth_signals/.test(text)) {
+          return Promise.reject(new Error('growth_signals insert failed'))
+        }
+        return Promise.resolve({ rows: [] })
+      })
+
+      const service = new LeadDiscoveryService([
+        new StubChannel('sec', [candidate({ company_name: 'Rollback Co', state: 'CA' })])
+      ])
+
+      await expect(service.run({ orgId: ORG_ID })).rejects.toThrow(/growth_signals insert failed/)
+
+      const issued = clientQuery.mock.calls.map((c) => String(c[0]))
+      // BEGIN opened, prospect inserted, then ROLLBACK (NOT COMMIT) on failure.
+      expect(issued).toContain('BEGIN')
+      expect(clientInserts('prospects').length).toBe(1)
+      expect(issued).toContain('ROLLBACK')
+      expect(issued).not.toContain('COMMIT')
+      // The pooled client is always released back to the pool.
+      expect(clientRelease).toHaveBeenCalledTimes(1)
+    })
+
+    it('commits the transaction on a successful candidate insert', async () => {
+      wireInsertsFresh()
+      const service = new LeadDiscoveryService([
+        new StubChannel('sec', [candidate({ company_name: 'Commit Co', state: 'CA' })])
+      ])
+
+      await service.run({ orgId: ORG_ID })
+
+      const issued = clientQuery.mock.calls.map((c) => String(c[0]))
+      expect(issued).toContain('BEGIN')
+      expect(issued).toContain('COMMIT')
+      expect(issued).not.toContain('ROLLBACK')
+      expect(clientRelease).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -180,17 +264,13 @@ describe('LeadDiscoveryService', () => {
       expect(result.candidates_found).toBe(2)
       expect(result.inserted).toBe(1)
       expect(result.duplicates).toBe(1)
-      const inserts = mockQuery.mock.calls.filter((c) => /INSERT INTO prospects/.test(String(c[0])))
-      expect(inserts.length).toBe(1)
+      expect(clientInserts('prospects').length).toBe(1)
     })
 
     it('dedupes against existing prospects already in the database', async () => {
       mockQuery.mockImplementation((text: string) => {
         if (/SELECT id FROM prospects/.test(text)) {
           return Promise.resolve([{ id: 'existing-prospect' }]) // already exists
-        }
-        if (/INSERT INTO prospects/.test(text)) {
-          return Promise.resolve([{ id: 'prospect-new' }])
         }
         return Promise.resolve([])
       })
@@ -211,10 +291,9 @@ describe('LeadDiscoveryService', () => {
       expect(params[0]).toBe(ORG_ID)
       expect(params[1]).toBe('existing') // normalizeCompanyName('Existing LLC')
       expect(params[2]).toBe('CA')
-      // Nothing inserted.
-      expect(mockQuery.mock.calls.some((c) => /INSERT INTO prospects/.test(String(c[0])))).toBe(
-        false
-      )
+      // Nothing inserted: no pooled client was even acquired.
+      expect(mockGetPoolClient).not.toHaveBeenCalled()
+      expect(clientInserts('prospects').length).toBe(0)
     })
   })
 
@@ -263,8 +342,9 @@ describe('LeadDiscoveryService', () => {
       expect(result.candidates_found).toBe(0)
       expect(result.inserted).toBe(0)
       expect(result.per_channel.every((r) => r.error !== null)).toBe(true)
-      // No INSERT of any kind was issued.
-      expect(mockQuery.mock.calls.some((c) => /INSERT INTO/.test(String(c[0])))).toBe(false)
+      // No INSERT of any kind was issued — no pooled client was acquired.
+      expect(mockGetPoolClient).not.toHaveBeenCalled()
+      expect(clientQuery).not.toHaveBeenCalled()
     })
   })
 

@@ -219,10 +219,16 @@ export class LeadDiscoveryService {
 
   /**
    * Insert a candidate as a prospect (status 'new') plus a growth_signals row
-   * for the discovery signal. `company_name_normalized` and `time_since_default`
-   * are populated by DB triggers, so they are not supplied here. Discovery
-   * provenance goes to `prospects.narrative` (prospects has no raw_data column);
-   * the full structured payload rides on the companion growth_signals row.
+   * for the discovery signal, in a SINGLE transaction. `company_name_normalized`
+   * and `time_since_default` are populated by DB triggers, so they are not
+   * supplied here. Discovery provenance goes to `prospects.narrative` (prospects
+   * has no raw_data column); the full structured payload rides on the companion
+   * growth_signals row.
+   *
+   * The two inserts are wrapped in BEGIN/COMMIT (mirrors
+   * AlertService.configureAlertRules): a failure on the signal insert ROLLBACKs
+   * the prospect insert, so a prospect is never stranded without its provenance
+   * signal.
    */
   private async insertCandidate(orgId: string, candidate: DiscoveryCandidate): Promise<void> {
     const industry = this.resolveIndustry(candidate.industry)
@@ -231,34 +237,46 @@ export class LeadDiscoveryService {
       `Discovered via ${candidate.source} ` +
       `(${candidate.signal_type}, strength ${candidate.signal_strength}). Unscored discovery seed.`
 
-    const rows = await database.query<{ id: string }>(
-      `INSERT INTO prospects
-         (org_id, company_name, industry, state, status, priority_score, default_date, narrative)
-       VALUES ($1, $2, $3, $4, 'new', $5, CURRENT_DATE, $6)
-       RETURNING id`,
-      [orgId, candidate.company_name, industry, state, UNSCORED_PRIORITY, narrative]
-    )
+    const client = await database.getPoolClient()
+    try {
+      await client.query('BEGIN')
 
-    const prospectId = rows[0]?.id
-    if (!prospectId) {
-      // Fail closed: without a returned id we cannot attach the signal.
-      throw new Error(`Insert for '${candidate.company_name}' did not return a prospect id`)
+      const result = await client.query<{ id: string }>(
+        `INSERT INTO prospects
+           (org_id, company_name, industry, state, status, priority_score, default_date, narrative)
+         VALUES ($1, $2, $3, $4, 'new', $5, CURRENT_DATE, $6)
+         RETURNING id`,
+        [orgId, candidate.company_name, industry, state, UNSCORED_PRIORITY, narrative]
+      )
+
+      const prospectId = result.rows[0]?.id
+      if (!prospectId) {
+        // Fail closed: without a returned id we cannot attach the signal.
+        throw new Error(`Insert for '${candidate.company_name}' did not return a prospect id`)
+      }
+
+      await client.query(
+        `INSERT INTO growth_signals
+           (prospect_id, type, description, detected_date, source_url, score, confidence, raw_data)
+         VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7)`,
+        [
+          prospectId,
+          candidate.signal_type,
+          `Discovered via ${candidate.source} (${candidate.signal_type})`,
+          null,
+          clampScore(candidate.signal_strength),
+          0.5,
+          JSON.stringify({ source: candidate.source, raw: candidate.raw })
+        ]
+      )
+
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
     }
-
-    await database.query(
-      `INSERT INTO growth_signals
-         (prospect_id, type, description, detected_date, source_url, score, confidence, raw_data)
-       VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7)`,
-      [
-        prospectId,
-        candidate.signal_type,
-        `Discovered via ${candidate.source} (${candidate.signal_type})`,
-        null,
-        clampScore(candidate.signal_strength),
-        0.5,
-        JSON.stringify({ source: candidate.source, raw: candidate.raw })
-      ]
-    )
   }
 
   /**

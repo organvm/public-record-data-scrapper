@@ -29,7 +29,7 @@ import {
   getOutreachQueue,
   getIngestionCoverageTelemetry
 } from '@/queue/queues'
-import metricsRouter from '@/routes/metrics'
+import metricsRouter, { __resetQueueDepthCache } from '@/routes/metrics'
 import { renderPrometheus, escapeLabelValue, PrometheusMetric } from '@/observability/prometheus'
 
 // ---------------------------------------------------------------------------
@@ -181,6 +181,9 @@ describe('GET /api/metrics', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Drop the module-level queue-depth cache so each test fires its own
+    // (mocked) Redis collection rather than reusing a prior test's snapshot.
+    __resetQueueDepthCache()
     delete process.env.METRICS_TOKEN
 
     // Default: all 8 queues initialized and returning zeros.
@@ -313,5 +316,53 @@ describe('GET /api/metrics', () => {
     expect(res.text).toContain('ingestion_failure_total{state="CA"} 2')
     expect(res.text).toContain('ingestion_consecutive_failures{state="CA"} 1')
     expect(res.text).toContain('ingestion_success_total{state="TX"} 3')
+  })
+
+  it('reuses the cached queue depths on a second scrape within the TTL', async () => {
+    process.env.METRICS_TOKEN = 'tok'
+    const ingestion = mockQueueCounts({
+      waiting: 5,
+      active: 2,
+      completed: 100,
+      failed: 1,
+      delayed: 3
+    })
+    vi.mocked(getIngestionQueue).mockReturnValue(ingestion)
+
+    // First scrape: fires the live Redis collection (one count call per state).
+    const first = await request(app).get('/api/metrics').set('X-Metrics-Token', 'tok')
+    expect(first.status).toBe(200)
+    expect(first.text).toContain('bullmq_queue_jobs{queue="ucc-ingestion",state="waiting"} 5')
+    const waitingCalls = (ingestion as unknown as { getWaitingCount: ReturnType<typeof vi.fn> })
+      .getWaitingCount
+    expect(waitingCalls).toHaveBeenCalledTimes(1)
+
+    // Second scrape within the 5s TTL: the cache answers, no new Redis calls.
+    const second = await request(app).get('/api/metrics').set('X-Metrics-Token', 'tok')
+    expect(second.status).toBe(200)
+    // Same cached depth surfaces.
+    expect(second.text).toContain('bullmq_queue_jobs{queue="ucc-ingestion",state="waiting"} 5')
+    // No additional count calls were issued (depths served from cache).
+    expect(waitingCalls).toHaveBeenCalledTimes(1)
+
+    // Process metrics stay live (recomputed each scrape, never cached).
+    expect(second.text).toContain('# HELP process_uptime_seconds')
+  })
+
+  it('caches the fail-closed unavailable list (omission survives a cache hit)', async () => {
+    process.env.METRICS_TOKEN = 'tok'
+    vi.mocked(getOutreachQueue).mockImplementation(() => {
+      throw new Error('Outreach queue not initialized')
+    })
+
+    const first = await request(app).get('/api/metrics').set('X-Metrics-Token', 'tok')
+    expect(first.status).toBe(200)
+    expect(first.text).toContain('# queue "outreach" unavailable: Outreach queue not initialized')
+
+    // Second scrape within TTL: still omitted with the comment, served from cache.
+    const second = await request(app).get('/api/metrics').set('X-Metrics-Token', 'tok')
+    expect(second.status).toBe(200)
+    expect(second.text).not.toContain('bullmq_queue_jobs{queue="outreach"')
+    expect(second.text).toContain('# queue "outreach" unavailable: Outreach queue not initialized')
   })
 })

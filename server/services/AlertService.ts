@@ -144,6 +144,89 @@ export interface HealthCheckResult {
 }
 
 /**
+ * Raw `alerts` table row shape (migration 020). snake_case columns, JSONB data.
+ */
+interface AlertRow {
+  id: string
+  org_id: string
+  rule_id: string | null
+  prospect_id: string
+  type: AlertType
+  severity: AlertSeverity
+  status: AlertStatus
+  title: string
+  message: string
+  data: Record<string, unknown> | null
+  created_at: string | Date
+  acknowledged_at: string | Date | null
+  acknowledged_by: string | null
+  resolved_at: string | Date | null
+  resolved_by: string | null
+  resolution_notes: string | null
+}
+
+/**
+ * Raw `alert_rules` table row shape (migration 020).
+ */
+interface AlertRuleRow {
+  id: string
+  org_id: string
+  type: AlertType
+  threshold: number | string
+  action: AlertAction
+  severity: AlertSeverity
+  enabled: boolean
+  prospect_ids: string[] | null
+  webhook_url: string | null
+  config: Record<string, unknown> | null
+  created_at: string | Date
+  updated_at: string | Date
+}
+
+function toIso(value: string | Date | null | undefined): string | undefined {
+  if (value == null) return undefined
+  return value instanceof Date ? value.toISOString() : value
+}
+
+function mapAlertRow(row: AlertRow): Alert {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    ruleId: row.rule_id ?? undefined,
+    prospectId: row.prospect_id,
+    type: row.type,
+    severity: row.severity,
+    status: row.status,
+    title: row.title,
+    message: row.message,
+    data: row.data ?? {},
+    createdAt: toIso(row.created_at) ?? new Date().toISOString(),
+    acknowledgedAt: toIso(row.acknowledged_at),
+    acknowledgedBy: row.acknowledged_by ?? undefined,
+    resolvedAt: toIso(row.resolved_at),
+    resolvedBy: row.resolved_by ?? undefined,
+    resolutionNotes: row.resolution_notes ?? undefined
+  }
+}
+
+function mapRuleRow(row: AlertRuleRow): AlertRule {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    type: row.type,
+    threshold: Number(row.threshold),
+    action: row.action,
+    severity: row.severity,
+    enabled: row.enabled,
+    prospectIds: row.prospect_ids ?? undefined,
+    webhookUrl: row.webhook_url ?? undefined,
+    config: row.config ?? undefined,
+    createdAt: toIso(row.created_at) ?? new Date().toISOString(),
+    updatedAt: toIso(row.updated_at) ?? new Date().toISOString()
+  }
+}
+
+/**
  * Service for managing DEWS (Distressed Early Warning System) alerts.
  *
  * Provides methods for:
@@ -326,34 +409,16 @@ export class AlertService {
       ruleId
     } = params
 
-    const id = crypto.randomUUID()
-    const now = new Date().toISOString()
-
-    // TODO(DEWS-persistence): There is no `alerts` table for DEWS prospect/health
-    // alerts (the existing `compliance_alerts` table has a different schema and
-    // alert_type domain, and lacks prospect_id/rule_id). Until a dedicated
-    // alerts table + migration exists, alerts are NOT persisted — they live only
-    // for the duration of the request. This warning makes that observable.
-    console.warn(
-      `[AlertService] NOT PERSISTED: created in-memory alert "${title}" (${type}, ${severity}) ` +
-        `for prospect ${prospectId}. DEWS alert storage is not wired — this alert will be lost.`
+    // Persist to the `alerts` table (migration 020). The DB generates the id and
+    // created_at; the inserted row is mapped back to the Alert shape.
+    const rows = await database.query<AlertRow>(
+      `INSERT INTO alerts (org_id, rule_id, prospect_id, type, severity, status, title, message, data)
+       VALUES ($1, $2, $3, $4, $5, 'active', $6, $7, $8::jsonb)
+       RETURNING *`,
+      [orgId, ruleId ?? null, prospectId, type, severity, title, message, JSON.stringify(data)]
     )
 
-    const alert: Alert = {
-      id,
-      orgId,
-      prospectId,
-      ruleId,
-      type,
-      severity,
-      status: 'active',
-      title,
-      message,
-      data,
-      createdAt: now
-    }
-
-    return alert
+    return mapAlertRow(rows[0])
   }
 
   /**
@@ -363,22 +428,16 @@ export class AlertService {
    * @returns Array of active alerts
    */
   async getActiveAlerts(orgId: string): Promise<Alert[]> {
-    // TODO: Query persisted alerts once storage is wired.
-    // const query = `
-    //   SELECT *
-    //   FROM alerts
-    //   WHERE org_id = $1 AND status = 'active'
-    //   ORDER BY
-    //     CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
-    //     created_at DESC
-    // `
-
-    console.warn(
-      `[AlertService] NOT PERSISTED: getActiveAlerts for org ${orgId} returns [] because DEWS ` +
-        `alert storage is not wired. TODO: add an alerts table + query here.`
+    const rows = await database.query<AlertRow>(
+      `SELECT *
+       FROM alerts
+       WHERE org_id = $1 AND status = 'active'
+       ORDER BY
+         CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
+         created_at DESC`,
+      [orgId]
     )
-
-    return []
+    return rows.map(mapAlertRow)
   }
 
   /**
@@ -388,17 +447,13 @@ export class AlertService {
    * @param userId - The user acknowledging the alert
    */
   async acknowledgeAlert(alertId: string, userId?: string): Promise<void> {
-    const now = new Date().toISOString()
-
-    // TODO: Persist alert acknowledgements once storage is wired.
-    // const query = `
-    //   UPDATE alerts
-    //   SET status = 'acknowledged', acknowledged_at = $2, acknowledged_by = $3
-    //   WHERE id = $1
-    // `
-
-    console.log(
-      `[AlertService] Acknowledged alert ${alertId} by user ${userId || 'system'} at ${now}`
+    await database.query(
+      `UPDATE alerts
+         SET status = 'acknowledged',
+             acknowledged_at = NOW(),
+             acknowledged_by = $2
+       WHERE id = $1 AND status = 'active'`,
+      [alertId, userId ?? null]
     )
   }
 
@@ -410,19 +465,15 @@ export class AlertService {
    * @param notes - Optional resolution notes
    */
   async resolveAlert(alertId: string, userId?: string, notes?: string): Promise<void> {
-    const now = new Date().toISOString()
-
-    // TODO: Persist alert resolutions once storage is wired.
-    // const query = `
-    //   UPDATE alerts
-    //   SET status = 'resolved', resolved_at = $2, resolved_by = $3, resolution_notes = $4
-    //   WHERE id = $1
-    // `
-
-    console.log(`[AlertService] Resolved alert ${alertId} by user ${userId || 'system'} at ${now}`)
-    if (notes) {
-      console.log(`[AlertService] Resolution notes: ${notes}`)
-    }
+    await database.query(
+      `UPDATE alerts
+         SET status = 'resolved',
+             resolved_at = NOW(),
+             resolved_by = $2,
+             resolution_notes = $3
+       WHERE id = $1`,
+      [alertId, userId ?? null, notes ?? null]
+    )
   }
 
   /**
@@ -432,14 +483,15 @@ export class AlertService {
    * @param userId - The user dismissing the alert
    */
   async dismissAlert(alertId: string, userId?: string): Promise<void> {
-    // TODO: Persist alert dismissals once storage is wired.
-    // const query = `
-    //   UPDATE alerts
-    //   SET status = 'dismissed', resolved_at = NOW(), resolved_by = $2, resolution_notes = 'Dismissed'
-    //   WHERE id = $1
-    // `
-
-    console.log(`[AlertService] Dismissed alert ${alertId} by user ${userId || 'system'}`)
+    await database.query(
+      `UPDATE alerts
+         SET status = 'dismissed',
+             resolved_at = NOW(),
+             resolved_by = $2,
+             resolution_notes = COALESCE(resolution_notes, 'Dismissed')
+       WHERE id = $1`,
+      [alertId, userId ?? null]
+    )
   }
 
   /**
@@ -450,18 +502,15 @@ export class AlertService {
    * @returns Array of historical alerts
    */
   async getAlertHistory(prospectId: string, limit: number = 50): Promise<Alert[]> {
-    // TODO: Query alert history once storage is wired.
-    // const query = `
-    //   SELECT *
-    //   FROM alerts
-    //   WHERE prospect_id = $1
-    //   ORDER BY created_at DESC
-    //   LIMIT $2
-    // `
-
-    console.log(`[AlertService] Getting alert history for prospect: ${prospectId}, limit: ${limit}`)
-
-    return []
+    const rows = await database.query<AlertRow>(
+      `SELECT *
+       FROM alerts
+       WHERE prospect_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [prospectId, limit]
+    )
+    return rows.map(mapAlertRow)
   }
 
   /**
@@ -473,17 +522,47 @@ export class AlertService {
   async listAlerts(params: ListAlertsParams): Promise<{ alerts: Alert[]; total: number }> {
     const { orgId, status, type, severity, prospectId, limit = 50, offset = 0 } = params
 
-    // TODO: Build and execute the persisted alert query once storage is wired.
-    console.log(`[AlertService] Listing alerts for org: ${orgId}`, {
-      status,
-      type,
-      severity,
-      prospectId,
-      limit,
-      offset
-    })
+    const conditions: string[] = ['org_id = $1']
+    const values: unknown[] = [orgId]
 
-    return { alerts: [], total: 0 }
+    if (status !== undefined) {
+      const statuses = Array.isArray(status) ? status : [status]
+      values.push(statuses)
+      conditions.push(`status = ANY($${values.length})`)
+    }
+    if (type !== undefined) {
+      values.push(type)
+      conditions.push(`type = $${values.length}`)
+    }
+    if (severity !== undefined) {
+      values.push(severity)
+      conditions.push(`severity = $${values.length}`)
+    }
+    if (prospectId !== undefined) {
+      values.push(prospectId)
+      conditions.push(`prospect_id = $${values.length}`)
+    }
+
+    const where = conditions.join(' AND ')
+
+    const countRows = await database.query<{ total: string | number }>(
+      `SELECT COUNT(*)::int AS total FROM alerts WHERE ${where}`,
+      values
+    )
+    const total = Number(countRows[0]?.total ?? 0)
+
+    const limitParam = values.length + 1
+    const offsetParam = values.length + 2
+    const rows = await database.query<AlertRow>(
+      `SELECT *
+       FROM alerts
+       WHERE ${where}
+       ORDER BY created_at DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      [...values, limit, offset]
+    )
+
+    return { alerts: rows.map(mapAlertRow), total }
   }
 
   /**
@@ -495,18 +574,41 @@ export class AlertService {
   async saveRule(
     rule: Omit<AlertRule, 'createdAt' | 'updatedAt'> & { id?: string }
   ): Promise<AlertRule> {
-    const now = new Date().toISOString()
-    const id = rule.id || crypto.randomUUID()
+    // Upsert: INSERT a new rule (DB-generated id) or UPDATE in place when an id
+    // is supplied. ON CONFLICT keeps created_at and bumps updated_at.
+    const id = rule.id ?? crypto.randomUUID()
+    const prospectIds = rule.prospectIds && rule.prospectIds.length > 0 ? rule.prospectIds : null
 
-    const savedRule: AlertRule = {
-      ...rule,
-      id,
-      createdAt: now,
-      updatedAt: now
-    }
+    const rows = await database.query<AlertRuleRow>(
+      `INSERT INTO alert_rules
+         (id, org_id, type, threshold, action, severity, enabled, prospect_ids, webhook_url, config)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+       ON CONFLICT (id) DO UPDATE SET
+         type = EXCLUDED.type,
+         threshold = EXCLUDED.threshold,
+         action = EXCLUDED.action,
+         severity = EXCLUDED.severity,
+         enabled = EXCLUDED.enabled,
+         prospect_ids = EXCLUDED.prospect_ids,
+         webhook_url = EXCLUDED.webhook_url,
+         config = EXCLUDED.config,
+         updated_at = NOW()
+       RETURNING *`,
+      [
+        id,
+        rule.orgId,
+        rule.type,
+        rule.threshold,
+        rule.action,
+        rule.severity,
+        rule.enabled,
+        prospectIds,
+        rule.webhookUrl ?? null,
+        rule.config ? JSON.stringify(rule.config) : null
+      ]
+    )
 
-    console.log(`[AlertService] Saved rule: ${savedRule.type} (threshold: ${savedRule.threshold})`)
-    return savedRule
+    return mapRuleRow(rows[0])
   }
 
   /**
@@ -516,21 +618,14 @@ export class AlertService {
    * @returns Array of enabled alert rules
    */
   async getEnabledRules(orgId: string): Promise<AlertRule[]> {
-    // TODO: Query persisted rules once storage is wired.
-    // const query = `
-    //   SELECT *
-    //   FROM alert_rules
-    //   WHERE org_id = $1 AND enabled = true
-    //   ORDER BY type, threshold
-    // `
-
-    console.warn(
-      `[AlertService] NOT PERSISTED: getEnabledRules for org ${orgId} returns [] because the ` +
-        `alert_rules table is not wired. DEWS will NOT fire any alerts until rule storage exists. ` +
-        `TODO: add an alert_rules table + query here.`
+    const rows = await database.query<AlertRuleRow>(
+      `SELECT *
+       FROM alert_rules
+       WHERE org_id = $1 AND enabled = true
+       ORDER BY type, threshold`,
+      [orgId]
     )
-
-    return []
+    return rows.map(mapRuleRow)
   }
 
   /**
@@ -539,8 +634,7 @@ export class AlertService {
    * @param ruleId - The rule's unique identifier
    */
   async deleteRule(ruleId: string): Promise<void> {
-    // TODO: Delete persisted rules once storage is wired.
-    console.log(`[AlertService] Deleted rule: ${ruleId}`)
+    await database.query('DELETE FROM alert_rules WHERE id = $1', [ruleId])
   }
 
   /**
@@ -557,31 +651,45 @@ export class AlertService {
     orgId: string,
     rules: Array<Omit<AlertRule, 'id' | 'orgId' | 'createdAt' | 'updatedAt'>>
   ): Promise<AlertRule[]> {
-    const now = new Date().toISOString()
+    // Transactionally replace the org's rule set: delete existing, insert new.
+    const client = await database.getPoolClient()
+    const configured: AlertRule[] = []
+    try {
+      await client.query('BEGIN')
+      await client.query('DELETE FROM alert_rules WHERE org_id = $1', [orgId])
 
-    // TODO: Replace with transactional persistence once rule storage is wired.
-    // 1. Begin a transaction
-    // 2. Delete all existing rules for the org
-    // 3. Insert the new rules
-    // 4. Commit the transaction
+      for (const rule of rules) {
+        const prospectIds =
+          rule.prospectIds && rule.prospectIds.length > 0 ? rule.prospectIds : null
+        const result = await client.query(
+          `INSERT INTO alert_rules
+             (org_id, type, threshold, action, severity, enabled, prospect_ids, webhook_url, config)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+           RETURNING *`,
+          [
+            orgId,
+            rule.type,
+            rule.threshold,
+            rule.action,
+            rule.severity,
+            rule.enabled,
+            prospectIds,
+            rule.webhookUrl ?? null,
+            rule.config ? JSON.stringify(rule.config) : null
+          ]
+        )
+        configured.push(mapRuleRow(result.rows[0] as AlertRuleRow))
+      }
 
-    const configuredRules: AlertRule[] = rules.map((rule, index) => ({
-      ...rule,
-      id: `rule-${orgId}-${index}-${Date.now()}`,
-      orgId,
-      createdAt: now,
-      updatedAt: now
-    }))
-
-    console.log(`[AlertService] Configured ${configuredRules.length} rules for org: ${orgId}`)
-
-    for (const rule of configuredRules) {
-      console.log(
-        `  - ${rule.type}: threshold=${rule.threshold}, action=${rule.action}, severity=${rule.severity}`
-      )
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
     }
 
-    return configuredRules
+    return configured
   }
 
   /**

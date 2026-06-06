@@ -50,6 +50,50 @@ export async function createCheckoutSession(
   })
 }
 
+/**
+ * Subscription tiers recognized by the `organizations.subscription_tier` column
+ * (see database/migrations/004_multitenancy.sql). 'free' is the unentitled
+ * baseline; the rest grant the paid data tier (see middleware/dataTier.ts).
+ */
+export type SubscriptionTier = 'free' | 'starter' | 'professional' | 'enterprise'
+
+/**
+ * Map a Stripe Price id to an internal subscription tier.
+ *
+ * The mapping is configured via environment so that price ids (which differ per
+ * Stripe account / mode) are never hard-coded:
+ *   STRIPE_PRICE_STARTER, STRIPE_PRICE_PROFESSIONAL, STRIPE_PRICE_ENTERPRISE
+ *
+ * `STRIPE_PRICE_ID` (the single price used by the /checkout route) is also
+ * honored as the 'starter' price when no explicit starter price is set, so a
+ * minimally-configured deployment still maps its one price.
+ *
+ * Returns `null` when the price is unknown. Callers MUST fail closed on null:
+ * persist the raw price id but leave `subscription_tier` unchanged, and log the
+ * unmapped price so the gap is observable.
+ */
+export function mapPriceToTier(priceId: string | null | undefined): SubscriptionTier | null {
+  if (!priceId) {
+    return null
+  }
+
+  const starter = process.env.STRIPE_PRICE_STARTER || process.env.STRIPE_PRICE_ID
+  const professional = process.env.STRIPE_PRICE_PROFESSIONAL
+  const enterprise = process.env.STRIPE_PRICE_ENTERPRISE
+
+  if (enterprise && priceId === enterprise) {
+    return 'enterprise'
+  }
+  if (professional && priceId === professional) {
+    return 'professional'
+  }
+  if (starter && priceId === starter) {
+    return 'starter'
+  }
+
+  return null
+}
+
 export async function constructWebhookEvent(
   payload: Buffer,
   signature: string

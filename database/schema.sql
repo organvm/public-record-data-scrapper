@@ -692,3 +692,88 @@ CREATE TABLE IF NOT EXISTS pre_call_briefings (
   UNIQUE(prospect_id)
 );
 CREATE INDEX IF NOT EXISTS idx_briefings_prospect ON pre_call_briefings(prospect_id);
+
+-- ============================================================================
+-- Migration 020: Billing persistence + DEWS alert storage
+--
+-- NOTE on bootstrap ordering: the objects below depend on `organizations`
+-- (migration 004) and `prospects`. Neither the `organizations`/`users`
+-- multi-tenancy tables (004) nor `portfolio_health_history` (009) are
+-- reproduced in this schema.sql snapshot — they are migration-only. To keep a
+-- pure `schema.sql` bootstrap (which has no `organizations` table) from
+-- erroring, the entire block is guarded by a DO that runs only when both
+-- `organizations` and `prospects` already exist. On a database evolved via
+-- `npm run migrate` the migration-020 objects are created idempotently; this
+-- mirror is a no-op there (IF NOT EXISTS).
+-- ============================================================================
+DO $migration_020$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'organizations')
+     AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'prospects') THEN
+
+    -- (A) Billing columns on organizations
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(255);
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255);
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(30);
+    ALTER TABLE organizations ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMP WITH TIME ZONE;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_stripe_customer
+        ON organizations(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_stripe_subscription
+        ON organizations(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
+
+    -- (B) DEWS alert rules
+    CREATE TABLE IF NOT EXISTS alert_rules (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        type VARCHAR(30) NOT NULL CHECK (type IN (
+            'health_drop', 'new_ucc', 'payment_missed', 'score_critical', 'trend_declining'
+        )),
+        threshold NUMERIC(10, 2) NOT NULL DEFAULT 0,
+        action VARCHAR(20) NOT NULL CHECK (action IN ('email', 'sms', 'webhook', 'in_app')),
+        severity VARCHAR(20) NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        prospect_ids UUID[],
+        webhook_url TEXT,
+        config JSONB,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_alert_rules_org_enabled
+        ON alert_rules(org_id, enabled) WHERE enabled = true;
+    CREATE INDEX IF NOT EXISTS idx_alert_rules_type ON alert_rules(type);
+
+    -- (B) DEWS alerts
+    CREATE TABLE IF NOT EXISTS alerts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        rule_id UUID REFERENCES alert_rules(id) ON DELETE SET NULL,
+        prospect_id UUID NOT NULL REFERENCES prospects(id) ON DELETE CASCADE,
+        type VARCHAR(30) NOT NULL CHECK (type IN (
+            'health_drop', 'new_ucc', 'payment_missed', 'score_critical', 'trend_declining'
+        )),
+        severity VARCHAR(20) NOT NULL DEFAULT 'medium' CHECK (severity IN (
+            'low', 'medium', 'high', 'critical'
+        )),
+        status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN (
+            'active', 'acknowledged', 'resolved', 'dismissed'
+        )),
+        title VARCHAR(500) NOT NULL,
+        message TEXT NOT NULL,
+        data JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        acknowledged_at TIMESTAMP WITH TIME ZONE,
+        acknowledged_by UUID,
+        resolved_at TIMESTAMP WITH TIME ZONE,
+        resolved_by UUID,
+        resolution_notes TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_alerts_org_status ON alerts(org_id, status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_alerts_prospect ON alerts(prospect_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_alerts_active
+        ON alerts(org_id, severity, created_at DESC) WHERE status = 'active';
+
+  END IF;
+END
+$migration_020$;

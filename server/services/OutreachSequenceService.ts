@@ -177,4 +177,66 @@ export class OutreachSequenceService {
       [sequenceId]
     )
   }
+
+  /**
+   * Find a prospect's outreach sequences that are still in flight (pending or
+   * active). These are the sequences an inbound reply should attach to and stop.
+   * Returns the sequence id plus its current trigger_type/status.
+   */
+  async getActiveSequenceIds(
+    prospectId: string
+  ): Promise<{ id: string; triggerType: string; status: string }[]> {
+    return this.db.query<{ id: string; triggerType: string; status: string }>(
+      `SELECT id, trigger_type AS "triggerType", status
+       FROM outreach_sequences
+       WHERE prospect_id = $1 AND status IN ('pending', 'active')
+       ORDER BY created_at DESC`,
+      [prospectId]
+    )
+  }
+
+  /**
+   * Record that a contact replied to a sequence, and stop any further pending or
+   * scheduled sends for it.
+   *
+   * The status CHECK on outreach_sequences (migration 012) does not include a
+   * dedicated 'replied' value, and there is no column that fits a reply marker.
+   * Rather than introduce a migration purely for a label, we reuse the existing
+   * terminal 'cancelled' state — which already halts pending/scheduled steps via
+   * the same state machine `cancelSequence` uses — and stamp the reply provenance
+   * (timestamp, communication id, disposition) into the existing `metadata` JSONB
+   * column. This keeps the reply auditable without a schema change.
+   *
+   * The metadata merge preserves any pre-existing keys (e.g. trigger context) by
+   * merging into COALESCE(metadata, '{}') server-side.
+   */
+  async recordReply(
+    sequenceId: string,
+    communicationId: string | null,
+    disposition: string
+  ): Promise<void> {
+    const replyMeta = {
+      replied_at: new Date().toISOString(),
+      reply_communication_id: communicationId,
+      reply_disposition: disposition
+    }
+
+    // Mark the sequence terminal so it is no longer "in flight" and stamp the
+    // reply provenance. Merging with COALESCE(metadata,'{}') keeps prior keys.
+    await this.db.query(
+      `UPDATE outreach_sequences
+       SET status = 'cancelled',
+           completed_at = NOW(),
+           metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
+       WHERE id = $1`,
+      [sequenceId, JSON.stringify(replyMeta)]
+    )
+
+    // Stop any remaining sends that have not yet gone out.
+    await this.db.query(
+      `UPDATE outreach_steps SET status = 'skipped'
+       WHERE sequence_id = $1 AND status IN ('pending', 'scheduled')`,
+      [sequenceId]
+    )
+  }
 }

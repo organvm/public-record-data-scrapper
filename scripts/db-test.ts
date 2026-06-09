@@ -7,6 +7,7 @@
  */
 
 import { config } from 'dotenv'
+import { fileURLToPath } from 'url'
 import { testConnection, query, closePool } from '../apps/web/src/lib/db'
 
 // Load environment variables
@@ -88,7 +89,9 @@ async function main() {
 }
 
 // Run if executed directly
-if (require.main === module) {
+const invokedDirectly = process.argv[1] === fileURLToPath(import.meta.url)
+
+if (invokedDirectly) {
   main()
 }
 

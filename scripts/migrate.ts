@@ -46,6 +46,17 @@ async function getAppliedMigrations(): Promise<Set<string>> {
   }
 }
 
+async function recordMigration(migration: Migration): Promise<void> {
+  await pool.query(
+    `
+      INSERT INTO schema_migrations (version, name)
+      VALUES ($1, $2)
+      ON CONFLICT (version) DO NOTHING
+    `,
+    [migration.version, migration.name]
+  )
+}
+
 function getPendingMigrations(migrationsDir: string, appliedVersions: Set<string>): Migration[] {
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql') && !f.includes('_down.sql'))
@@ -84,6 +95,7 @@ async function runMigration(migration: Migration): Promise<void> {
   try {
     // Run the migration SQL
     await pool.query(sql)
+    await recordMigration(migration)
     console.log(`✓ Migration ${migration.version} completed successfully`)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

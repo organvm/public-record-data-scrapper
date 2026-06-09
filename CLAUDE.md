@@ -112,9 +112,9 @@ terraform/   → AWS infrastructure (VPC, RDS, ElastiCache)
 
 Express.js REST API (port 3000) with Swagger at `/api/docs`.
 
-**Routes** (10): health, prospects, competitors, portfolio, enrichment, jobs, contacts, deals, billing, webhooks. All except health and webhooks require JWT auth.
+**Routes** (18 files): health, status, prospects, competitors, competitive, portfolio, enrichment, jobs, contacts, deals, billing, webhooks, outreach, communications, compliance, discovery, agentic, metrics. All require JWT auth except health, webhooks (signature-verified), and metrics (JWT **or** `METRICS_TOKEN`).
 
-**Services** (19): ProspectsService, CompetitorsService, PortfolioService, EnrichmentService, ScoringService, StackAnalysisService, SuppressionService (TCPA/DNC), UnderwritingService, ComplianceReportService, AlertService, ContactsService, DealsService, CommunicationsService, QualificationService, NarrativeService, ConsentService, DisclosureService, AuditService, DisclosureCalculator.
+**Services** (30 files): ProspectsService, CompetitorsService, PortfolioService, EnrichmentService, ScoringService, StackAnalysisService, SuppressionService (TCPA/DNC), UnderwritingService, ComplianceReportService, AlertService, ContactsService, DealsService, CommunicationsService, QualificationService, NarrativeService, ConsentService, DisclosureService, AuditService, DisclosureCalculator, ReplyHandlingService, LeadDiscoveryService (+ discovery-channels: SEC EDGAR, Socrata permits, SBA loans), ImprovementExecutor, OutreachSequenceService, and supporting modules under `server/services/`.
 
 **Integrations** (7): ACH payments, AWS (S3/SQS/CloudWatch), Plaid (bank linking), SendGrid (email), Stripe (payments + webhooks), Twilio (SMS/voice).
 

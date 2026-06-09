@@ -107,6 +107,18 @@ export interface ImprovementSuggestion {
   automatable: boolean
   safetyScore: number // 0-100, higher is safer
   implementation?: ImplementationPlan
+  /**
+   * Ids of the specific prospects this suggestion was derived from. Populated
+   * by agents whose finding references concrete prospect rows (e.g. stale
+   * health scores, prospects holding financial data). The server-side
+   * ImprovementExecutor requires these to take a real action (re-enrichment /
+   * re-score / alert); without them an actionable category fails closed.
+   *
+   * Genuinely system-level suggestions (architecture, pipeline-wide policy)
+   * leave this absent on purpose — there are no specific prospects to act on,
+   * and `executed:false` with a named reason is the correct honest outcome.
+   */
+  prospectIds?: string[]
 }
 
 export interface ImplementationPlan {
@@ -126,6 +138,14 @@ export interface Improvement {
   completedAt?: string
   result?: ImprovementResult
   reviewedBy?: AgentRole[]
+  /**
+   * Prospect ids the improvement applies to. Defaults to the originating
+   * suggestion's `prospectIds`, but kept on the improvement so a future review
+   * layer can narrow the target set without mutating the suggestion. The engine
+   * forwards these (falling back to the suggestion's ids) to the execute
+   * request.
+   */
+  prospectIds?: string[]
 }
 
 export interface ImprovementResult {

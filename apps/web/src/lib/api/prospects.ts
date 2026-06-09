@@ -9,6 +9,16 @@ export async function fetchProspects(
   return apiRequest<Prospect[]>('/prospects', { signal, headers })
 }
 
+/**
+ * Fetch a single prospect by id. Mirrors GET /api/prospects/:id, which returns
+ * the canonical camelCase Prospect (including `state`). Throws ApiError (404
+ * "Prospect not found") which callers surface verbatim — no placeholder is
+ * invented client-side.
+ */
+export async function fetchProspect(prospectId: string, signal?: AbortSignal): Promise<Prospect> {
+  return apiRequest<Prospect>(`/prospects/${encodeURIComponent(prospectId)}`, { signal })
+}
+
 export async function claimProspect(
   prospectId: string,
   user: string,

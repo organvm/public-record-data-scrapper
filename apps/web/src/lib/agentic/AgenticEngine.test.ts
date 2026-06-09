@@ -3,16 +3,46 @@
  * Tests the core autonomous improvement engine and its capabilities
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AgenticEngine } from './AgenticEngine'
-import { SystemContext } from './types'
+import { SystemContext, Improvement } from './types'
+import type { AgenticApiClient, ExecutionResult } from '../api/agentic'
+
+/**
+ * Builds a mock AgenticApiClient. `executeImprovement` resolves to the given
+ * ExecutionResult (defaulting to a real-action success), and `sendCallback`
+ * is a no-op spy. Pass an Error-rejecting executeImprovement to simulate an
+ * unreachable API.
+ */
+function makeApiClient(
+  result: ExecutionResult = { executed: true, action: 're-enrichment', details: { jobId: 'job-1' } }
+): AgenticApiClient {
+  return {
+    executeImprovement: vi.fn(async () => result),
+    sendCallback: vi.fn(async () => {})
+  }
+}
+
+/**
+ * An API client that always rejects, modelling an unreachable / failing server.
+ */
+function makeUnreachableApiClient(): AgenticApiClient {
+  return {
+    executeImprovement: vi.fn(async () => {
+      throw new Error('Network request failed')
+    }),
+    sendCallback: vi.fn(async () => {})
+  }
+}
 
 describe('AgenticEngine', () => {
   let engine: AgenticEngine
   let mockContext: SystemContext
 
   beforeEach(() => {
-    engine = new AgenticEngine()
+    // Inject a succeeding API client by default so execution-path tests assert
+    // real server-confirmed behaviour rather than a removed simulation.
+    engine = new AgenticEngine(undefined, { apiClient: makeApiClient() })
     mockContext = {
       prospects: [
         {
@@ -244,6 +274,149 @@ describe('AgenticEngine', () => {
 
     it('should throw error for non-existent improvement', async () => {
       await expect(engine.approveAndExecute('non-existent-id', mockContext)).rejects.toThrow()
+    })
+
+    it('forwards the suggestion prospectIds to the execute request', async () => {
+      const apiClient = makeApiClient({
+        executed: true,
+        action: 're-enrichment',
+        details: { jobId: 'job-7' }
+      })
+      const engineWithIds = new AgenticEngine(undefined, { apiClient })
+
+      // Inject a prospect-specific improvement (as an agent would emit it) so
+      // the engine has concrete ids to forward.
+      const improvement: Improvement = {
+        id: 'imp-with-ids',
+        suggestion: {
+          id: 'sug-with-ids',
+          category: 'data-quality',
+          priority: 'high',
+          title: 'Re-enrich stale prospects',
+          description: 'Refresh stale rows',
+          reasoning: 'stale',
+          estimatedImpact: 'higher completeness',
+          automatable: true,
+          safetyScore: 75,
+          prospectIds: ['p1', 'p2']
+        },
+        status: 'detected',
+        detectedAt: new Date().toISOString()
+      }
+      engineWithIds.setImprovements([improvement])
+
+      await engineWithIds.approveAndExecute('imp-with-ids', mockContext)
+
+      expect(apiClient.executeImprovement).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'imp-with-ids',
+          category: 'data-quality',
+          prospectIds: ['p1', 'p2']
+        })
+      )
+    })
+
+    it('omits prospectIds for a system-level suggestion that carries none', async () => {
+      const apiClient = makeApiClient({
+        executed: false,
+        action: 'none',
+        details: {},
+        reason: 'category data-quality requires prospectIds but none were provided'
+      })
+      const engineNoIds = new AgenticEngine(undefined, { apiClient })
+
+      const improvement: Improvement = {
+        id: 'imp-no-ids',
+        suggestion: {
+          id: 'sug-no-ids',
+          category: 'data-quality',
+          priority: 'high',
+          title: 'Implement automated data enrichment pipeline',
+          description: 'System-level pipeline work',
+          reasoning: 'architecture',
+          estimatedImpact: 'platform-wide',
+          automatable: true,
+          safetyScore: 75
+          // No prospectIds: genuinely system-level.
+        },
+        status: 'detected',
+        detectedAt: new Date().toISOString()
+      }
+      engineNoIds.setImprovements([improvement])
+
+      const result = await engineNoIds.approveAndExecute('imp-no-ids', mockContext)
+
+      // The request carries no ids, and the server (mock) fails closed with the
+      // named reason — the correct honest outcome for a system-level suggestion.
+      expect(apiClient.executeImprovement).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'imp-no-ids', prospectIds: undefined })
+      )
+      expect(result.success).toBe(false)
+      expect(result.feedback).toContain('requires prospectIds')
+      const stored = engineNoIds.getImprovements().find((i) => i.id === 'imp-no-ids')
+      expect(stored?.status).toBe('rejected')
+    })
+
+    it('should mark an improvement completed when the server confirms a real action', async () => {
+      const apiClient = makeApiClient({
+        executed: true,
+        action: 'alert',
+        details: { alertId: 'alert-99' }
+      })
+      const realEngine = new AgenticEngine(undefined, { apiClient })
+
+      await realEngine.runAutonomousCycle(mockContext)
+      const [improvement] = realEngine.getImprovements()
+      const result = await realEngine.approveAndExecute(improvement.id, mockContext)
+
+      expect(result.success).toBe(true)
+      expect(apiClient.executeImprovement).toHaveBeenCalled()
+      // No fabricated metrics — server returns observed effects only.
+      expect(result.metrics).toEqual({ before: {}, after: {} })
+      expect(result.feedback).toContain('alert')
+      const stored = realEngine.getImprovements().find((i) => i.id === improvement.id)
+      expect(stored?.status).toBe('completed')
+    })
+  })
+
+  describe('Fail-closed execution', () => {
+    it('keeps an improvement rejected (not completed) when the API is unreachable', async () => {
+      const apiClient = makeUnreachableApiClient()
+      const failEngine = new AgenticEngine(undefined, { apiClient })
+
+      await failEngine.runAutonomousCycle(mockContext)
+      const [improvement] = failEngine.getImprovements()
+      const result = await failEngine.approveAndExecute(improvement.id, mockContext)
+
+      expect(result.success).toBe(false)
+      expect(result.changes).toHaveLength(0)
+      expect(result.feedback).toContain('Execution failed')
+      // No invented metrics on failure.
+      expect(result.metrics).toEqual({ before: {}, after: {} })
+
+      const stored = failEngine.getImprovements().find((i) => i.id === improvement.id)
+      expect(stored?.status).toBe('rejected')
+      expect(stored?.status).not.toBe('completed')
+    })
+
+    it('fails closed with the named reason when the server returns executed:false', async () => {
+      const apiClient = makeApiClient({
+        executed: false,
+        action: 'none',
+        details: {},
+        reason: 'no server-side action for category usability'
+      })
+      const failEngine = new AgenticEngine(undefined, { apiClient })
+
+      await failEngine.runAutonomousCycle(mockContext)
+      const [improvement] = failEngine.getImprovements()
+      const result = await failEngine.approveAndExecute(improvement.id, mockContext)
+
+      expect(result.success).toBe(false)
+      expect(result.feedback).toBe('no server-side action for category usability')
+
+      const stored = failEngine.getImprovements().find((i) => i.id === improvement.id)
+      expect(stored?.status).toBe('rejected')
     })
   })
 

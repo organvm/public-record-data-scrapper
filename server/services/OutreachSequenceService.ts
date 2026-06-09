@@ -1,11 +1,26 @@
+import type { PoolClient } from 'pg'
 import {
   OUTREACH_SEQUENCES,
   MINIMUM_CAPACITY_SCORE,
   SEQUENCE_COOLDOWN_DAYS
 } from '../config/outreachTemplates'
 
+/**
+ * The minimal database surface this service depends on. `query` is the row-array
+ * passthrough every caller already provides. `getPoolClient` is optional: when
+ * present (the real `database` wrapper exposes it), recordReply runs its two
+ * UPDATEs on a single dedicated connection inside a BEGIN/COMMIT transaction.
+ * When absent (lightweight unit fakes), recordReply falls back to sequential
+ * `query` calls — still checking the sequence rowCount so the caller gets a
+ * truthful result.
+ */
+interface SequenceDb {
+  query: <T>(sql: string, params?: unknown[]) => Promise<T[]>
+  getPoolClient?: () => Promise<PoolClient>
+}
+
 export class OutreachSequenceService {
-  constructor(private db: { query: <T>(sql: string, params?: unknown[]) => Promise<T[]> }) {}
+  constructor(private db: SequenceDb) {}
 
   async isEligible(
     prospectId: string,
@@ -176,5 +191,135 @@ export class OutreachSequenceService {
       `UPDATE outreach_steps SET status = 'skipped' WHERE sequence_id = $1 AND status IN ('pending', 'scheduled')`,
       [sequenceId]
     )
+  }
+
+  /**
+   * Find a prospect's outreach sequences that are still in flight (pending or
+   * active). These are the sequences an inbound reply should attach to and stop.
+   * Returns the sequence id plus its current trigger_type/status.
+   */
+  async getActiveSequenceIds(
+    prospectId: string
+  ): Promise<{ id: string; triggerType: string; status: string }[]> {
+    return this.db.query<{ id: string; triggerType: string; status: string }>(
+      `SELECT id, trigger_type AS "triggerType", status
+       FROM outreach_sequences
+       WHERE prospect_id = $1 AND status IN ('pending', 'active')
+       ORDER BY created_at DESC`,
+      [prospectId]
+    )
+  }
+
+  /**
+   * Record that a contact replied to a sequence, and stop any further pending or
+   * scheduled sends for it.
+   *
+   * The status CHECK on outreach_sequences (migration 012) does not include a
+   * dedicated 'replied' value, and there is no column that fits a reply marker.
+   * Rather than introduce a migration purely for a label, we reuse the existing
+   * terminal 'cancelled' state — which already halts pending/scheduled steps via
+   * the same state machine `cancelSequence` uses — and stamp the reply provenance
+   * (timestamp, communication id, disposition) into the existing `metadata` JSONB
+   * column. This keeps the reply auditable without a schema change.
+   *
+   * The metadata merge preserves any pre-existing keys (e.g. trigger context) by
+   * merging into COALESCE(metadata, '{}') server-side.
+   *
+   * Transactionality: the sequence terminal-marking and the step-skipping are a
+   * single atomic unit — a crash between them would leave a "cancelled" sequence
+   * with live pending steps that the worker would keep sending. When the db
+   * exposes a pool client we run both inside BEGIN/COMMIT on one connection;
+   * otherwise we degrade to sequential queries (unit fakes). Either way we check
+   * the sequence UPDATE's rowCount: a no-op match (already-terminal or unknown
+   * id) is surfaced as a named warning rather than silently claiming success.
+   *
+   * Return type: this is the method the ReplyHandlingService `OutreachSequencePort`
+   * contract calls, and that port is typed `Promise<void>`. We keep `recordReply`
+   * void-compatible so that contract (and its caller in webhooks.ts) compiles
+   * unchanged. Callers that need the matched/no-match outcome use the sibling
+   * `recordReplyResult` below, which returns the boolean directly.
+   */
+  async recordReply(
+    sequenceId: string,
+    communicationId: string | null,
+    disposition: string
+  ): Promise<void> {
+    const matched = await this.recordReplyResult(sequenceId, communicationId, disposition)
+    if (!matched) {
+      // Named result for the no-match case (already-terminal or unknown id):
+      // the reply was NOT attached to any in-flight sequence. Surface it so it
+      // is observable instead of a silent success.
+      console.warn('[OutreachSequenceService] recordReply matched no in-flight sequence', {
+        sequenceId,
+        disposition
+      })
+    }
+  }
+
+  /**
+   * Transactional core of recordReply. Returns true when the sequence row was
+   * updated, false when no row matched. Separated from `recordReply` so the
+   * boolean outcome is available to callers (and tests) without changing the
+   * void-typed `OutreachSequencePort.recordReply` contract.
+   */
+  async recordReplyResult(
+    sequenceId: string,
+    communicationId: string | null,
+    disposition: string
+  ): Promise<boolean> {
+    const replyMeta = {
+      replied_at: new Date().toISOString(),
+      reply_communication_id: communicationId,
+      reply_disposition: disposition
+    }
+    const metaJson = JSON.stringify(replyMeta)
+
+    // Mark the sequence terminal (so it is no longer "in flight") and stamp the
+    // reply provenance. Merging with COALESCE(metadata,'{}') keeps prior keys.
+    // RETURNING id lets both the pool-client and fallback paths detect a match.
+    const sequenceSql = `UPDATE outreach_sequences
+       SET status = 'cancelled',
+           completed_at = NOW(),
+           metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
+       WHERE id = $1
+       RETURNING id`
+    const stepsSql = `UPDATE outreach_steps SET status = 'skipped'
+       WHERE sequence_id = $1 AND status IN ('pending', 'scheduled')`
+
+    if (this.db.getPoolClient) {
+      const client = await this.db.getPoolClient()
+      try {
+        await client.query('BEGIN')
+        const seqResult = await client.query(sequenceSql, [sequenceId, metaJson])
+        if ((seqResult.rowCount ?? 0) === 0) {
+          // No sequence matched — nothing to skip. Roll back the (empty) tx and
+          // report no attachment.
+          await client.query('ROLLBACK')
+          return false
+        }
+        await client.query(stepsSql, [sequenceId])
+        await client.query('COMMIT')
+        return true
+      } catch (error) {
+        try {
+          await client.query('ROLLBACK')
+        } catch {
+          // Swallow rollback failures so the original error propagates.
+        }
+        throw error
+      } finally {
+        client.release()
+      }
+    }
+
+    // Fallback (no pool client, e.g. unit fakes): sequential queries. Without a
+    // single connection there is no real transaction to roll back, so we run
+    // both UPDATEs unconditionally (matching the pre-existing two-write
+    // behavior) and report attachment from the sequence UPDATE's returned rows.
+    // A fake that does not honor RETURNING simply reports false; the steps
+    // UPDATE still runs, so no caller's query sequence is shortened.
+    const seqRows = await this.db.query<{ id: string }>(sequenceSql, [sequenceId, metaJson])
+    await this.db.query(stepsSql, [sequenceId])
+    return seqRows.length > 0
   }
 }

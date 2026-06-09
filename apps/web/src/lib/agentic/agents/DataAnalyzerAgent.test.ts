@@ -412,4 +412,62 @@ describe('DataAnalyzerAgent', () => {
       expect(criticalFindings.length).toBeGreaterThan(0)
     })
   })
+
+  describe('Prospect-id attachment for the executor', () => {
+    it('attaches the stale/incomplete prospect ids to data-quality suggestions', async () => {
+      mockContext.prospects = [
+        {
+          id: 'prospect-stale',
+          companyName: 'Stale Co',
+          // 10 days old → stale, and no revenue/growth signals → incomplete.
+          healthScore: {
+            lastUpdated: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        },
+        {
+          id: 'prospect-fresh',
+          companyName: 'Fresh Co',
+          estimatedRevenue: 1_000_000,
+          growthSignals: [{ type: 'hiring' }],
+          healthScore: {
+            lastUpdated: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        }
+      ] as any
+
+      const analysis = await agent.analyze(mockContext)
+
+      const enrichment = analysis.improvements.find(
+        (i) => i.title === 'Implement automated data enrichment pipeline'
+      )
+      expect(enrichment).toBeDefined()
+      // The stale+incomplete prospect is a concrete target; the fully-populated
+      // fresh one is not flagged.
+      expect(enrichment?.prospectIds).toContain('prospect-stale')
+      expect(enrichment?.prospectIds).not.toContain('prospect-fresh')
+
+      const refresh = analysis.improvements.find(
+        (i) => i.title === 'Enable automatic health score refresh'
+      )
+      expect(refresh?.prospectIds).toEqual(['prospect-stale'])
+    })
+
+    it('leaves prospectIds absent when flagged prospects carry no ids', async () => {
+      // A finding still fires (stale data), but the prospect has no id, so there
+      // is nothing concrete for the executor to act on — fail-closed by omission.
+      mockContext.prospects = [
+        {
+          companyName: 'No-Id Co',
+          healthScore: {
+            lastUpdated: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        }
+      ] as any
+
+      const analysis = await agent.analyze(mockContext)
+      analysis.improvements.forEach((imp) => {
+        expect(imp.prospectIds).toBeUndefined()
+      })
+    })
+  })
 })

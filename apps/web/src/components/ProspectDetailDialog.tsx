@@ -20,6 +20,7 @@ import { HealthGradeBadge } from './HealthGradeBadge'
 import { SignalTimeline } from './SignalTimeline'
 import { NotesAndReminders } from './NotesAndReminders'
 import { EmailComposer } from './EmailComposer'
+import { PreCallBriefing } from './outreach/PreCallBriefing'
 import { MobileProspectDetails } from './MobileProspectDetails'
 import {
   Buildings,
@@ -306,11 +307,12 @@ export function ProspectDetailDialog({
           )}
 
           <Tabs defaultValue="signals" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="signals">
                 Growth Signals ({prospect.growthSignals.length})
               </TabsTrigger>
               <TabsTrigger value="filings">UCC Filings ({prospect.uccFilings.length})</TabsTrigger>
+              <TabsTrigger value="briefing">Briefing</TabsTrigger>
               <TabsTrigger value="notes">Notes & Reminders</TabsTrigger>
             </TabsList>
 
@@ -359,6 +361,11 @@ export function ProspectDetailDialog({
                   </div>
                 </Card>
               ))}
+            </TabsContent>
+
+            <TabsContent value="briefing" className="mt-4">
+              {/* key remounts on prospect change so briefing state never leaks across prospects */}
+              <PreCallBriefing key={prospect.id} prospectId={prospect.id} />
             </TabsContent>
 
             <TabsContent value="notes" className="mt-4">

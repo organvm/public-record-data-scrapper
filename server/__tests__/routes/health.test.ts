@@ -204,7 +204,9 @@ describe('Health Routes', () => {
       expect(stateIndex.NY).toMatchObject({
         status: 'red',
         primaryStrategy: 'scrape',
-        scheduled: false,
+        // NY is scheduled since STATE_STRATEGY_PROFILES gained NY: ['scrape'];
+        // it stays red until NY_UCC_DEBTOR_SEEDS is configured.
+        scheduled: true,
         isHighValue: true
       })
     })

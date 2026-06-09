@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { PreCallBriefingService } from '../services/PreCallBriefingService'
 import { OutreachSequenceService } from '../services/OutreachSequenceService'
+import { narrativeService } from '../services/NarrativeService'
 import { database } from '../database/connection'
 
 const router = Router()
@@ -20,6 +21,20 @@ router.get('/briefing/:prospectId', async (req, res) => {
       return res.status(404).json({ error: (err as Error).message })
     }
     res.status(500).json({ error: 'Failed to generate briefing' })
+  }
+})
+
+// GET /api/outreach/narrative/:prospectId — Generate sales narrative
+router.get('/narrative/:prospectId', async (req, res) => {
+  try {
+    const narrative = await narrativeService.generateNarrative(req.params.prospectId)
+    res.json(narrative)
+  } catch (err) {
+    if ((err as Error).message.includes('not found')) {
+      return res.status(404).json({ error: (err as Error).message })
+    }
+    console.error('[outreach] Narrative error:', (err as Error).message)
+    res.status(500).json({ error: 'Failed to generate narrative' })
   }
 })
 

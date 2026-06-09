@@ -12,6 +12,7 @@ import type {
 import { createCAApiCollector } from '../../../apps/web/src/lib/collectors/state-collectors/CAApiCollector'
 import { createTXBulkCollector } from '../../../apps/web/src/lib/collectors/state-collectors/TXBulkCollector'
 import { createFLVendorCollector } from '../../../apps/web/src/lib/collectors/state-collectors/FLVendorCollector'
+import { createNYScraperCollector } from '../../../apps/web/src/lib/collectors/state-collectors/NYScraperCollector'
 import {
   evaluateIngestionRecoveryAction,
   getIngestionQueue,
@@ -279,10 +280,19 @@ function resolveCollectorForJob(
       }
       return collector
     }
-    case 'NY:scrape':
-      throw new NonRetryableIngestionError(
-        'NY real-time portal search exists, but no production incremental ingestion collector is wired yet.'
-      )
+    case 'NY:scrape': {
+      const collector = createNYScraperCollector()
+      // NY needs no credentials but is portal-driven: the collector can only run
+      // with a configured debtor-seed list (NY_UCC_DEBTOR_SEEDS). Gate on
+      // isReady() exactly like FL so an unconfigured environment fails closed
+      // instead of running an empty collection.
+      if (!collector || !collector.isReady()) {
+        throw new NonRetryableIngestionError(
+          'NY scraper collector is not ready because no debtor seeds are configured (set NY_UCC_DEBTOR_SEEDS).'
+        )
+      }
+      return collector
+    }
     default:
       throw new NonRetryableIngestionError(
         strategy

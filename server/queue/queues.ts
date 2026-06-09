@@ -191,7 +191,10 @@ export async function hydrateTelemetryFromDatabase(
 const STATE_STRATEGY_PROFILES: Partial<Record<string, IngestionStrategy[]>> = {
   CA: ['api'],
   TX: ['bulk'],
-  FL: ['vendor']
+  FL: ['vendor'],
+  // NY portal supports per-debtor search only; the scrape collector iterates
+  // NY_UCC_DEBTOR_SEEDS and relies on external_id upsert dedupe.
+  NY: ['scrape']
 }
 
 function resolveTimestamp(timestamp?: string): string {

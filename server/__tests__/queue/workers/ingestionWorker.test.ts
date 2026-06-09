@@ -61,9 +61,14 @@ const mocks = vi.hoisted(() => {
     mockCreateCAApiCollector: vi.fn(),
     mockCreateTXBulkCollector: vi.fn(),
     mockCreateFLVendorCollector: vi.fn(),
+    mockCreateNYScraperCollector: vi.fn(),
     mockCACollector: createCollector(),
     mockTXCollector: createCollector(),
     mockFLCollector: {
+      ...createCollector(),
+      isReady: vi.fn(() => true)
+    },
+    mockNYCollector: {
       ...createCollector(),
       isReady: vi.fn(() => true)
     }
@@ -114,6 +119,10 @@ vi.mock('../../../../apps/web/src/lib/collectors/state-collectors/FLVendorCollec
   createFLVendorCollector: mocks.mockCreateFLVendorCollector
 }))
 
+vi.mock('../../../../apps/web/src/lib/collectors/state-collectors/NYScraperCollector', () => ({
+  createNYScraperCollector: mocks.mockCreateNYScraperCollector
+}))
+
 function createFiling(overrides: Partial<Record<string, any>> = {}) {
   return {
     filingNumber: 'CA-0001',
@@ -153,6 +162,7 @@ describeConditional('Ingestion Worker', () => {
       if (state === 'CA') return ['api']
       if (state === 'TX') return ['bulk']
       if (state === 'FL') return ['vendor']
+      if (state === 'NY') return ['scrape']
       return []
     })
     mocks.mockResolveUccProvider.mockReset().mockReturnValue('unconfigured')
@@ -166,6 +176,7 @@ describeConditional('Ingestion Worker', () => {
     mocks.mockCreateCAApiCollector.mockReset().mockReturnValue(mocks.mockCACollector)
     mocks.mockCreateTXBulkCollector.mockReset().mockReturnValue(mocks.mockTXCollector)
     mocks.mockCreateFLVendorCollector.mockReset().mockReturnValue(mocks.mockFLCollector)
+    mocks.mockCreateNYScraperCollector.mockReset().mockReturnValue(mocks.mockNYCollector)
 
     mocks.mockCACollector.collectNewFilings.mockReset().mockResolvedValue([createFiling()])
     mocks.mockTXCollector.collectNewFilings
@@ -175,6 +186,10 @@ describeConditional('Ingestion Worker', () => {
       .mockReset()
       .mockResolvedValue([createFiling({ filingNumber: 'FL-0001', state: 'FL' })])
     mocks.mockFLCollector.isReady.mockReset().mockReturnValue(true)
+    mocks.mockNYCollector.collectNewFilings
+      .mockReset()
+      .mockResolvedValue([createFiling({ filingNumber: 'NY-0001', state: 'NY' })])
+    mocks.mockNYCollector.isReady.mockReset().mockReturnValue(true)
   })
 
   afterEach(() => {
@@ -360,6 +375,78 @@ describeConditional('Ingestion Worker', () => {
         })
       )
       expect(mocks.mockRecordIngestionFallbackEscalated).not.toHaveBeenCalled()
+    })
+
+    it('resolves the NY scraper collector for NY:scrape and persists its filings', async () => {
+      const { createIngestionWorker } = await import('../../../queue/workers/ingestionWorker')
+
+      const worker = createIngestionWorker()
+      const mockJob = {
+        id: 'job-ny-1',
+        data: { state: 'NY', strategy: 'scrape', dataTier: 'free-tier', batchSize: 500 },
+        updateProgress: mocks.mockUpdateProgress
+      }
+
+      await worker.processor(mockJob as any)
+
+      expect(mocks.mockCreateNYScraperCollector).toHaveBeenCalled()
+      expect(mocks.mockNYCollector.isReady).toHaveBeenCalled()
+      expect(mocks.mockNYCollector.collectNewFilings).toHaveBeenCalledWith({
+        since: undefined,
+        limit: 500,
+        includeInactive: true
+      })
+      expect(mocks.mockDatabaseQuery).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO ucc_filings'),
+        expect.arrayContaining(['NY:NY-0001', 'NY', 'ucc_ny_scrape'])
+      )
+      expect(mocks.mockRecordIngestionCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({ state: 'NY', strategy: 'scrape', recordsProcessed: 1 })
+      )
+    })
+
+    it('fails closed without self-heal when the NY collector is not ready', async () => {
+      const { createIngestionWorker } = await import('../../../queue/workers/ingestionWorker')
+
+      mocks.mockNYCollector.isReady.mockReturnValue(false)
+
+      const worker = createIngestionWorker()
+      const mockJob = {
+        id: 'job-ny-2',
+        data: { state: 'NY', strategy: 'scrape', dataTier: 'free-tier' },
+        updateProgress: mocks.mockUpdateProgress
+      }
+
+      const error = await worker.processor(mockJob as any).catch((caught) => caught)
+
+      expect(error).toBeInstanceOf(Error)
+      expect(error.message).toBe(
+        'NY scraper collector is not ready because no debtor seeds are configured (set NY_UCC_DEBTOR_SEEDS).'
+      )
+      expect(mocks.mockNYCollector.collectNewFilings).not.toHaveBeenCalled()
+      expect(mocks.mockEvaluateIngestionRecoveryAction).not.toHaveBeenCalled()
+      expect(mocks.mockQueueAdd).not.toHaveBeenCalled()
+    })
+
+    it('fails closed without self-heal when the NY collector factory returns null', async () => {
+      const { createIngestionWorker } = await import('../../../queue/workers/ingestionWorker')
+
+      mocks.mockCreateNYScraperCollector.mockReturnValueOnce(null)
+
+      const worker = createIngestionWorker()
+      const mockJob = {
+        id: 'job-ny-3',
+        data: { state: 'NY', strategy: 'scrape', dataTier: 'free-tier' },
+        updateProgress: mocks.mockUpdateProgress
+      }
+
+      const error = await worker.processor(mockJob as any).catch((caught) => caught)
+
+      expect(error).toBeInstanceOf(Error)
+      expect(error.message).toBe(
+        'NY scraper collector is not ready because no debtor seeds are configured (set NY_UCC_DEBTOR_SEEDS).'
+      )
+      expect(mocks.mockEvaluateIngestionRecoveryAction).not.toHaveBeenCalled()
     })
   })
 

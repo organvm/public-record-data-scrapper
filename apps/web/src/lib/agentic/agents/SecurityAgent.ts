@@ -26,14 +26,41 @@ export class SecurityAgent extends BaseAgent {
     const securityChecks = this.performSecurityChecks(context)
     findings.push(...securityChecks)
 
+    // Prospects holding financial data are the concrete subjects of these
+    // security suggestions. Attaching their ids lets the server-side executor
+    // raise a real alert against a specific prospect; with no such prospect the
+    // suggestion is genuinely system-level and (correctly) fails closed.
+    const financialDataProspectIds = this.collectFinancialDataProspectIds(context)
+
     // Suggest improvements based on findings
     if (findings.some((f) => f.severity === 'critical')) {
-      improvements.push(this.suggestSecurityHardening())
+      improvements.push(this.suggestSecurityHardening(financialDataProspectIds))
     }
 
-    improvements.push(this.suggestDataEncryption())
+    improvements.push(this.suggestDataEncryption(financialDataProspectIds))
 
     return this.createAnalysis(findings, improvements)
+  }
+
+  /**
+   * Ids of prospects that carry financial data (estimated revenue or a UCC
+   * filing lien amount) — the rows that warrant an encryption / hardening
+   * alert. Mirrors the predicate in checkSensitiveDataHandling.
+   */
+  private collectFinancialDataProspectIds(context: SystemContext): string[] {
+    const prospects = context.prospects as Array<Record<string, unknown>>
+    return prospects
+      .filter((prospect) => {
+        const hasEstimatedRevenue = typeof prospect.estimatedRevenue === 'number'
+        const filings = Array.isArray(prospect.uccFilings) ? prospect.uccFilings : []
+        const hasLienAmount = filings.some((filing) => {
+          const record = filing as Record<string, unknown>
+          return typeof record.lienAmount === 'number'
+        })
+        return hasEstimatedRevenue || hasLienAmount
+      })
+      .map((prospect) => prospect.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
   }
 
   private performSecurityChecks(context: SystemContext): Finding[] {
@@ -97,8 +124,8 @@ export class SecurityAgent extends BaseAgent {
     return null
   }
 
-  private suggestSecurityHardening(): ImprovementSuggestion {
-    return this.createImprovement(
+  private suggestSecurityHardening(prospectIds: string[]): ImprovementSuggestion {
+    const suggestion = this.createImprovement(
       'security',
       'critical',
       'Implement comprehensive security hardening',
@@ -133,10 +160,12 @@ export class SecurityAgent extends BaseAgent {
         ]
       }
     )
+
+    return prospectIds.length > 0 ? { ...suggestion, prospectIds } : suggestion
   }
 
-  private suggestDataEncryption(): ImprovementSuggestion {
-    return this.createImprovement(
+  private suggestDataEncryption(prospectIds: string[]): ImprovementSuggestion {
+    const suggestion = this.createImprovement(
       'security',
       'high',
       'Enable encryption for sensitive data fields',
@@ -170,5 +199,7 @@ export class SecurityAgent extends BaseAgent {
         ]
       }
     )
+
+    return prospectIds.length > 0 ? { ...suggestion, prospectIds } : suggestion
   }
 }

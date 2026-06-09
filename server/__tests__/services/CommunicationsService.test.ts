@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { CommunicationsService } from '../../services/CommunicationsService'
-import { ValidationError, DatabaseError, ForbiddenError } from '../../errors'
+import { ValidationError, DatabaseError, ForbiddenError, ExternalServiceError } from '../../errors'
 
 // Mock the database module
 vi.mock('../../database/connection', () => ({
@@ -26,14 +26,22 @@ vi.mock('../../integrations/twilio/voice', () => ({
   }
 }))
 
-// Mock SendGrid integrations
+// Mock SendGrid integrations. sendTransactional is a hoisted shared mock so a
+// test can reconfigure the provider's resolved value (e.g. a provider-returned
+// { status: 'failed' }) — the real adapter resolves rather than throws on a
+// provider error, which the service must treat as a failure (never fabricate
+// a 'sent' row).
+const { mockSendTransactional } = vi.hoisted(() => ({
+  mockSendTransactional: vi.fn()
+}))
+
 vi.mock('../../integrations/sendgrid/client', () => ({
   SendGridClient: class MockSendGridClient {}
 }))
 
 vi.mock('../../integrations/sendgrid/send', () => ({
   SendGridSend: class MockSendGridSend {
-    sendTransactional = vi.fn().mockResolvedValue({ messageId: 'msg-123' })
+    sendTransactional = mockSendTransactional
   }
 }))
 
@@ -61,6 +69,10 @@ describe('CommunicationsService', () => {
     allowAllSuppression.isOnDNCList.mockResolvedValue({ isSuppressed: false })
     allowAllSuppression.isEmailSuppressed.mockResolvedValue({ isSuppressed: false })
     allowAllConsent.hasConsent.mockResolvedValue({ hasConsent: true })
+    // Default: SendGrid accepts the message. The accepted shape carries a
+    // status, mirroring the real EmailSendResult so the service's
+    // status === 'failed' guard is exercised against a faithful return.
+    mockSendTransactional.mockResolvedValue({ messageId: 'msg-123', status: 'accepted' })
     service = new CommunicationsService({
       suppressionService: allowAllSuppression as never,
       consentService: allowAllConsent as never
@@ -238,6 +250,55 @@ describe('CommunicationsService', () => {
           body: 'Test'
         })
       ).rejects.toThrow(ValidationError)
+    })
+
+    it('fails closed when SendGrid RETURNS a failure (never fabricates a sent row)', async () => {
+      const mockCommunication = {
+        id: 'comm-fail',
+        org_id: 'org-1',
+        channel: 'email',
+        direction: 'outbound',
+        to_address: 'test@example.com',
+        subject: 'Test Subject',
+        body: 'Test body',
+        status: 'queued',
+        attachments: [],
+        metadata: {},
+        created_at: '2024-01-01T00:00:00Z'
+      }
+
+      // 1: INSERT communications RETURNING the queued row.
+      mockQuery.mockResolvedValueOnce([mockCommunication])
+      // 2: the failed-status UPDATE (no RETURNING usage).
+      mockQuery.mockResolvedValueOnce([])
+
+      // The real adapter RESOLVES (does not throw) with a failed status.
+      mockSendTransactional.mockResolvedValueOnce({
+        messageId: '',
+        status: 'failed',
+        errors: ['451 mailbox temporarily unavailable']
+      })
+
+      await expect(
+        service.sendEmail({
+          orgId: 'org-1',
+          toAddress: 'test@example.com',
+          subject: 'Test Subject',
+          body: 'Test body'
+        })
+      ).rejects.toThrow(ExternalServiceError)
+
+      // The communication row was updated to 'failed' with the named provider
+      // reason — not left/recorded as 'sent'.
+      const updateCall = mockQuery.mock.calls.find((c) =>
+        String(c[0]).includes('UPDATE communications')
+      )
+      expect(updateCall).toBeDefined()
+      const updateSql = String(updateCall![0])
+      expect(updateSql).toContain('status = $2')
+      const updateValues = updateCall![1] as unknown[]
+      expect(updateValues).toContain('failed')
+      expect(updateValues).toContain('451 mailbox temporarily unavailable')
     })
 
     it('should create pending status for scheduled emails', async () => {
@@ -558,16 +619,29 @@ describe('CommunicationsService', () => {
 
       mockQuery.mockResolvedValueOnce(mockFollowUps)
 
-      const result = await service.getPendingFollowUps('contact-1')
+      const result = await service.getPendingFollowUps('contact-1', 'org-1')
 
       expect(result).toHaveLength(1)
       expect(result[0].id).toBe('followup-1')
     })
 
+    it('scopes the query to the org (cross-org follow-ups are invisible)', async () => {
+      mockQuery.mockResolvedValueOnce([])
+
+      const result = await service.getPendingFollowUps('contact-1', 'org-1')
+
+      // The SQL must filter by org_id, and the org must be a bound parameter.
+      const sql = String(mockQuery.mock.calls[0][0])
+      expect(sql).toContain('org_id = $2')
+      expect(mockQuery.mock.calls[0][1]).toEqual(['contact-1', 'org-1'])
+      // A foreign-org contactId returns nothing rather than another tenant's rows.
+      expect(result).toHaveLength(0)
+    })
+
     it('should throw DatabaseError on failure', async () => {
       mockQuery.mockRejectedValueOnce(new Error('Query failed'))
 
-      await expect(service.getPendingFollowUps('contact-1')).rejects.toThrow(DatabaseError)
+      await expect(service.getPendingFollowUps('contact-1', 'org-1')).rejects.toThrow(DatabaseError)
     })
   })
 
@@ -575,16 +649,30 @@ describe('CommunicationsService', () => {
     it('should cancel a follow-up', async () => {
       mockQuery.mockResolvedValueOnce({ rowCount: 1 } as unknown as [])
 
-      const result = await service.cancelFollowUp('followup-1')
+      const result = await service.cancelFollowUp('followup-1', 'org-1')
 
+      // The DELETE must be org-scoped with the org bound as a parameter.
+      const sql = String(mockQuery.mock.calls[0][0])
+      expect(sql).toContain('org_id = $2')
+      expect(mockQuery.mock.calls[0][1]).toEqual(['followup-1', 'org-1'])
       expect(result).toBe(true)
     })
 
     it('should return false when follow-up not found', async () => {
       mockQuery.mockResolvedValueOnce({ rowCount: 0 } as unknown as [])
 
-      const result = await service.cancelFollowUp('non-existent')
+      const result = await service.cancelFollowUp('non-existent', 'org-1')
 
+      expect(result).toBe(false)
+    })
+
+    it('cannot cancel another org follow-up (cross-org delete affects no rows)', async () => {
+      // The cross-org DELETE matches no rows -> rowCount 0 -> false (404 at route).
+      mockQuery.mockResolvedValueOnce({ rowCount: 0 } as unknown as [])
+
+      const result = await service.cancelFollowUp('other-org-followup', 'org-1')
+
+      expect(mockQuery.mock.calls[0][1]).toEqual(['other-org-followup', 'org-1'])
       expect(result).toBe(false)
     })
   })

@@ -11,20 +11,13 @@
  */
 
 import { database } from '../database/connection'
-import {
-  NotFoundError,
-  ValidationError,
-  DatabaseError,
-  ExternalServiceError,
-  ForbiddenError
-} from '../errors'
+import { ValidationError, DatabaseError, ExternalServiceError, ForbiddenError } from '../errors'
 import type {
   Communication,
   CommunicationTemplate,
   CommunicationChannel,
   CommunicationDirection,
-  CommunicationStatus,
-  Contact
+  CommunicationStatus
 } from '@public-records/core'
 
 // Import integration clients (stubbed)
@@ -69,6 +62,7 @@ interface CommunicationRow {
   delivered_at?: string
   failed_at?: string
   failure_reason?: string
+  received_at?: string
   scheduled_for?: string
   sent_at?: string
   metadata: Record<string, unknown>
@@ -183,10 +177,7 @@ export class CommunicationsService {
   private suppressionService: SuppressionService
   private consentService: ConsentService
 
-  constructor(deps?: {
-    suppressionService?: SuppressionService
-    consentService?: ConsentService
-  }) {
+  constructor(deps?: { suppressionService?: SuppressionService; consentService?: ConsentService }) {
     this.twilioClient = new TwilioClient()
     this.twilioSMS = new TwilioSMS(this.twilioClient)
     this.twilioVoice = new TwilioVoice(this.twilioClient)
@@ -224,14 +215,26 @@ export class CommunicationsService {
     if (channel === 'email' && toAddress) {
       const suppressed = await this.suppressionService.isEmailSuppressed(orgId, toAddress)
       if (suppressed.isSuppressed) {
-        await this.recordBlockedCommunication({ orgId, channel, toAddress, contactId, reason: `Email is on suppression list (${suppressed.source || 'internal'})` })
+        await this.recordBlockedCommunication({
+          orgId,
+          channel,
+          toAddress,
+          contactId,
+          reason: `Email is on suppression list (${suppressed.source || 'internal'})`
+        })
         throw new ForbiddenError('Recipient email is on the suppression (DNC) list')
       }
     } else if ((channel === 'sms' || channel === 'call') && toPhone) {
       const dncChannel = channel === 'call' ? 'call' : 'sms'
       const suppressed = await this.suppressionService.isOnDNCList(orgId, toPhone, dncChannel)
       if (suppressed.isSuppressed) {
-        await this.recordBlockedCommunication({ orgId, channel, toPhone, contactId, reason: `Number is on DNC list (${suppressed.source || 'internal'})` })
+        await this.recordBlockedCommunication({
+          orgId,
+          channel,
+          toPhone,
+          contactId,
+          reason: `Number is on DNC list (${suppressed.source || 'internal'})`
+        })
         throw new ForbiddenError('Recipient is on the Do-Not-Call (DNC) suppression list')
       }
     }
@@ -240,7 +243,14 @@ export class CommunicationsService {
     if (contactId) {
       const consent = await this.consentService.hasConsent(orgId, contactId, channel)
       if (!consent.hasConsent) {
-        await this.recordBlockedCommunication({ orgId, channel, toPhone, toAddress, contactId, reason: `No active ${channel} consent on file for contact` })
+        await this.recordBlockedCommunication({
+          orgId,
+          channel,
+          toPhone,
+          toAddress,
+          contactId,
+          reason: `No active ${channel} consent on file for contact`
+        })
         throw new ForbiddenError(`No active consent on file for ${channel} to this contact`)
       }
     }
@@ -320,6 +330,7 @@ export class CommunicationsService {
       deliveredAt: row.delivered_at,
       failedAt: row.failed_at,
       failureReason: row.failure_reason,
+      receivedAt: row.received_at,
       scheduledFor: row.scheduled_for,
       sentAt: row.sent_at,
       metadata: row.metadata || {},
@@ -370,7 +381,10 @@ export class CommunicationsService {
   /**
    * Render a template with variable substitution
    */
-  renderTemplate(template: CommunicationTemplate, variables: TemplateVariables): {
+  renderTemplate(
+    template: CommunicationTemplate,
+    variables: TemplateVariables
+  ): {
     subject?: string
     body: string
     bodyHtml?: string
@@ -410,7 +424,10 @@ export class CommunicationsService {
       const results = await database.query<CommunicationTemplateRow>(query, values)
       return results.map(this.transformTemplate)
     } catch (error) {
-      throw new DatabaseError('Failed to list templates', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to list templates',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -500,16 +517,33 @@ export class CommunicationsService {
             attachments: input.attachments
           })
 
+          // SendGridSend.sendTransactional does NOT throw on a provider error —
+          // it resolves to { status: 'failed', errors: [...] }. Recording 'sent'
+          // for that case would fabricate a delivered message (the campaign's
+          // cardinal sin). Fail closed: mark the row failed with the named
+          // provider reason and surface a 502 via ExternalServiceError.
+          if (result.status === 'failed') {
+            const providerReason = result.errors?.join('; ') || 'SendGrid rejected the message'
+            await this.updateCommunicationStatus(
+              communication.id,
+              'failed',
+              undefined,
+              providerReason
+            )
+            throw new ExternalServiceError('SendGrid', `Failed to send email: ${providerReason}`)
+          }
+
           // Update communication with sent status
-          await this.updateCommunicationStatus(
-            communication.id,
-            'sent',
-            result.messageId
-          )
+          await this.updateCommunicationStatus(communication.id, 'sent', result.messageId)
 
           return { ...communication, status: 'sent', externalId: result.messageId }
         } catch (sendError) {
-          // Update communication with failed status
+          // A provider-returned failure (handled above) already recorded the
+          // failed row — re-throw as-is rather than double-writing the status.
+          if (sendError instanceof ExternalServiceError) throw sendError
+
+          // A thrown error (network/validation inside the adapter): record the
+          // failed status, then surface it as a 502.
           await this.updateCommunicationStatus(
             communication.id,
             'failed',
@@ -582,11 +616,7 @@ export class CommunicationsService {
           })
 
           // Update communication with sent status
-          await this.updateCommunicationStatus(
-            communication.id,
-            'sent',
-            result.messageSid
-          )
+          await this.updateCommunicationStatus(communication.id, 'sent', result.messageSid)
 
           return { ...communication, status: 'sent', externalId: result.messageSid }
         } catch (sendError) {
@@ -660,11 +690,7 @@ export class CommunicationsService {
         })
 
         // Update communication with external ID
-        await this.updateCommunicationStatus(
-          communication.id,
-          'pending',
-          result.callSid
-        )
+        await this.updateCommunicationStatus(communication.id, 'pending', result.callSid)
 
         return { ...communication, externalId: result.callSid }
       } catch (callError) {
@@ -719,12 +745,12 @@ export class CommunicationsService {
         }
       }
 
-      await database.query(
-        `UPDATE communications SET ${updates.join(', ')} WHERE id = $1`,
-        values
-      )
+      await database.query(`UPDATE communications SET ${updates.join(', ')} WHERE id = $1`, values)
     } catch (error) {
-      throw new DatabaseError('Failed to update communication status', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to update communication status',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -807,7 +833,10 @@ export class CommunicationsService {
         total
       }
     } catch (error) {
-      throw new DatabaseError('Failed to get communication history', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to get communication history',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -822,7 +851,10 @@ export class CommunicationsService {
       )
       return results[0] ? this.transformCommunication(results[0]) : null
     } catch (error) {
-      throw new DatabaseError('Failed to get communication', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to get communication',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -862,50 +894,72 @@ export class CommunicationsService {
         channel: row.channel as CommunicationChannel
       }
     } catch (error) {
-      throw new DatabaseError('Failed to schedule follow-up', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to schedule follow-up',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
   /**
-   * Get pending follow-ups for a contact
+   * Get pending follow-ups for a contact within a tenant.
+   *
+   * The query is org-scoped (AND org_id = $2) so a contactId cannot leak
+   * follow-ups belonging to another tenant — the RLS policy is defense in
+   * depth, not the only guard.
    */
-  async getPendingFollowUps(contactId: string): Promise<Array<{
-    id: string
-    scheduledFor: string
-    channel: CommunicationChannel
-    templateId?: string
-  }>> {
+  async getPendingFollowUps(
+    contactId: string,
+    orgId: string
+  ): Promise<
+    Array<{
+      id: string
+      scheduledFor: string
+      channel: CommunicationChannel
+      templateId?: string
+    }>
+  > {
     try {
       const results = await database.query<ScheduledFollowUpRow>(
         `SELECT * FROM scheduled_followups
-         WHERE contact_id = $1 AND sent = false AND scheduled_for > NOW()
+         WHERE contact_id = $1 AND org_id = $2 AND sent = false AND scheduled_for > NOW()
          ORDER BY scheduled_for`,
-        [contactId]
+        [contactId, orgId]
       )
 
-      return results.map(row => ({
+      return results.map((row) => ({
         id: row.id,
         scheduledFor: row.scheduled_for,
         channel: row.channel as CommunicationChannel,
         templateId: row.template_id
       }))
     } catch (error) {
-      throw new DatabaseError('Failed to get pending follow-ups', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to get pending follow-ups',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
   /**
-   * Cancel a scheduled follow-up
+   * Cancel a scheduled follow-up within a tenant.
+   *
+   * The DELETE is org-scoped (AND org_id = $2) so a follow-up id from another
+   * tenant cannot be cancelled — a cross-org id deletes nothing and returns
+   * false (surfaced as a 404 by the route).
    */
-  async cancelFollowUp(id: string): Promise<boolean> {
+  async cancelFollowUp(id: string, orgId: string): Promise<boolean> {
     try {
       const results = await database.query(
-        'DELETE FROM scheduled_followups WHERE id = $1 AND sent = false',
-        [id]
+        'DELETE FROM scheduled_followups WHERE id = $1 AND org_id = $2 AND sent = false',
+        [id, orgId]
       )
       return (results as unknown as { rowCount: number }).rowCount > 0
     } catch (error) {
-      throw new DatabaseError('Failed to cancel follow-up', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to cancel follow-up',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -923,13 +977,13 @@ export class CommunicationsService {
     reason?: string
   }): Promise<void> {
     const statusMap: Record<string, CommunicationStatus> = {
-      'delivered': 'delivered',
-      'open': 'opened',
-      'click': 'clicked',
-      'bounce': 'bounced',
-      'dropped': 'failed',
-      'spam_report': 'failed',
-      'unsubscribe': 'failed'
+      delivered: 'delivered',
+      open: 'opened',
+      click: 'clicked',
+      bounce: 'bounced',
+      dropped: 'failed',
+      spam_report: 'failed',
+      unsubscribe: 'failed'
     }
 
     const status = statusMap[event.event]
@@ -943,12 +997,7 @@ export class CommunicationsService {
       )
 
       if (results[0]) {
-        await this.updateCommunicationStatus(
-          results[0].id,
-          status,
-          undefined,
-          event.reason
-        )
+        await this.updateCommunicationStatus(results[0].id, status, undefined, event.reason)
       }
     } catch (error) {
       console.error('Failed to handle SendGrid webhook:', error)
@@ -965,11 +1014,11 @@ export class CommunicationsService {
     ErrorMessage?: string
   }): Promise<void> {
     const statusMap: Record<string, CommunicationStatus> = {
-      'queued': 'queued',
-      'sent': 'sent',
-      'delivered': 'delivered',
-      'failed': 'failed',
-      'undelivered': 'failed'
+      queued: 'queued',
+      sent: 'sent',
+      delivered: 'delivered',
+      failed: 'failed',
+      undelivered: 'failed'
     }
 
     const status = statusMap[event.MessageStatus]
@@ -982,12 +1031,7 @@ export class CommunicationsService {
       )
 
       if (results[0]) {
-        await this.updateCommunicationStatus(
-          results[0].id,
-          status,
-          undefined,
-          event.ErrorMessage
-        )
+        await this.updateCommunicationStatus(results[0].id, status, undefined, event.ErrorMessage)
       }
     } catch (error) {
       console.error('Failed to handle Twilio SMS webhook:', error)
@@ -1004,14 +1048,14 @@ export class CommunicationsService {
     RecordingUrl?: string
   }): Promise<void> {
     const statusMap: Record<string, CommunicationStatus> = {
-      'queued': 'pending',
-      'ringing': 'pending',
+      queued: 'pending',
+      ringing: 'pending',
       'in-progress': 'pending',
-      'completed': 'answered',
-      'busy': 'busy',
+      completed: 'answered',
+      busy: 'busy',
       'no-answer': 'no_answer',
-      'failed': 'failed',
-      'canceled': 'failed'
+      failed: 'failed',
+      canceled: 'failed'
     }
 
     const status = statusMap[event.CallStatus]

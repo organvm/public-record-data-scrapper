@@ -27,6 +27,12 @@ vi.mock('../EmailComposer', () => ({
     open ? <div data-testid="email-composer">Email Composer</div> : null
 }))
 
+vi.mock('../outreach/PreCallBriefing', () => ({
+  PreCallBriefing: ({ prospectId }: { prospectId: string }) => (
+    <div data-testid="pre-call-briefing">Briefing: {prospectId}</div>
+  )
+}))
+
 // Mock UI components
 vi.mock('@public-records/ui/dialog', () => ({
   Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
@@ -446,6 +452,18 @@ describe('ProspectDetailDialog', () => {
     it('renders notes tab trigger', () => {
       render(<ProspectDetailDialog {...defaultProps} />)
       expect(screen.getByTestId('tab-trigger-notes')).toHaveTextContent('Notes & Reminders')
+    })
+
+    it('renders briefing tab trigger', () => {
+      render(<ProspectDetailDialog {...defaultProps} />)
+      expect(screen.getByTestId('tab-trigger-briefing')).toHaveTextContent('Briefing')
+    })
+  })
+
+  describe('briefing tab content', () => {
+    it('renders pre-call briefing for the selected prospect', () => {
+      render(<ProspectDetailDialog {...defaultProps} />)
+      expect(screen.getByTestId('pre-call-briefing')).toHaveTextContent('Briefing: prospect-1')
     })
   })
 

@@ -479,4 +479,36 @@ describe('SecurityAgent', () => {
       )
     })
   })
+
+  describe('Prospect-id attachment for the executor', () => {
+    it('attaches financial-data prospect ids to security suggestions', async () => {
+      mockContext.prospects = [
+        { id: 'prospect-money', companyName: 'Rich Co', estimatedRevenue: 1_000_000 },
+        { id: 'prospect-clean', companyName: 'Plain Co' }
+      ] as any
+
+      const analysis = await agent.analyze(mockContext)
+
+      const encryption = analysis.improvements.find(
+        (i) => i.title === 'Enable encryption for sensitive data fields'
+      )
+      expect(encryption).toBeDefined()
+      // The alert target is a real prospect that actually holds financial data.
+      expect(encryption?.prospectIds).toContain('prospect-money')
+      expect(encryption?.prospectIds).not.toContain('prospect-clean')
+    })
+
+    it('leaves prospectIds absent for a system-level suggestion (no financial-data prospects)', async () => {
+      // No prospect carries financial data, so the encryption suggestion is
+      // genuinely system-level — no concrete target, ids omitted, fail-closed.
+      mockContext.prospects = [{ id: 'prospect-clean', companyName: 'Plain Co' }] as any
+
+      const analysis = await agent.analyze(mockContext)
+      const encryption = analysis.improvements.find(
+        (i) => i.title === 'Enable encryption for sensitive data fields'
+      )
+      expect(encryption).toBeDefined()
+      expect(encryption?.prospectIds).toBeUndefined()
+    })
+  })
 })

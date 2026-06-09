@@ -36,17 +36,53 @@ export class DataAnalyzerAgent extends BaseAgent {
     const completenessCheck = this.checkDataCompleteness(context)
     if (completenessCheck) findings.push(completenessCheck)
 
+    // Identify the concrete prospects this analysis flags so the suggestions
+    // can carry real targets for the server-side executor (re-enrichment /
+    // re-score). These are the prospects with stale or incomplete data — the
+    // exact rows a data-quality action would touch.
+    const staleProspectIds = this.collectStaleProspectIds(context)
+    const incompleteProspectIds = this.collectIncompleteProspectIds(context)
+    const dataQualityProspectIds = uniqueIds([...staleProspectIds, ...incompleteProspectIds])
+
     // Generate improvement suggestions
     if (findings.some((f) => f.category === 'data-quality')) {
-      improvements.push(this.suggestDataQualityImprovement(findings))
+      improvements.push(this.suggestDataQualityImprovement(findings, dataQualityProspectIds))
     }
 
     // Suggest automated data refresh
     if (findings.some((f) => f.description.includes('stale'))) {
-      improvements.push(this.suggestAutomatedRefresh())
+      improvements.push(this.suggestAutomatedRefresh(staleProspectIds))
     }
 
     return this.createAnalysis(findings, improvements)
+  }
+
+  /**
+   * Prospect ids whose health score is stale (>7 days). These are the targets
+   * a refresh / re-enrichment action would act on.
+   */
+  private collectStaleProspectIds(context: SystemContext): string[] {
+    const now = new Date()
+    return (context.prospects as Prospect[])
+      .filter((p) => {
+        if (!p.healthScore?.lastUpdated) return false
+        const daysSinceUpdate =
+          (now.getTime() - new Date(p.healthScore.lastUpdated).getTime()) / (1000 * 60 * 60 * 24)
+        return daysSinceUpdate > 7
+      })
+      .map((p) => p.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+  }
+
+  /**
+   * Prospect ids missing revenue estimates or growth signals — the rows a
+   * data-enrichment action would fill in.
+   */
+  private collectIncompleteProspectIds(context: SystemContext): string[] {
+    return (context.prospects as Prospect[])
+      .filter((p) => !p.estimatedRevenue || !p.growthSignals || p.growthSignals.length === 0)
+      .map((p) => p.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
   }
 
   private checkDataFreshness(context: SystemContext): Finding | null {
@@ -156,8 +192,11 @@ export class DataAnalyzerAgent extends BaseAgent {
     return null
   }
 
-  private suggestDataQualityImprovement(findings: Finding[]): ImprovementSuggestion {
-    return this.createImprovement(
+  private suggestDataQualityImprovement(
+    findings: Finding[],
+    prospectIds: string[]
+  ): ImprovementSuggestion {
+    const suggestion = this.createImprovement(
       'data-quality',
       'high',
       'Implement automated data enrichment pipeline',
@@ -190,10 +229,16 @@ export class DataAnalyzerAgent extends BaseAgent {
         ]
       }
     )
+
+    // Attach the flagged prospects so the server-side executor can enqueue a
+    // real re-enrichment job against them. Only attach when we actually have
+    // concrete targets; an empty array would (correctly) fail closed, but
+    // omitting the field keeps the suggestion shape honest.
+    return prospectIds.length > 0 ? { ...suggestion, prospectIds } : suggestion
   }
 
-  private suggestAutomatedRefresh(): ImprovementSuggestion {
-    return this.createImprovement(
+  private suggestAutomatedRefresh(staleProspectIds: string[]): ImprovementSuggestion {
+    const suggestion = this.createImprovement(
       'data-quality',
       'medium',
       'Enable automatic health score refresh',
@@ -218,5 +263,17 @@ export class DataAnalyzerAgent extends BaseAgent {
         ]
       }
     )
+
+    // The stale prospects are the exact rows a refresh would re-score.
+    return staleProspectIds.length > 0
+      ? { ...suggestion, prospectIds: staleProspectIds }
+      : suggestion
   }
+}
+
+/**
+ * De-duplicates prospect ids while preserving first-seen order.
+ */
+function uniqueIds(ids: string[]): string[] {
+  return Array.from(new Set(ids))
 }

@@ -18,6 +18,7 @@ import {
 } from './types'
 import { v4 as uuidv4 } from 'uuid'
 import { AgentCallbackClient } from './AgentCallbackClient'
+import { agenticApiClient, toExecuteRequest, type AgenticApiClient } from '../api/agentic'
 
 export class AgenticEngine {
   private council: AgenticCouncil
@@ -30,8 +31,12 @@ export class AgenticEngine {
     result: ImprovementResult
   }> = []
   private callbackClient?: AgentCallbackClient
+  private readonly apiClient: AgenticApiClient
 
-  constructor(config?: Partial<AgenticConfig>, options?: { callbackClient?: AgentCallbackClient }) {
+  constructor(
+    config?: Partial<AgenticConfig>,
+    options?: { callbackClient?: AgentCallbackClient; apiClient?: AgenticApiClient }
+  ) {
     this.council = new AgenticCouncil()
     this.config = {
       enabled: true,
@@ -53,6 +58,10 @@ export class AgenticEngine {
       ...config
     }
     this.callbackClient = options?.callbackClient
+    // The API client is the real execution seam. Defaults to the live HTTP
+    // client; tests inject a mock. There is NO simulated fallback — execution
+    // is only real (server-confirmed) or it fails closed.
+    this.apiClient = options?.apiClient ?? agenticApiClient
   }
 
   /**
@@ -152,84 +161,77 @@ export class AgenticEngine {
   }
 
   /**
-   * Executes an improvement autonomously
+   * Executes an improvement by dispatching it to the real server-side
+   * ImprovementExecutor via the API client.
+   *
+   * There is no simulation and no fabricated metrics. The improvement is only
+   * marked `completed` when the server confirms a real action ran
+   * (`executed: true`). When the server reports `executed: false` (no
+   * server-side action for the category, or missing inputs) OR the API is
+   * unreachable, the improvement fails closed: status `rejected`, the named
+   * reason captured as feedback, and empty metrics (no invented before/after).
+   *
+   * The `context` is intentionally unused now that execution is real — its
+   * only previous consumer was the deleted simulation.
    */
   private async executeImprovement(
     improvement: Improvement,
     context: SystemContext
   ): Promise<ImprovementResult> {
+    void context
     console.log(`🔧 Executing improvement: ${improvement.suggestion.title}`)
 
     improvement.status = 'implementing'
 
+    let result: ImprovementResult
+
     try {
-      // Simulate improvement execution
-      // In a real system, this would perform actual changes
-      const result = await this.simulateExecution(improvement, context)
+      const execution = await this.apiClient.executeImprovement(toExecuteRequest(improvement))
 
-      improvement.status = result.success ? 'completed' : 'rejected'
-      improvement.completedAt = new Date().toISOString()
-      improvement.result = result
-
-      this.executionHistory.push({
-        improvementId: improvement.id,
-        timestamp: new Date().toISOString(),
-        result
-      })
-
-      return result
+      if (execution.executed) {
+        result = {
+          success: true,
+          changes: [`Executed ${execution.action} for ${improvement.suggestion.title}`],
+          // No fabricated metrics: the server returns observed effects only.
+          metrics: { before: {}, after: {} },
+          feedback: `Server executed action '${execution.action}': ${JSON.stringify(
+            execution.details
+          )}`
+        }
+      } else {
+        // Fail closed: the server explicitly declined to act. Surface the
+        // named reason; never claim success.
+        result = {
+          success: false,
+          changes: [],
+          metrics: { before: {}, after: {} },
+          feedback:
+            execution.reason ?? `No server-side action executed for ${improvement.suggestion.title}`
+        }
+      }
     } catch (error) {
+      // API unreachable / errored: fail closed with the named error. The
+      // improvement is NOT marked complete and no metrics are invented.
       console.error(`❌ Execution failed:`, error)
-      improvement.status = 'rejected'
-      return {
+      result = {
         success: false,
         changes: [],
         metrics: { before: {}, after: {} },
-        feedback: `Execution failed: ${error}`
+        feedback: `Execution failed: ${error instanceof Error ? error.message : String(error)}`
       }
     }
-  }
 
-  /**
-   * Simulates execution of an improvement
-   * In production, this would be replaced with actual implementation logic
-   */
-  private async simulateExecution(
-    improvement: Improvement,
-    context: SystemContext
-  ): Promise<ImprovementResult> {
-    // Simulate processing time
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    improvement.status = result.success ? 'completed' : 'rejected'
+    improvement.completedAt = new Date().toISOString()
+    improvement.result = result
 
-    const { dataFreshnessScore, avgResponseTime, errorRate, userSatisfactionScore } =
-      context.performanceMetrics
+    this.executionHistory.push({
+      improvementId: improvement.id,
+      timestamp: new Date().toISOString(),
+      result
+    })
 
-    const metricsBefore = {
-      dataCompleteness: dataFreshnessScore,
-      performanceScore: Math.max(0, Math.min(100, 100 - avgResponseTime / 10)),
-      securityScore: Math.max(0, Math.min(100, 100 - errorRate * 100)),
-      userSatisfaction: userSatisfactionScore
-    }
-
-    const metricsAfter = {
-      dataCompleteness: Math.min(100, metricsBefore.dataCompleteness + 10),
-      performanceScore: Math.min(100, metricsBefore.performanceScore + 15),
-      securityScore: Math.min(100, metricsBefore.securityScore + 10),
-      userSatisfaction: Math.min(10, metricsBefore.userSatisfaction + 1)
-    }
-
-    return {
-      success: true,
-      changes: [
-        `Applied ${improvement.suggestion.title}`,
-        ...(improvement.suggestion.implementation?.steps || [])
-      ],
-      metrics: {
-        before: metricsBefore,
-        after: metricsAfter
-      },
-      feedback: `Successfully implemented ${improvement.suggestion.title}. ${improvement.suggestion.estimatedImpact}`
-    }
+    return result
   }
 
   /**

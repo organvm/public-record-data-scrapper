@@ -1,6 +1,14 @@
 export type HealthGrade = 'A' | 'B' | 'C' | 'D' | 'F'
 export type SignalType = 'hiring' | 'permit' | 'contract' | 'expansion' | 'equipment'
-export type ProspectStatus = 'new' | 'claimed' | 'contacted' | 'qualified' | 'dead' | 'closed-won' | 'closed-lost' | 'unclaimed'
+export type ProspectStatus =
+  | 'new'
+  | 'claimed'
+  | 'contacted'
+  | 'qualified'
+  | 'dead'
+  | 'closed-won'
+  | 'closed-lost'
+  | 'unclaimed'
 export type IndustryType =
   | 'restaurant'
   | 'retail'
@@ -554,9 +562,22 @@ export interface User {
 }
 
 // CRM / Contacts
-export type ContactRole = 'owner' | 'ceo' | 'cfo' | 'controller' | 'manager' | 'bookkeeper' | 'other'
+export type ContactRole =
+  | 'owner'
+  | 'ceo'
+  | 'cfo'
+  | 'controller'
+  | 'manager'
+  | 'bookkeeper'
+  | 'other'
 export type ContactMethod = 'email' | 'phone' | 'mobile' | 'sms'
-export type ContactRelationship = 'owner' | 'decision_maker' | 'influencer' | 'employee' | 'advisor' | 'other'
+export type ContactRelationship =
+  | 'owner'
+  | 'decision_maker'
+  | 'influencer'
+  | 'employee'
+  | 'advisor'
+  | 'other'
 
 export interface Contact {
   id: string
@@ -591,12 +612,24 @@ export interface ProspectContact {
 }
 
 export type ActivityType =
-  | 'call_outbound' | 'call_inbound' | 'call_missed'
-  | 'email_sent' | 'email_received' | 'email_opened' | 'email_clicked'
-  | 'sms_sent' | 'sms_received'
-  | 'meeting_scheduled' | 'meeting_completed' | 'meeting_cancelled'
-  | 'note' | 'task_created' | 'task_completed'
-  | 'status_change' | 'document_sent' | 'document_signed'
+  | 'call_outbound'
+  | 'call_inbound'
+  | 'call_missed'
+  | 'email_sent'
+  | 'email_received'
+  | 'email_opened'
+  | 'email_clicked'
+  | 'sms_sent'
+  | 'sms_received'
+  | 'meeting_scheduled'
+  | 'meeting_completed'
+  | 'meeting_cancelled'
+  | 'note'
+  | 'task_created'
+  | 'task_completed'
+  | 'status_change'
+  | 'document_sent'
+  | 'document_signed'
 
 export interface ContactActivity {
   id: string
@@ -687,9 +720,17 @@ export interface Deal {
 }
 
 export type DocumentType =
-  | 'application' | 'bank_statement' | 'tax_return' | 'voided_check'
-  | 'drivers_license' | 'business_license' | 'landlord_letter'
-  | 'contract' | 'signed_contract' | 'disclosure' | 'signed_disclosure'
+  | 'application'
+  | 'bank_statement'
+  | 'tax_return'
+  | 'voided_check'
+  | 'drivers_license'
+  | 'business_license'
+  | 'landlord_letter'
+  | 'contract'
+  | 'signed_contract'
+  | 'disclosure'
+  | 'signed_disclosure'
   | 'other'
 
 export interface DealDocument {
@@ -712,13 +753,32 @@ export interface DealDocument {
 export type CommunicationChannel = 'email' | 'sms' | 'call'
 export type CommunicationDirection = 'inbound' | 'outbound'
 export type CommunicationStatus =
-  | 'pending' | 'queued' | 'sent' | 'delivered' | 'opened' | 'clicked'
-  | 'bounced' | 'failed' | 'answered' | 'no_answer' | 'voicemail' | 'busy'
+  | 'pending'
+  | 'queued'
+  | 'sent'
+  | 'delivered'
+  | 'opened'
+  | 'clicked'
+  | 'bounced'
+  | 'failed'
+  | 'answered'
+  | 'no_answer'
+  | 'voicemail'
+  | 'busy'
+  // 'received' marks an inbound message persisted from a provider webhook
+  // (e.g. Twilio inbound SMS). See migration 021.
+  | 'received'
 
 export type TemplateCategory =
-  | 'initial_outreach' | 'follow_up' | 'application_request'
-  | 'document_request' | 'approval_notification' | 'funding_notification'
-  | 'check_in' | 'renewal' | 'other'
+  | 'initial_outreach'
+  | 'follow_up'
+  | 'application_request'
+  | 'document_request'
+  | 'approval_notification'
+  | 'funding_notification'
+  | 'check_in'
+  | 'renewal'
+  | 'other'
 
 export interface CommunicationTemplate {
   id: string
@@ -766,6 +826,8 @@ export interface Communication {
   deliveredAt?: string
   failedAt?: string
   failureReason?: string
+  // Set for inbound messages persisted via a provider webhook. See migration 021.
+  receivedAt?: string
   scheduledFor?: string
   sentAt?: string
   metadata: Record<string, unknown>
@@ -774,16 +836,33 @@ export interface Communication {
 
 // Compliance
 export type ConsentType =
-  | 'express_written' | 'prior_express' | 'transactional'
-  | 'marketing_email' | 'marketing_sms' | 'marketing_call'
-  | 'data_sharing' | 'terms_of_service' | 'privacy_policy'
+  | 'express_written'
+  | 'prior_express'
+  | 'transactional'
+  | 'marketing_email'
+  | 'marketing_sms'
+  | 'marketing_call'
+  | 'data_sharing'
+  | 'terms_of_service'
+  | 'privacy_policy'
 
 export type CollectionMethod =
-  | 'web_form' | 'phone_recording' | 'signed_document'
-  | 'email_opt_in' | 'sms_opt_in' | 'verbal' | 'imported'
+  | 'web_form'
+  | 'phone_recording'
+  | 'signed_document'
+  | 'email_opt_in'
+  | 'sms_opt_in'
+  | 'verbal'
+  | 'imported'
 
 export type DisclosureStatus =
-  | 'draft' | 'generated' | 'sent' | 'viewed' | 'signed' | 'expired' | 'superseded'
+  | 'draft'
+  | 'generated'
+  | 'sent'
+  | 'viewed'
+  | 'signed'
+  | 'expired'
+  | 'superseded'
 
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical'
 export type AlertStatus = 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'false_positive'

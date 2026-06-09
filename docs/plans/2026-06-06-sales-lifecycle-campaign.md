@@ -86,3 +86,15 @@ DisclosureService / ContactsService fully implemented server-side · Stripe chec
 - Every phase lands as PR(s) with tsc clean, tests ≥ baseline, build green.
 - No new mock paths; anything unimplementable fails closed with a named reason.
 - External-dependency asks are batched in Phase 2 so engineering never blocks on them.
+
+## Closure status (2026-06-07)
+
+- **Phase 1 — EXECUTED** (DONE-588, PR #249). **Phase 3 — EXECUTED** (DONE-589, PR #250;
+  28 adversarial-review findings fixed pre-PR). Tech-debt prerequisite — EXECUTED
+  (DONE-587, PR #248). Merge order #248 → #249 → #250, owner-gated.
+- **Phase 2 — OPEN** under IRF-III-060 (credential ladder) + IRF-III-061 (env-truth
+  hazard) + IRF-III-062 (MCP-mintable: Sentry/Stripe/Cloudflare/Neon).
+- **Phase 4 — PARTIAL**: Prometheus + DEMO_RUNBOOK shipped (PR #250); Sentry DSN
+  (IRF-III-062), e-sign provider, Cloudflare epic #239 remain.
+- IRF filing: corpvs PR #434 (DONE-587..589 + IRF-III-060..062 + IRF-SYS-252..253).
+  Session handoff: `.claude/plans/2026-06-07-handoff-sales-lifecycle-close.md`.

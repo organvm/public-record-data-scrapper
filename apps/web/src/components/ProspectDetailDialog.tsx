@@ -45,6 +45,18 @@ function clampPercent(value: number | undefined | null): number {
   return Math.min(100, Math.max(0, value))
 }
 
+const mlFactorLabels: Record<string, string> = {
+  healthTrend: 'Financial Health',
+  signalQuality: 'Signal Quality',
+  industryRisk: 'Market Conditions',
+  timeToRecovery: 'Time to Recovery',
+  financialStability: 'Financial Stability'
+}
+
+function formatMlFactorLabel(key: string): string {
+  return mlFactorLabels[key] || key.replace(/([A-Z])/g, ' $1').trim()
+}
+
 interface ProspectDetailDialogProps {
   prospect: Prospect | null
   open: boolean
@@ -292,7 +304,7 @@ export function ProspectDetailDialog({
                 {Object.entries(prospect.mlScoring.factors).map(([key, value]) => (
                   <div key={key} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                      <span>{formatMlFactorLabel(key)}</span>
                       <span className="font-mono text-xs">{value}%</span>
                     </div>
                     <Progress value={clampPercent(value)} className="h-1.5" />

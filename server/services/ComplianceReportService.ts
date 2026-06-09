@@ -14,10 +14,7 @@
 import { database } from '../database/connection'
 import { DatabaseError, ValidationError } from '../errors'
 import { auditService } from './AuditService'
-import { consentService } from './ConsentService'
-import { suppressionService } from './SuppressionService'
 import { disclosureService } from './DisclosureService'
-import type { AuditLog, Communication, Disclosure, ConsentRecord } from '@public-records/core'
 
 // Date range for reports
 interface DateRange {
@@ -123,10 +120,7 @@ export class ComplianceReportService {
   /**
    * Generate outreach report with consent status
    */
-  async generateOutreachReport(
-    orgId: string,
-    dateRange: DateRange
-  ): Promise<OutreachEntry[]> {
+  async generateOutreachReport(orgId: string, dateRange: DateRange): Promise<OutreachEntry[]> {
     this.validateDateRange(dateRange)
 
     try {
@@ -208,10 +202,7 @@ export class ComplianceReportService {
    * Generate DNC check report
    * Note: This queries audit logs for DNC check events
    */
-  async generateDNCReport(
-    orgId: string,
-    dateRange: DateRange
-  ): Promise<DNCCheckRecord[]> {
+  async generateDNCReport(orgId: string, dateRange: DateRange): Promise<DNCCheckRecord[]> {
     this.validateDateRange(dateRange)
 
     try {
@@ -235,7 +226,7 @@ export class ComplianceReportService {
         checkTime: log.created_at,
         wasOnList: (log.after_state?.isSuppressed as boolean) || false,
         source: log.after_state?.source as string,
-        action: log.after_state?.isSuppressed ? 'blocked' : 'allowed' as const,
+        action: log.after_state?.isSuppressed ? 'blocked' : ('allowed' as const),
         communicationId: log.entity_id
       }))
     } catch (error) {
@@ -278,10 +269,7 @@ export class ComplianceReportService {
   /**
    * Detect compliance violations
    */
-  async detectViolations(
-    orgId: string,
-    dateRange: DateRange
-  ): Promise<ComplianceViolation[]> {
+  async detectViolations(orgId: string, dateRange: DateRange): Promise<ComplianceViolation[]> {
     const violations: ComplianceViolation[] = []
 
     try {

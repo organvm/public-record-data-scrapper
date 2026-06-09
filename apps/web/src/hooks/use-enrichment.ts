@@ -36,7 +36,19 @@ export function useEnrichment(): UseEnrichmentResult {
       })
 
       if (taskResult.success) {
-        setResult(taskResult.data as unknown as EnrichmentResult)
+        const rawData = taskResult.data as Record<string, unknown> | undefined
+        const enrichmentResult =
+          rawData && 'success' in rawData
+            ? (rawData as unknown as EnrichmentResult)
+            : ({
+                success: true,
+                data: taskResult.data,
+                sources: [],
+                cost: 0,
+                timestamp: new Date().toISOString()
+              } satisfies EnrichmentResult)
+
+        setResult(enrichmentResult)
         const data = taskResult.data as Record<string, unknown> | undefined
         setProgress((data?.progress as unknown[]) || [])
       } else {

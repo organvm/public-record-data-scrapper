@@ -19,13 +19,11 @@ vi.mock('../../services/AuditService', () => ({
 
 vi.mock('../../services/ConsentService', () => ({
   consentService: {
-    hasConsent: vi
-      .fn()
-      .mockResolvedValue({
-        hasConsent: true,
-        consentType: 'express_written',
-        grantedAt: '2024-01-01T00:00:00Z'
-      })
+    hasConsent: vi.fn().mockResolvedValue({
+      hasConsent: true,
+      consentType: 'express_written',
+      grantedAt: '2024-01-01T00:00:00Z'
+    })
   }
 }))
 
@@ -43,13 +41,11 @@ vi.mock('../../services/DisclosureService', () => ({
 
 import { database } from '../../database/connection'
 import { auditService } from '../../services/AuditService'
-import { consentService } from '../../services/ConsentService'
 import { disclosureService } from '../../services/DisclosureService'
 
 const mockQuery = vi.mocked(database.query)
 const mockAuditSummary = vi.mocked(auditService.getAuditSummary)
 const mockHighVolumeAlerts = vi.mocked(auditService.getHighVolumeAlerts)
-const mockHasConsent = vi.mocked(consentService.hasConsent)
 const mockDisclosureList = vi.mocked(disclosureService.list)
 
 describe('ComplianceReportService', () => {

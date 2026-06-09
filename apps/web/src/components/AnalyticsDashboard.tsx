@@ -26,7 +26,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  type PieLabelRenderProps
 } from 'recharts'
 
 interface AnalyticsDashboardProps {
@@ -369,10 +370,8 @@ export function AnalyticsDashboard({
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                label={
-                  ((entry: { name: string; percent?: number }) =>
-                    `${entry.name} ${((entry.percent ?? 0) * 100).toFixed(0)}%`) as any
+                label={(entry: PieLabelRenderProps) =>
+                  `${String(entry.name ?? '')} ${((entry.percent ?? 0) * 100).toFixed(0)}%`
                 }
                 outerRadius={100}
                 fill="#8884d8"

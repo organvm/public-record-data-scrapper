@@ -1,17 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Contact } from '@public-records/core'
-import { Card, CardHeader, CardTitle, CardContent } from '@public-records/ui/card'
+import { Card, CardContent } from '@public-records/ui/card'
 import { Button } from '@public-records/ui/button'
-import { Badge } from '@public-records/ui/badge'
 import { Textarea } from '@public-records/ui/textarea'
 import { Label } from '@public-records/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@public-records/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -30,8 +22,6 @@ import {
   Play,
   Note,
   Clock,
-  User,
-  Buildings,
   CheckCircle,
   XCircle,
   Voicemail,
@@ -45,11 +35,7 @@ interface CallInterfaceProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCallStart: () => void
-  onCallEnd: (data: {
-    duration: number
-    outcome: CallOutcome
-    notes: string
-  }) => void
+  onCallEnd: (data: { duration: number; outcome: CallOutcome; notes: string }) => void
   onScheduleFollowUp?: (data: {
     contactId: string
     scheduledFor: string
@@ -116,15 +102,17 @@ export function CallInterface({
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      setCallState('idle')
-      setDuration(0)
-      setIsMuted(false)
-      setIsOnHold(false)
-      setNotes('')
-      setOutcome('')
-      setShowFollowUp(false)
-      setFollowUpDate('')
-      setFollowUpNote('')
+      queueMicrotask(() => {
+        setCallState('idle')
+        setDuration(0)
+        setIsMuted(false)
+        setIsOnHold(false)
+        setNotes('')
+        setOutcome('')
+        setShowFollowUp(false)
+        setFollowUpDate('')
+        setFollowUpNote('')
+      })
     }
     return () => {
       if (timerRef.current) {
@@ -136,7 +124,7 @@ export function CallInterface({
   // Update call state when isConnecting changes
   useEffect(() => {
     if (isConnecting) {
-      setCallState('connecting')
+      queueMicrotask(() => setCallState('connecting'))
     }
   }, [isConnecting])
 

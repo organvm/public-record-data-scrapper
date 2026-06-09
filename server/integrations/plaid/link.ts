@@ -8,7 +8,7 @@
  * @module server/integrations/plaid/link
  */
 
-import { plaidClient, PlaidClient, PlaidApiResponse } from './client'
+import { plaidClient, PlaidClient } from './client'
 
 /**
  * Link token creation request parameters
@@ -149,7 +149,9 @@ export class PlaidLinkManager {
       ...(request.redirectUri && { redirect_uri: request.redirectUri }),
       ...(request.accountFilters && { account_filters: request.accountFilters }),
       ...(request.accessToken && { access_token: request.accessToken }),
-      ...(request.linkCustomizationName && { link_customization_name: request.linkCustomizationName })
+      ...(request.linkCustomizationName && {
+        link_customization_name: request.linkCustomizationName
+      })
     }
 
     const response = await this.client.makeRequest<{
@@ -239,7 +241,10 @@ export class PlaidLinkManager {
    * @param clientUserId - User ID for the session
    * @returns Link token for update mode
    */
-  async createUpdateLinkToken(accessToken: string, clientUserId: string): Promise<LinkTokenResponse> {
+  async createUpdateLinkToken(
+    accessToken: string,
+    clientUserId: string
+  ): Promise<LinkTokenResponse> {
     return this.createLinkToken({
       clientUserId,
       accessToken,

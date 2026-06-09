@@ -52,7 +52,9 @@ export class GenerativeNarrativeEngine {
     })
 
     // Call LLM API
-    const response = await this.callLLM(prompt)
+    const response = this.shouldUseMockData()
+      ? this.generateMockNarrativeResponse(prospect)
+      : await this.callLLM(prompt)
 
     // Parse structured response
     const sections = this.parseNarrativeResponse(response)
@@ -262,6 +264,43 @@ Format as plain text with markdown section headers.
 `
 
     return prompt
+  }
+
+  private shouldUseMockData(): boolean {
+    return (
+      import.meta.env.VITE_USE_MOCK_DATA === 'true' ||
+      process.env.VITE_USE_MOCK_DATA === 'true' ||
+      process.env.NODE_ENV === 'test'
+    )
+  }
+
+  private generateMockNarrativeResponse(prospect: Prospect): string {
+    return `## SUMMARY
+${prospect.companyName} shows a viable recovery profile with meaningful growth indicators and an actionable UCC history. The prospect warrants review because recent signals align with commercial funding opportunities.
+
+## KEY_FINDINGS
+- ${prospect.companyName} has ${prospect.growthSignals.length} growth signal(s) available for review.
+- The current health grade is ${prospect.healthScore.grade}, supporting a measured underwriting posture.
+- UCC history includes ${prospect.uccFilings.length} filing(s), which can inform lender positioning.
+
+## OPPORTUNITY_ANALYSIS
+The available business signals, filing history, and health metrics indicate a prospect that may benefit from timely capital outreach when paired with appropriate risk controls and verification.
+
+## RISK_FACTORS
+- Historical default context should be validated before outreach.
+- Filing details may require manual confirmation from source records.
+- Health and growth indicators should be refreshed before underwriting.
+
+## RECOMMENDED_ACTIONS
+- Verify the latest UCC filing status.
+- Confirm current business operating health.
+- Prioritize compliant outreach with documented consent.
+
+## MARKET_CONTEXT
+Mock market context indicates sufficient signal coverage for a first-pass lending narrative.
+
+## COMPETITIVE_LANDSCAPE
+Competitive positioning should be assessed against active secured parties and recent filing activity.`
   }
 
   /**

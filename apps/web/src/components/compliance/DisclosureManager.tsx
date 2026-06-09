@@ -4,7 +4,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '@public-records/ui/car
 import { Button } from '@public-records/ui/button'
 import { Input } from '@public-records/ui/input'
 import { Badge } from '@public-records/ui/badge'
-import { Progress } from '@public-records/ui/progress'
 import { ScrollArea } from '@public-records/ui/scroll-area'
 import { Separator } from '@public-records/ui/separator'
 import {
@@ -39,11 +38,8 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  Clock,
   Signature,
   Plus,
-  Calendar,
-  CurrencyDollar,
   Warning
 } from '@phosphor-icons/react'
 import { cn } from '@public-records/ui/utils'
@@ -535,7 +531,10 @@ export function DisclosureManager({
                   </Button>
                 )}
                 {selectedDisclosure.documentUrl && (
-                  <Button variant="outline" onClick={() => onDownloadDisclosure(selectedDisclosure)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => onDownloadDisclosure(selectedDisclosure)}
+                  >
                     <Download size={14} weight="bold" className="mr-2" />
                     Download
                   </Button>

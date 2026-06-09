@@ -16,7 +16,6 @@
  */
 
 import {
-  PlaidAccount,
   PlaidTransaction,
   plaidTransactionsManager,
   PlaidTransactionsManager
@@ -523,9 +522,7 @@ export class UnderwritingService {
 
     const sortedRevenues = [...revenues].sort((a, b) => a - b)
     const medianMonthlyRevenue =
-      sortedRevenues.length > 0
-        ? sortedRevenues[Math.floor(sortedRevenues.length / 2)]
-        : 0
+      sortedRevenues.length > 0 ? sortedRevenues[Math.floor(sortedRevenues.length / 2)] : 0
 
     // Calculate seasonality score (variance coefficient)
     const variance =
@@ -684,10 +681,12 @@ export class UnderwritingService {
     // Consistent amounts = higher confidence
     const amounts = payments.map((p) => p.amount)
     const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length
-    const variance = amounts.reduce((sum, a) => sum + Math.pow(a - avgAmount, 2), 0) / amounts.length
+    const variance =
+      amounts.reduce((sum, a) => sum + Math.pow(a - avgAmount, 2), 0) / amounts.length
     const cv = avgAmount > 0 ? Math.sqrt(variance) / avgAmount : 1
 
-    if (cv < 0.1) score += 0.2 // Very consistent amounts
+    if (cv < 0.1)
+      score += 0.2 // Very consistent amounts
     else if (cv < 0.25) score += 0.1
 
     return Math.min(1, score)
@@ -712,6 +711,7 @@ export class UnderwritingService {
     const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6
 
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+    void slope
 
     // Calculate percentage change
     const firstAvg = (values[0] + values[1] + (values[2] || values[1])) / 3

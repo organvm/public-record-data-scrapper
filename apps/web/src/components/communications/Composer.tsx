@@ -10,7 +10,6 @@ import { Button } from '@public-records/ui/button'
 import { Input } from '@public-records/ui/input'
 import { Textarea } from '@public-records/ui/textarea'
 import { Label } from '@public-records/ui/label'
-import { Badge } from '@public-records/ui/badge'
 import { Separator } from '@public-records/ui/separator'
 import {
   Select,
@@ -36,10 +35,8 @@ import {
   Eye,
   PencilSimple,
   MagnifyingGlass,
-  User,
-  CaretDown
+  User
 } from '@phosphor-icons/react'
-import { cn } from '@public-records/ui/utils'
 
 interface ComposerProps {
   open: boolean
@@ -57,12 +54,6 @@ interface ComposerProps {
     scheduledFor?: string
   }) => void
   isSending?: boolean
-}
-
-interface TemplateVariable {
-  name: string
-  value: string
-  placeholder: string
 }
 
 // Radix Select forbids empty-string item values; use a sentinel for "blank".
@@ -198,14 +189,16 @@ export function Composer({
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
-      setChannel(defaultChannel)
-      setContactId(defaultContactId || '')
-      setTemplateId('')
-      setSubject('')
-      setBody('')
-      setScheduledFor('')
-      setIsPreview(false)
-      setVariables({})
+      queueMicrotask(() => {
+        setChannel(defaultChannel)
+        setContactId(defaultContactId || '')
+        setTemplateId('')
+        setSubject('')
+        setBody('')
+        setScheduledFor('')
+        setIsPreview(false)
+        setVariables({})
+      })
     }
   }, [open, defaultChannel, defaultContactId])
 
@@ -304,10 +297,7 @@ export function Composer({
           {/* Template Selection */}
           <div>
             <Label className="mb-2 block">Template (Optional)</Label>
-            <Select
-              value={templateId || BLANK_TEMPLATE_VALUE}
-              onValueChange={handleTemplateSelect}
-            >
+            <Select value={templateId || BLANK_TEMPLATE_VALUE} onValueChange={handleTemplateSelect}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a template or start from scratch" />
               </SelectTrigger>

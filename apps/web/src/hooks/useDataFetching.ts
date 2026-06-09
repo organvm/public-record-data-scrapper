@@ -123,7 +123,6 @@ export function useDataFetching({
 
   useEffect(() => {
     const controller = new AbortController()
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchData({ signal: controller.signal })
     return () => controller.abort()
   }, [fetchData])

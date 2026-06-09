@@ -66,7 +66,11 @@ function mapClaimTierToDataTier(claimTier: string): ResolvedDataTier {
   if (normalized === 'oss' || normalized === 'free' || normalized === 'free-tier') {
     return DEFAULT_RESOLVED_TIER
   }
-  if (PAID_ALIASES.has(normalized) || normalized === 'professional' || normalized === 'enterprise') {
+  if (
+    PAID_ALIASES.has(normalized) ||
+    normalized === 'professional' ||
+    normalized === 'enterprise'
+  ) {
     return 'starter-tier'
   }
   // Defer to the billing-vocabulary mapping for anything else; it fails closed.
@@ -174,7 +178,8 @@ async function resolveServerSideTier(req: Request): Promise<ResolvedDataTier> {
  * the header argument is now IGNORED — the tier is derived server-side and
  * defaults to the most restrictive value when no request context is available.
  */
-export function resolveDataTier(_headerValue?: string | string[] | undefined): ResolvedDataTier {
+export function resolveDataTier(headerValue?: string | string[] | undefined): ResolvedDataTier {
+  void headerValue
   return DEFAULT_RESOLVED_TIER
 }
 

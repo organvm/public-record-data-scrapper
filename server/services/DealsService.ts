@@ -272,7 +272,10 @@ export class DealsService {
       return this.transformStage(results[0])
     } catch (error) {
       if (error instanceof NotFoundError) throw error
-      throw new DatabaseError('Failed to get default stage', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to get default stage',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -334,7 +337,12 @@ export class DealsService {
     const whereClause = `WHERE ${conditions.join(' AND ')}`
     const offset = (page - 1) * limit
 
-    const allowedSortColumns = ['created_at', 'updated_at', 'amount_requested', 'expected_close_date']
+    const allowedSortColumns = [
+      'created_at',
+      'updated_at',
+      'amount_requested',
+      'expected_close_date'
+    ]
     const safeSortBy = allowedSortColumns.includes(sortBy) ? sortBy : 'created_at'
     const safeSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC'
 
@@ -395,8 +403,8 @@ export class DealsService {
       }
 
       const pipelineStages = stages
-        .filter(s => !s.isTerminal)
-        .map(stage => {
+        .filter((s) => !s.isTerminal)
+        .map((stage) => {
           const stageDeals = dealsByStage.get(stage.id) || []
           return {
             ...stage,
@@ -417,7 +425,10 @@ export class DealsService {
         }
       }
     } catch (error) {
-      throw new DatabaseError('Failed to get pipeline view', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to get pipeline view',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -560,6 +571,7 @@ export class DealsService {
     newStageId: string,
     options: { notes?: string; changedBy?: string } = {}
   ): Promise<Deal> {
+    void options
     try {
       // Validate stage exists
       const stageResult = await database.query<DealStageRow>(
@@ -577,7 +589,6 @@ export class DealsService {
       // Update timestamps based on stage
       const additionalUpdates: string[] = []
       const additionalValues: unknown[] = []
-      const additionalParamStart = 4
 
       if (newStage.slug === 'pack-submitted' && !deal.submittedAt) {
         additionalUpdates.push(`submitted_at = CURRENT_TIMESTAMP`)
@@ -616,7 +627,10 @@ export class DealsService {
       return this.transformDeal(results[0])
     } catch (error) {
       if (error instanceof NotFoundError || error instanceof ValidationError) throw error
-      throw new DatabaseError('Failed to move deal to stage', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to move deal to stage',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -650,7 +664,10 @@ export class DealsService {
 
       return this.transformDocument(results[0])
     } catch (error) {
-      throw new DatabaseError('Failed to upload document', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to upload document',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -689,7 +706,10 @@ export class DealsService {
       return this.transformDocument(results[0])
     } catch (error) {
       if (error instanceof NotFoundError) throw error
-      throw new DatabaseError('Failed to verify document', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to verify document',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
@@ -698,26 +718,28 @@ export class DealsService {
    */
   async deleteDocument(documentId: string): Promise<boolean> {
     try {
-      const results = await database.query(
-        'DELETE FROM deal_documents WHERE id = $1',
-        [documentId]
-      )
+      const results = await database.query('DELETE FROM deal_documents WHERE id = $1', [documentId])
       return (results as { rowCount: number }).rowCount > 0
     } catch (error) {
-      throw new DatabaseError('Failed to delete document', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to delete document',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 
   /**
    * Get document checklist status for a deal
    */
-  async getDocumentChecklist(dealId: string): Promise<{
-    documentType: DocumentType
-    isRequired: boolean
-    isUploaded: boolean
-    isVerified: boolean
-    document?: DealDocument
-  }[]> {
+  async getDocumentChecklist(dealId: string): Promise<
+    {
+      documentType: DocumentType
+      isRequired: boolean
+      isUploaded: boolean
+      isVerified: boolean
+      document?: DealDocument
+    }[]
+  > {
     const requiredDocs: DocumentType[] = [
       'application',
       'bank_statement',
@@ -726,9 +748,9 @@ export class DealsService {
     ]
 
     const documents = await this.getDocuments(dealId)
-    const docMap = new Map(documents.map(d => [d.documentType, d]))
+    const docMap = new Map(documents.map((d) => [d.documentType, d]))
 
-    return requiredDocs.map(docType => {
+    return requiredDocs.map((docType) => {
       const doc = docMap.get(docType)
       return {
         documentType: docType,
@@ -826,7 +848,7 @@ export class DealsService {
         avgDealSize: parseFloat(pipelineStats[0]?.avg_size || '0'),
         conversionRate,
         avgTimeToClose: parseFloat(timeToClose[0]?.avg_days || '0'),
-        dealsByStage: byStage.map(s => ({
+        dealsByStage: byStage.map((s) => ({
           stageId: s.stage_id,
           stageName: s.stage_name,
           count: parseInt(s.count),
@@ -834,7 +856,10 @@ export class DealsService {
         }))
       }
     } catch (error) {
-      throw new DatabaseError('Failed to get deal stats', error instanceof Error ? error : undefined)
+      throw new DatabaseError(
+        'Failed to get deal stats',
+        error instanceof Error ? error : undefined
+      )
     }
   }
 }

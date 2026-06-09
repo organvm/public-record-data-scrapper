@@ -212,7 +212,7 @@ export class DisclosureCalculator {
         paymentIntervalDays = 30
         break
 
-      case 'split':
+      case 'split': {
         // Variable based on revenue - use holdback percentage
         if (!input.holdbackPercentage || !input.estimatedMonthlyRevenue) {
           throw new ValidationError(
@@ -230,6 +230,7 @@ export class DisclosureCalculator {
         paymentAmount = avgMonthlyPayment
         paymentIntervalDays = 30
         break
+      }
 
       default:
         throw new ValidationError(`Unknown payment frequency: ${input.paymentFrequency}`)
@@ -376,11 +377,7 @@ export class DisclosureCalculator {
    * TODO(disclosure): replace this approximation with a true IRR over the
    * generated payment schedule for exact NY CFDL / Reg-Z-style APR compliance.
    */
-  private calculateTrueApr(
-    principal: number,
-    totalPayback: number,
-    termDays: number
-  ): number {
+  private calculateTrueApr(principal: number, totalPayback: number, termDays: number): number {
     if (principal <= 0 || termDays <= 0) {
       return 0
     }
@@ -401,16 +398,22 @@ export class DisclosureCalculator {
     switch (frequency) {
       case 'daily':
       case 'weekly':
-        return 'No prepayment discount. Full remaining balance is due even if paid early. ' +
-               'This is a purchase of future receivables, not a loan.'
+        return (
+          'No prepayment discount. Full remaining balance is due even if paid early. ' +
+          'This is a purchase of future receivables, not a loan.'
+        )
 
       case 'monthly':
-        return 'Prepayment may be made at any time. Full contracted amount is due ' +
-               'regardless of early payoff. Contact provider for specific terms.'
+        return (
+          'Prepayment may be made at any time. Full contracted amount is due ' +
+          'regardless of early payoff. Contact provider for specific terms.'
+        )
 
       case 'split':
-        return 'Payments are based on a percentage of receivables. Term is estimated. ' +
-               'Full purchased amount must be remitted regardless of timing.'
+        return (
+          'Payments are based on a percentage of receivables. Term is estimated. ' +
+          'Full purchased amount must be remitted regardless of timing.'
+        )
 
       default:
         return 'Contact provider for prepayment terms.'
@@ -452,8 +455,14 @@ export class DisclosureCalculator {
     }
 
     if (input.paymentFrequency === 'split') {
-      if (!input.holdbackPercentage || input.holdbackPercentage <= 0 || input.holdbackPercentage > 100) {
-        throw new ValidationError('Holdback percentage must be between 0 and 100 for split payments')
+      if (
+        !input.holdbackPercentage ||
+        input.holdbackPercentage <= 0 ||
+        input.holdbackPercentage > 100
+      ) {
+        throw new ValidationError(
+          'Holdback percentage must be between 0 and 100 for split payments'
+        )
       }
       if (!input.estimatedMonthlyRevenue || input.estimatedMonthlyRevenue <= 0) {
         throw new ValidationError('Estimated monthly revenue is required for split payments')
@@ -514,8 +523,7 @@ export class DisclosureCalculator {
     const formatCurrency = (value: number): string =>
       new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 
-    const formatPercent = (value: number): string =>
-      `${(value * 100).toFixed(2)}%`
+    const formatPercent = (value: number): string => `${(value * 100).toFixed(2)}%`
 
     return {
       fundingAmount: formatCurrency(calculation.fundingAmount),

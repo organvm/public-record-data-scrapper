@@ -324,7 +324,7 @@ export class PlaidTransactionsManager {
     }
 
     if (options.accountIds?.length) {
-      (body.options as Record<string, unknown>).account_ids = options.accountIds
+      ;(body.options as Record<string, unknown>).account_ids = options.accountIds
     }
 
     const response = await this.client.makeRequest<{
@@ -479,7 +479,10 @@ export class PlaidTransactionsManager {
    * @param cursor - Cursor from previous sync (empty for initial sync)
    * @returns Added, modified, and removed transactions
    */
-  async syncTransactions(accessToken: string, cursor: string = ''): Promise<TransactionsSyncResponse> {
+  async syncTransactions(
+    accessToken: string,
+    cursor: string = ''
+  ): Promise<TransactionsSyncResponse> {
     const response = await this.client.makeRequest<{
       added: Array<{
         transaction_id: string
@@ -535,7 +538,7 @@ export class PlaidTransactionsManager {
 
     return {
       added: response.data.added.map(this.transformTransaction),
-      modified: response.data.modified.map((t) => this.transformTransaction(t as any)),
+      modified: response.data.modified.map((t) => this.transformTransaction(t)),
       removed: response.data.removed.map((r) => ({ transactionId: r.transaction_id })),
       nextCursor: response.data.next_cursor,
       hasMore: response.data.has_more,

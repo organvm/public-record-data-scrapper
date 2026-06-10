@@ -8,14 +8,11 @@ import {
   Contact,
   Prospect
 } from '@public-records/core'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@public-records/ui/card'
+import { Card, CardHeader, CardContent } from '@public-records/ui/card'
 import { Button } from '@public-records/ui/button'
 import { Badge } from '@public-records/ui/badge'
 import { Progress } from '@public-records/ui/progress'
-import { Separator } from '@public-records/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@public-records/ui/tabs'
-import { Checkbox } from '@public-records/ui/checkbox'
-import { ScrollArea } from '@public-records/ui/scroll-area'
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import {
   ArrowLeft,
@@ -177,10 +174,7 @@ export function DealDetail({
                 <h2 className="text-2xl font-semibold">
                   {deal.dealNumber || `Deal-${deal.id.slice(0, 8)}`}
                 </h2>
-                <Badge
-                  style={{ backgroundColor: stage.color || '#6366f1' }}
-                  className="text-white"
-                >
+                <Badge style={{ backgroundColor: stage.color || '#6366f1' }} className="text-white">
                   {stage.name}
                 </Badge>
                 <Badge
@@ -452,7 +446,10 @@ export function DealDetail({
                   return (
                     <Card
                       key={docType}
-                      className={cn('p-4', doc ? 'border-green-500/50' : isRequired ? 'border-amber-500/50' : '')}
+                      className={cn(
+                        'p-4',
+                        doc ? 'border-green-500/50' : isRequired ? 'border-amber-500/50' : ''
+                      )}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">

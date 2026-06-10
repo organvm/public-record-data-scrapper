@@ -9,14 +9,17 @@ function generateId(): string {
     : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
 
+type ReminderInput = Omit<FollowUpReminder, 'id' | 'createdAt' | 'createdBy' | 'completed'> & {
+  reminderDate?: string
+  message?: string
+}
+
 export interface UseNotesAndRemindersResult {
   notes: ProspectNote[]
   reminders: FollowUpReminder[]
   handleAddNote: (note: Omit<ProspectNote, 'id' | 'createdAt' | 'createdBy'>) => void
   handleDeleteNote: (noteId: string) => void
-  handleAddReminder: (
-    reminder: Omit<FollowUpReminder, 'id' | 'createdAt' | 'createdBy' | 'completed'>
-  ) => void
+  handleAddReminder: (reminder: ReminderInput) => void
   handleCompleteReminder: (reminderId: string) => void
   handleDeleteReminder: (reminderId: string) => void
   handleSendEmail: (
@@ -51,14 +54,20 @@ export function useNotesAndReminders(): UseNotesAndRemindersResult {
   )
 
   const handleAddReminder = useCallback(
-    (reminder: Omit<FollowUpReminder, 'id' | 'createdAt' | 'createdBy' | 'completed'>) => {
-      const newReminder: FollowUpReminder = {
+    (reminder: ReminderInput) => {
+      const dueDate = reminder.dueDate || reminder.reminderDate || ''
+      const description = reminder.description || reminder.message || ''
+      const newReminder = {
         ...reminder,
+        dueDate,
+        description,
+        reminderDate: dueDate,
+        message: description,
         id: generateId(),
         createdBy: 'Current User',
         createdAt: new Date().toISOString(),
         completed: false
-      }
+      } satisfies FollowUpReminder & { reminderDate: string; message: string }
 
       setReminders((current) => [...(current || []), newReminder])
     },

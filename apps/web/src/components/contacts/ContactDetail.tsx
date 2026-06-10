@@ -1,18 +1,11 @@
 import { useState } from 'react'
 import { Contact, ContactActivity, Prospect, ProspectContact } from '@public-records/core'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@public-records/ui/card'
+import { Card, CardHeader, CardContent } from '@public-records/ui/card'
 import { Button } from '@public-records/ui/button'
 import { Badge } from '@public-records/ui/badge'
 import { Separator } from '@public-records/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@public-records/ui/tabs'
 import { Avatar, AvatarFallback } from '@public-records/ui/avatar'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from '@public-records/ui/dialog'
 import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
 import {
   Phone,

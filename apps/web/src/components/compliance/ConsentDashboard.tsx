@@ -38,12 +38,10 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  User,
   Plus,
   Envelope,
   ChatText,
   Phone,
-  Warning,
   Prohibit,
   Eye
 } from '@phosphor-icons/react'
@@ -132,9 +130,11 @@ function getInitials(name: string): string {
     .slice(0, 2)
 }
 
-function getConsentStatus(
-  consent: ConsentRecord
-): { status: ConsentStatusFilter; label: string; color: string } {
+function getConsentStatus(consent: ConsentRecord): {
+  status: ConsentStatusFilter
+  label: string
+  color: string
+} {
   if (consent.revokedAt) {
     return { status: 'revoked', label: 'Revoked', color: 'text-red-500' }
   }

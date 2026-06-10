@@ -238,7 +238,7 @@ export function ActivityTimeline({
           <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
 
           <div className="space-y-4">
-            {filteredActivities.map((activity, index) => {
+            {filteredActivities.map((activity) => {
               const config = activityConfig[activity.activityType]
               const Icon = config.icon
 

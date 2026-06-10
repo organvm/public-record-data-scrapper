@@ -46,7 +46,14 @@ interface AuditLogViewerProps {
   className?: string
 }
 
-type EntityTypeFilter = 'all' | 'prospect' | 'contact' | 'deal' | 'communication' | 'disclosure' | 'other'
+type EntityTypeFilter =
+  | 'all'
+  | 'prospect'
+  | 'contact'
+  | 'deal'
+  | 'communication'
+  | 'disclosure'
+  | 'other'
 type ActionFilter = 'all' | 'create' | 'update' | 'delete' | 'view' | 'send' | 'sign'
 
 const actionColors: Record<string, string> = {
@@ -85,23 +92,13 @@ function formatDateTime(dateString: string): string {
   })
 }
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-}
-
 function getUserName(userId: string | undefined, users: User[]): string {
   if (!userId) return 'System'
   const user = users.find((u) => u.id === userId)
   return user ? `${user.firstName} ${user.lastName}` : userId.slice(0, 8)
 }
 
-function renderChanges(
-  changes?: Record<string, { old: unknown; new: unknown }>
-): React.ReactNode {
+function renderChanges(changes?: Record<string, { old: unknown; new: unknown }>): React.ReactNode {
   if (!changes || Object.keys(changes).length === 0) {
     return <span className="text-muted-foreground text-xs">No changes recorded</span>
   }
@@ -261,10 +258,7 @@ export function AuditLogViewer({
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
-            <Select
-              value={actionFilter}
-              onValueChange={(v) => setActionFilter(v as ActionFilter)}
-            >
+            <Select value={actionFilter} onValueChange={(v) => setActionFilter(v as ActionFilter)}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Action" />
               </SelectTrigger>
@@ -353,7 +347,9 @@ export function AuditLogViewer({
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div className={cn('w-2 h-2 rounded-full', actionColor)} />
-                            <span className="text-sm capitalize">{log.action.replace('_', ' ')}</span>
+                            <span className="text-sm capitalize">
+                              {log.action.replace('_', ' ')}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -389,9 +385,7 @@ export function AuditLogViewer({
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Audit Log Details</DialogTitle>
-            <DialogDescription>
-              Full details of the audit event
-            </DialogDescription>
+            <DialogDescription>Full details of the audit event</DialogDescription>
           </DialogHeader>
 
           {selectedLog && (
@@ -434,9 +428,7 @@ export function AuditLogViewer({
               {selectedLog.changes && Object.keys(selectedLog.changes).length > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Changes</p>
-                  <Card className="p-3 bg-muted/30">
-                    {renderChanges(selectedLog.changes)}
-                  </Card>
+                  <Card className="p-3 bg-muted/30">{renderChanges(selectedLog.changes)}</Card>
                 </div>
               )}
 

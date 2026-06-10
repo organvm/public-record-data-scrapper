@@ -124,7 +124,6 @@ export function usePersonalizedRecommendations(
 
   useEffect(() => {
     if (prospects.length > 0 && userProfile) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       void generateRecommendations()
     }
   }, [prospects, userProfile, generateRecommendations])

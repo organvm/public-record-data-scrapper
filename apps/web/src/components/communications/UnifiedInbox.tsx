@@ -5,7 +5,7 @@ import {
   CommunicationDirection,
   Contact
 } from '@public-records/core'
-import { Card, CardHeader, CardTitle, CardContent } from '@public-records/ui/card'
+import { Card, CardHeader, CardTitle } from '@public-records/ui/card'
 import { Button } from '@public-records/ui/button'
 import { Input } from '@public-records/ui/input'
 import { Badge } from '@public-records/ui/badge'
@@ -22,14 +22,9 @@ import { Avatar, AvatarFallback } from '@public-records/ui/avatar'
 import {
   MagnifyingGlass,
   Envelope,
-  EnvelopeOpen,
   ChatText,
   Phone,
-  PhoneIncoming,
-  PhoneOutgoing,
-  Funnel,
   ArrowRight,
-  Calendar,
   PaperPlaneRight,
   Plus,
   ArrowLeft,
@@ -176,7 +171,11 @@ export function UnifiedInbox({
       } else if (date.toDateString() === yesterday.toDateString()) {
         key = 'Yesterday'
       } else {
-        key = date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
+        key = date.toLocaleDateString(undefined, {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric'
+        })
       }
 
       if (!groups[key]) groups[key] = []
@@ -313,7 +312,10 @@ export function UnifiedInbox({
                             </p>
                             <div className="flex items-center gap-2 mt-1">
                               <div
-                                className={cn('w-1.5 h-1.5 rounded-full', statusColors[comm.status])}
+                                className={cn(
+                                  'w-1.5 h-1.5 rounded-full',
+                                  statusColors[comm.status]
+                                )}
                               />
                               <span className="text-xs text-muted-foreground capitalize">
                                 {comm.status.replace('_', ' ')}
@@ -338,17 +340,20 @@ export function UnifiedInbox({
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-medium">
-                      {selectedCommunication.subject || `${channelConfig[selectedCommunication.channel].label} Message`}
+                      {selectedCommunication.subject ||
+                        `${channelConfig[selectedCommunication.channel].label} Message`}
                     </h3>
                     <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                       <span>{getContactName(selectedCommunication.contactId, contacts)}</span>
                       <span>-</span>
-                      <span>
-                        {new Date(selectedCommunication.createdAt).toLocaleString()}
-                      </span>
+                      <span>{new Date(selectedCommunication.createdAt).toLocaleString()}</span>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => onReply(selectedCommunication)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onReply(selectedCommunication)}
+                  >
                     <PaperPlaneRight size={14} weight="bold" className="mr-2" />
                     Reply
                   </Button>

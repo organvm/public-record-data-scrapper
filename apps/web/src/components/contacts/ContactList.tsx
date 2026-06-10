@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@public-records/ui/dropdown-menu'
-import { Avatar, AvatarFallback, AvatarImage } from '@public-records/ui/avatar'
+import { Avatar, AvatarFallback } from '@public-records/ui/avatar'
 import {
   MagnifyingGlass,
   Plus,
@@ -72,6 +72,15 @@ function formatRelativeTime(dateString?: string): string {
 
 function getInitials(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+}
+
+function SortIcon({ active, direction }: { active: boolean; direction: SortDirection }) {
+  if (!active) return null
+  return direction === 'asc' ? (
+    <CaretUp size={14} weight="bold" />
+  ) : (
+    <CaretDown size={14} weight="bold" />
+  )
 }
 
 export function ContactList({
@@ -125,8 +134,7 @@ export function ContactList({
           break
         case 'lastContacted':
           comparison =
-            new Date(a.lastContactedAt || 0).getTime() -
-            new Date(b.lastContactedAt || 0).getTime()
+            new Date(a.lastContactedAt || 0).getTime() - new Date(b.lastContactedAt || 0).getTime()
           break
       }
       return sortDirection === 'asc' ? comparison : -comparison
@@ -160,15 +168,6 @@ export function ContactList({
       newSelected.add(contactId)
     }
     setSelectedIds(newSelected)
-  }
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return null
-    return sortDirection === 'asc' ? (
-      <CaretUp size={14} weight="bold" />
-    ) : (
-      <CaretDown size={14} weight="bold" />
-    )
   }
 
   const roleOptions = ['all', 'owner', 'ceo', 'cfo', 'controller', 'manager', 'bookkeeper', 'other']
@@ -250,7 +249,7 @@ export function ContactList({
                 >
                   <div className="flex items-center gap-1">
                     Name
-                    <SortIcon field="name" />
+                    <SortIcon active={sortField === 'name'} direction={sortDirection} />
                   </div>
                 </TableHead>
                 <TableHead
@@ -259,7 +258,7 @@ export function ContactList({
                 >
                   <div className="flex items-center gap-1">
                     Email
-                    <SortIcon field="email" />
+                    <SortIcon active={sortField === 'email'} direction={sortDirection} />
                   </div>
                 </TableHead>
                 <TableHead>Phone</TableHead>
@@ -269,7 +268,7 @@ export function ContactList({
                 >
                   <div className="flex items-center gap-1">
                     Title/Company
-                    <SortIcon field="company" />
+                    <SortIcon active={sortField === 'company'} direction={sortDirection} />
                   </div>
                 </TableHead>
                 <TableHead
@@ -278,7 +277,7 @@ export function ContactList({
                 >
                   <div className="flex items-center gap-1">
                     Last Contacted
-                    <SortIcon field="lastContacted" />
+                    <SortIcon active={sortField === 'lastContacted'} direction={sortDirection} />
                   </div>
                 </TableHead>
                 <TableHead className="w-[50px]"></TableHead>

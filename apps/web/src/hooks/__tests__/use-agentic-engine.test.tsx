@@ -461,12 +461,16 @@ describe('useAgenticEngine', () => {
         useAgenticEngine(context, { enabled: true })
 
         useEffect(() => {
-          if (prospects.length === 0) {
-            setProspects([{ id: 'p-1' }])
-          } else if (updateCount === 0) {
-            setUpdateCount(1)
-            setProspects([{ id: 'p-1' }, { id: 'p-2' }])
-          }
+          const timer = setTimeout(() => {
+            if (prospects.length === 0) {
+              setProspects([{ id: 'p-1' }])
+            } else if (updateCount === 0) {
+              setUpdateCount(1)
+              setProspects([{ id: 'p-1' }, { id: 'p-2' }])
+            }
+          }, 0)
+
+          return () => clearTimeout(timer)
         }, [prospects, updateCount])
 
         return null

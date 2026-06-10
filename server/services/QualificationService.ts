@@ -16,7 +16,6 @@
  */
 
 import { database } from '../database/connection'
-import { DatabaseError, NotFoundError, ValidationError } from '../errors'
 import {
   UnderwritingFeatures,
   UnderwritingService,
@@ -242,7 +241,7 @@ export class QualificationService {
           industry: results[0].industry
         }
       }
-    } catch (error) {
+    } catch {
       // Prospect may not exist - continue with provided options
     }
 

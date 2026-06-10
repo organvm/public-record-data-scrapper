@@ -1,12 +1,11 @@
 import { useEffect } from 'react'
 import { Contact, ContactRole, ContactMethod } from '@public-records/core'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@public-records/ui/button'
 import { Input } from '@public-records/ui/input'
 import { Textarea } from '@public-records/ui/textarea'
-import { Label } from '@public-records/ui/label'
 import {
   Select,
   SelectContent,
@@ -35,7 +34,6 @@ import { Separator } from '@public-records/ui/separator'
 import { Badge } from '@public-records/ui/badge'
 import { User, Plus, X } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { cn } from '@public-records/ui/utils'
 
 const contactFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
@@ -118,6 +116,8 @@ export function ContactForm({
       source: ''
     }
   })
+
+  const tags = useWatch({ control: form.control, name: 'tags' }) ?? []
 
   // Reset form when contact changes or dialog opens
   useEffect(() => {
@@ -277,7 +277,9 @@ export function ContactForm({
 
             {/* Contact Information */}
             <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-4">Contact Information</h3>
+              <h3 className="text-sm font-medium text-muted-foreground mb-4">
+                Contact Information
+              </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -411,7 +413,7 @@ export function ContactForm({
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {(form.watch('tags') ?? []).map((tag) => (
+                {tags.map((tag) => (
                   <Badge key={tag} variant="secondary" className="gap-1">
                     {tag}
                     <button
@@ -423,7 +425,7 @@ export function ContactForm({
                     </button>
                   </Badge>
                 ))}
-                {(form.watch('tags') ?? []).length === 0 && (
+                {tags.length === 0 && (
                   <span className="text-sm text-muted-foreground">No tags added</span>
                 )}
               </div>

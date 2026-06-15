@@ -1,0 +1,106 @@
+# ============================================================================
+# Release: build + publish packaged artifacts on version tags
+# ----------------------------------------------------------------------------
+# Activation fix for issue #254 (item 1): "no tagged release assets". Pushing a
+# semver tag (e.g. v1.2.0) builds the production bundles and attaches packaged,
+# checksummed artifacts to a GitHub Release so end users have a concrete,
+# downloadable distribution.
+#
+# Artifacts:
+#   * ucc-mca-server-<tag>.tar.gz  — API server + worker CommonJS bundles
+#                                    (run with `node server.cjs` / `node worker.cjs`)
+#   * ucc-mca-web-<tag>.tar.gz     — compiled web dashboard (static hosting)
+#   * SHA256SUMS.txt               — checksums for every asset
+#
+# Usage:
+#   git tag v1.2.0 && git push origin v1.2.0
+# ============================================================================
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build a release for (e.g. v1.2.0)'
+        required: true
+
+# Needs write access to create the release and upload assets.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts || npm install --legacy-peer-deps --ignore-scripts
+
+      - name: Build production bundles
+        # build:render = web (apps/web/dist) + server.cjs + worker.cjs (dist/)
+        run: npm run build:render
+
+      - name: Package artifacts
+        id: package
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p release stage/server
+
+          # Server + worker bundles (the production runner). Ship package.json
+          # so operators can `npm install --omit=dev` the runtime dependencies.
+          cp dist/server.cjs dist/server.cjs.map dist/worker.cjs dist/worker.cjs.map stage/server/
+          cp package.json stage/server/
+          tar -czf "release/ucc-mca-server-${TAG}.tar.gz" -C stage/server .
+
+          # Compiled web dashboard (static hosting).
+          tar -czf "release/ucc-mca-web-${TAG}.tar.gz" -C apps/web/dist .
+
+          # Checksums for every asset.
+          ( cd release && sha256sum ucc-mca-*.tar.gz > SHA256SUMS.txt )
+
+          ls -la release
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          NOTES="Automated release for ${TAG}.
+
+          ## Artifacts
+          - \`ucc-mca-server-${TAG}.tar.gz\` — API server + worker bundles. Run with \`node server.cjs\` and \`node worker.cjs\` (install runtime deps with \`npm install --omit=dev\`).
+          - \`ucc-mca-web-${TAG}.tar.gz\` — compiled web dashboard for static hosting.
+          - \`SHA256SUMS.txt\` — checksums.
+
+          See the README \"Install & Run\" section for the full deploy + smoke-test flow."
+
+          # Create the release if it doesn't already exist, then upload assets.
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" release/* --clobber
+          else
+            gh release create "${TAG}" release/* \
+              --title "${TAG}" \
+              --notes "${NOTES}"
+          fi

@@ -2,9 +2,10 @@
 /**
  * Tests for Growth Signal Data Sources
  *
- * TODO: These tests have mocking issues where the mocked data doesn't
- * match the expected return structure from the data sources.
- * The tests need to be updated to properly mock the data source implementations.
+ * Sources that require credentials short-circuit before issuing a request,
+ * so the "missing credentials" cases resolve without touching the network or
+ * falling into the executeFetch retry/backoff path. Cases that exercise a
+ * successful response stub `fetch` explicitly.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'

@@ -275,6 +275,19 @@ export class BuildingPermitsSource extends BaseDataSource {
       const state = typeof query.state === 'string' ? query.state : ''
       const zipCode = typeof query.zipCode === 'string' ? query.zipCode : ''
 
+      // Short-circuit when the permit API isn't configured rather than
+      // burning retry/backoff cycles on a request guaranteed to fail.
+      if (!this.apiKey) {
+        return {
+          permits: [],
+          totalPermits: 0,
+          totalValue: 0,
+          recentActivity: false,
+          companyName,
+          note: 'Permit API not configured'
+        }
+      }
+
       // Example using a hypothetical permit aggregation service
       // In reality, this would need to be implemented per jurisdiction
       const searchUrl = `https://api.permitdata.io/v1/permits/search`
@@ -296,8 +309,8 @@ export class BuildingPermitsSource extends BaseDataSource {
       })
 
       if (!response.ok) {
-        // Return empty data if API not configured rather than failing
-        if (!this.apiKey || response.status === 401) {
+        // Treat auth failures as "not configured" rather than a hard error.
+        if (response.status === 401) {
           return {
             permits: [],
             totalPermits: 0,

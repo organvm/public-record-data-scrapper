@@ -1,9 +1,11 @@
 /**
  * Tests for Health Score Data Sources
  *
- * TODO: These tests have mocking issues where the mocked data doesn't
- * match the expected return structure from the data sources.
- * The tests need to be updated to properly mock the data source implementations.
+ * Sources that require credentials short-circuit before issuing a request,
+ * so the "missing credentials" cases resolve without touching the network.
+ * Cases that exercise a successful response stub `fetch` so they never fall
+ * into the executeFetch retry/backoff path (which would add real wall-clock
+ * delay to the suite).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -76,6 +78,13 @@ describe('BBBSource', () => {
   })
 
   it('should include source name', async () => {
+    // BBB is a keyless scraping source, so stub a successful HTML response to
+    // avoid the executeFetch retry/backoff path (which adds real delay).
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      text: async () => '<div class="rating-A+">12 complaints</div>'
+    } as Response)
+
     const result = await source.fetchData({
       companyName: 'Test Corp',
       city: 'Austin',

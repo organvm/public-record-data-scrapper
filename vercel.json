@@ -1,4 +1,14 @@
 {
-  "buildCommand": "npm install --legacy-peer-deps && npm run build"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm install --legacy-peer-deps && npm run build",
+  "outputDirectory": "apps/web/dist",
+  "functions": {
+    "api/index.ts": { "maxDuration": 30 },
+    "api/spark-fallback.ts": { "maxDuration": 5 }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/_spark/(.*)", "destination": "/api/spark-fallback" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
-

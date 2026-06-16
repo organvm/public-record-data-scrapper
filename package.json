@@ -43,6 +43,7 @@
     "test:scrapers:ny": "tsx scripts/scrapers/test-scrapers.ts NY",
     "test:scrapers:headed": "tsx scripts/scrapers/test-scrapers.ts --headed",
     "postinstall": "node ./scripts/ensure-main-branch.mjs",
+    "train:ml-model": "tsx scripts/trainMLModel.ts",
     "scrape": "tsx scripts/cli-scraper.ts",
     "scrape:scheduled": "tsx scripts/scheduled-run.ts",
     "migrate": "npm run db:migrate",
@@ -166,7 +167,7 @@
     "@vitest/ui": "^4.0.8",
     "axios": "^1.16.0",
     "cheerio": "^1.1.2",
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.3",
     "eslint": "^9.28.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -202,6 +203,7 @@
   "overrides": {
     "localtunnel": {
       "axios": "^1.7.4"
-    }
+    },
+    "esbuild": "0.28.1"
   }
 }

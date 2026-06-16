@@ -15,6 +15,7 @@ import type { StateCollector } from './types'
 import { createCAApiCollector } from './state-collectors/CAApiCollector'
 import { createTXBulkCollector } from './state-collectors/TXBulkCollector'
 import { FLVendorCollector, createFLVendorCollector } from './state-collectors/FLVendorCollector'
+import { NYScraperCollector, createNYScraperCollector } from './state-collectors/NYScraperCollector'
 
 /**
  * Access method types for state data
@@ -140,7 +141,8 @@ const STATE_CONFIGS: Record<string, StateConfig> = {
   NY: {
     code: 'NY',
     name: 'New York',
-    accessMethods: [],
+    accessMethods: ['scrape'],
+    activeMethod: 'scrape',
     hasApi: false,
     hasBulk: false,
     requiresVendor: false,
@@ -150,7 +152,12 @@ const STATE_CONFIGS: Record<string, StateConfig> = {
       vendor: null,
       scrape: 0
     },
-    notes: 'NY portal ingestion is not wired to a production collector yet'
+    notes:
+      'NY DOS UCC public portal scraper. Credential-gated like FL: set ' +
+      'NY_UCC_DEBTOR_SEEDS (comma-separated debtor names) to activate; otherwise ' +
+      'the collector reports isReady()=false and is withheld (fail-closed). The ' +
+      'portal has no bulk/date-windowed query, so collection is seed-enumeration ' +
+      'based. Live-portal extraction is implemented but pending production verification.'
   }
 }
 
@@ -320,11 +327,26 @@ export class StateCollectorFactory {
   }
 
   /**
-   * Create scraper-based collector
+   * Create scraper-based collector.
+   *
+   * Mirrors the FL vendor gate: the collector is only returned when it reports
+   * isReady() (i.e. its required configuration is present), so an unconfigured
+   * state fails closed via getCollector() returning undefined rather than
+   * running an empty/fabricated collection.
    */
   private createScraperCollector(stateCode: string): StateCollector | undefined {
-    void stateCode
-    return undefined
+    switch (stateCode) {
+      case 'NY': {
+        const collector = createNYScraperCollector()
+        // Only expose NY once debtor seeds are configured (NY_UCC_DEBTOR_SEEDS).
+        if (collector && (collector as NYScraperCollector).isReady()) {
+          return collector
+        }
+        return undefined
+      }
+      default:
+        return undefined
+    }
   }
 
   /**
@@ -513,12 +535,12 @@ export class StateCollectorFactory {
   /**
    * Check if a state has an implemented collector.
    *
-   * This is kept consistent with getImplementedStates(): a state is only
-   * reported as having a collector if a concrete collector implementation
-   * exists for it. NY is intentionally excluded — it has empty accessMethods
-   * and no collector factory case, so getCollector('NY') returns undefined.
-   * Previously hasCollector('NY') returned true while getCollector('NY')
-   * returned undefined, which could lead callers into a null dereference.
+   * This reports whether a concrete collector implementation exists for a state
+   * (CA, TX, FL, NY). Like FL, a credential-gated state can be "implemented" yet
+   * still have getCollector() return undefined when its configuration is absent
+   * (FL: contract inactive; NY: NY_UCC_DEBTOR_SEEDS unset). Callers that
+   * materialise collectors go through getCollectors(), which skips undefined
+   * results, so the gated-but-implemented state never causes a null dereference.
    */
   hasCollector(stateCode: string): boolean {
     const normalizedCode = stateCode.toUpperCase()
@@ -528,16 +550,18 @@ export class StateCollectorFactory {
   /**
    * Get list of states with implemented collectors.
    *
-   * Only includes states that have an actual collector implementation wired up
-   * via createCollectorForMethod(). NY is excluded until its portal collector
-   * is implemented (its STATE_CONFIG has empty accessMethods), so that
-   * hasCollector()/getImplementedStates()/getCollector() all agree.
+   * Includes every state that has an actual collector implementation wired up
+   * via createCollectorForMethod(). Some entries are credential-gated and will
+   * only yield a live collector once configured: FL needs an active vendor
+   * contract, NY needs NY_UCC_DEBTOR_SEEDS. They are still "implemented" — the
+   * collection code exists and is tested — but fail closed when unconfigured.
    */
   getImplementedStates(): string[] {
     return [
-      'CA', // California - API
-      'TX', // Texas - Bulk
-      'FL' // Florida - Vendor (requires contract)
+      'CA', // California - API (CA_SOS_API_KEY)
+      'TX', // Texas - Bulk (TX_SOSDIRECT_API_KEY + account)
+      'FL', // Florida - Vendor (requires active contract)
+      'NY' // New York - Portal scraper (requires NY_UCC_DEBTOR_SEEDS)
     ]
   }
 

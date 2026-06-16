@@ -1,0 +1,71 @@
+{
+  "intercept": -0.1402703238531812,
+  "weights": {
+    "filingBurden": -1.3636308600294818,
+    "healthNorm": 0.3798677952356483,
+    "lapsedRatio": 0.2440984361852853,
+    "logFilings": -0.1865000574545853,
+    "logReviews": 0.8473478926566451,
+    "recency": 1.0466981002728077,
+    "recoveryWindow": 1.0749545674250982,
+    "sentiment": 0.6446202170698112,
+    "terminatedRatio": 0.8940231261076289,
+    "violations": -0.41407905998906525
+  },
+  "normalizers": {
+    "filingBurden": {
+      "mean": 0.41597222222222235,
+      "std": 0.39647604413706783
+    },
+    "healthNorm": {
+      "mean": 0.4905833333333334,
+      "std": 0.285897113875293
+    },
+    "lapsedRatio": {
+      "mean": 0.23088293650793662,
+      "std": 0.3197965917077133
+    },
+    "logFilings": {
+      "mean": 1.3564675568114841,
+      "std": 0.6242101084534227
+    },
+    "logReviews": {
+      "mean": 3.156445428327161,
+      "std": 0.8626085106973153
+    },
+    "recency": {
+      "mean": 0.10817351598173519,
+      "std": 0.22783090723391355
+    },
+    "recoveryWindow": {
+      "mean": 0.5509121061359868,
+      "std": 0.34738235707398274
+    },
+    "sentiment": {
+      "mean": 0.49713119747951473,
+      "std": 0.2905616244814482
+    },
+    "terminatedRatio": {
+      "mean": 0.2531448412698414,
+      "std": 0.332851916239356
+    },
+    "violations": {
+      "mean": 0.23749999999999988,
+      "std": 0.17007963820908517
+    }
+  },
+  "featureOrder": [
+    "filingBurden",
+    "healthNorm",
+    "lapsedRatio",
+    "logFilings",
+    "logReviews",
+    "recency",
+    "recoveryWindow",
+    "sentiment",
+    "terminatedRatio",
+    "violations"
+  ],
+  "trainedAt": "2026-06-16T11:19:51.459Z",
+  "modelVersion": "1.0.0"
+}

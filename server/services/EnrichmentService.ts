@@ -6,6 +6,10 @@
  * data sources (SEC EDGAR, OSHA enforcement, USPTO, Census Business Patterns)
  * via the shared `@public-records/core/enrichment` data-source layer.
  *
+ * Optional credential-gated sources (SAM.gov, D&B, Clearbit, ZoomInfo) are
+ * queried only when their API-key env vars are configured; unconfigured ones are
+ * skipped entirely and never count against the confidence denominator.
+ *
  * Fail-closed discipline: a source that errors contributes a *named* error, not
  * invented data. If ALL queried sources fail, enrichment fails with the
  * aggregated reasons rather than persisting fabricated values.
@@ -18,6 +22,10 @@ import {
   OSHASource,
   USPTOSource,
   CensusSource,
+  SAMGovSource,
+  DnBSource,
+  ClearbitSource,
+  ZoomInfoSource,
   type DataSourceResponse
 } from '@public-records/core/enrichment'
 import { database } from '../database/connection'
@@ -41,6 +49,19 @@ interface SourceOutcome {
   source: string
   success: boolean
   error?: string
+}
+
+/**
+ * A credential-gated enrichment source (SAM.gov, D&B, Clearbit, ZoomInfo).
+ *
+ * These are only queried when `isConfigured()` is true, so an unconfigured
+ * provider is skipped entirely (it never drags down the confidence denominator).
+ * Kept as a structural interface so tests can inject a fake without a real key.
+ */
+export interface KeyedEnrichmentSource {
+  getConfig(): { name: string }
+  isConfigured(): boolean
+  fetchData(query: Record<string, unknown>): Promise<DataSourceResponse>
 }
 
 /**
@@ -188,12 +209,24 @@ export class EnrichmentService {
   private readonly oshaSource: OSHASource
   private readonly usptoSource: USPTOSource
   private readonly censusSource: CensusSource
+  /**
+   * Credential-gated sources that are only queried when configured. By default
+   * this is the subset of {SAM.gov, D&B, Clearbit, ZoomInfo} whose API key env
+   * vars are present; with none configured the array is empty and enrichment
+   * behaves exactly as the free-source-only pipeline.
+   */
+  private readonly keyedSources: KeyedEnrichmentSource[]
 
-  constructor() {
+  constructor(options?: { keyedSources?: KeyedEnrichmentSource[] }) {
     this.secSource = new SECEdgarSource()
     this.oshaSource = new OSHASource()
     this.usptoSource = new USPTOSource()
     this.censusSource = new CensusSource()
+    this.keyedSources =
+      options?.keyedSources ??
+      [new SAMGovSource(), new DnBSource(), new ClearbitSource(), new ZoomInfoSource()].filter(
+        (source) => source.isConfigured()
+      )
   }
 
   /**
@@ -302,6 +335,51 @@ export class EnrichmentService {
       outcomes.push({ source: 'census', success: false, error: `unknown state '${state}'` })
     }
 
+    // --- Keyed/commercial sources (SAM.gov, D&B, Clearbit, ZoomInfo) ---------
+    // Only sources with a configured credential are present in `keyedSources`;
+    // each is fail-closed and contributes a *named* outcome. Their firmographic
+    // output (revenue, industry, headcount, credit rating, federal registration)
+    // refines the result when present but is never fabricated.
+    const firmographics: {
+      estimatedRevenue?: number
+      industry?: string
+      employeeCount?: number
+      creditRating?: string
+      samRegistered?: boolean
+    } = {}
+
+    for (const source of this.keyedSources) {
+      const sourceName = source.getConfig().name
+      if (!companyName) {
+        outcomes.push({ source: sourceName, success: false, error: 'missing company name' })
+        continue
+      }
+      const keyed = await source.fetchData({ companyName, state })
+      this.recordOutcome(outcomes, keyed)
+      if (keyed.success) {
+        const data = asRecord(keyed.data)
+        const revenue = asNumber(data.estimatedRevenue ?? data.revenue ?? data.annualRevenue)
+        if (revenue > 0 && firmographics.estimatedRevenue === undefined) {
+          firmographics.estimatedRevenue = revenue
+        }
+        const ind = typeof data.industry === 'string' ? data.industry.trim() : ''
+        if (ind && firmographics.industry === undefined) {
+          firmographics.industry = ind
+        }
+        const employees = asNumber(data.employeeCount)
+        if (employees > 0 && firmographics.employeeCount === undefined) {
+          firmographics.employeeCount = employees
+        }
+        const rating = typeof data.creditRating === 'string' ? data.creditRating.trim() : ''
+        if (rating && firmographics.creditRating === undefined) {
+          firmographics.creditRating = rating
+        }
+        if (typeof data.isRegistered === 'boolean' && firmographics.samRegistered === undefined) {
+          firmographics.samRegistered = data.isRegistered
+        }
+      }
+    }
+
     const successfulSources = outcomes.filter((o) => o.success)
     const failedSources = outcomes.filter((o) => !o.success)
     const sourceErrors = failedSources.map((o) => `${o.source}: ${o.error ?? 'unknown error'}`)
@@ -342,6 +420,10 @@ export class EnrichmentService {
 
     const dataSourcesUsed = successfulSources.map((o) => o.source)
 
+    // Prefer a commercial firmographic revenue figure (D&B/ZoomInfo/Clearbit)
+    // over the Census payroll proxy when a keyed source supplied one.
+    const resolvedRevenue = firmographics.estimatedRevenue ?? censusPayroll
+
     const result: EnrichmentResult = {
       growth_signals: growthSignals,
       health_score: {
@@ -350,8 +432,8 @@ export class EnrichmentService {
         trend,
         violations: oshaViolations
       },
-      estimated_revenue: censusPayroll,
-      industry_classification: industry || 'unknown',
+      estimated_revenue: resolvedRevenue,
+      industry_classification: firmographics.industry || industry || 'unknown',
       data_sources_used: dataSourcesUsed,
       confidence,
       source_errors: sourceErrors
@@ -433,10 +515,9 @@ export class EnrichmentService {
       enrichedFields.push('health_score')
     }
 
-    // Update prospect enrichment metadata (and estimated revenue when Census
-    // produced a payroll figure we can use as a proxy).
-    const censusSucceeded = successfulSources.some((o) => o.source === 'census')
-    if (censusSucceeded && censusPayroll > 0) {
+    // Update prospect enrichment metadata (and estimated revenue when either a
+    // keyed firmographic source or Census produced a usable figure).
+    if (resolvedRevenue > 0) {
       await database.query(
         `UPDATE prospects
             SET last_enriched_at = NOW(),
@@ -444,7 +525,7 @@ export class EnrichmentService {
                 estimated_revenue = $3,
                 updated_at = NOW()
           WHERE id = $1`,
-        [prospectId, confidence, censusPayroll]
+        [prospectId, confidence, resolvedRevenue]
       )
       enrichedFields.push('estimated_revenue')
     } else {
@@ -470,7 +551,9 @@ export class EnrichmentService {
         company_name: companyName,
         industry,
         state,
-        data_sources_used: dataSourcesUsed
+        data_sources_used: dataSourcesUsed,
+        // Only present when a configured keyed source actually returned values.
+        ...(Object.keys(firmographics).length > 0 ? { firmographics } : {})
       }
     })
 

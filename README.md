@@ -1,18 +1,18 @@
 # Public Record Data Scraper
 
-**Extract, enrich, and score UCC filings from all 50 US state Secretary of State portals.** Turns raw public records into prioritized, outreach-ready leads for the Merchant Cash Advance industry.
+**Extract, enrich, and score UCC filings from US state Secretary of State portals.** Turns raw public records into prioritized, outreach-ready leads for the Merchant Cash Advance industry. Four state collectors are implemented today (CA, TX, FL, NY); the remaining states are on the roadmap.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests: 2,055](https://img.shields.io/badge/tests-2%2C055%20passing-brightgreen)](https://github.com/organvm-iii-ergon/public-record-data-scrapper)
+[![Tests: 3,321](https://img.shields.io/badge/tests-3%2C321%20passing-brightgreen)](https://github.com/organvm-iii-ergon/public-record-data-scrapper)
 [![Deploy: Vercel](https://img.shields.io/badge/deploy-Vercel-black?logo=vercel)](https://public-record-data-scrapper.vercel.app)
 
 ---
 
 ## What It Does
 
-1. **Collects** UCC-1 filing data from 50 state portals via 60+ autonomous agents (handles CAPTCHAs, rate limits, session management, and fallback strategies per state)
-2. **Enriches** each filing with data from SEC EDGAR, OSHA, USPTO, Census Bureau, SAM.gov, and optional commercial sources (D&B, Clearbit, ZoomInfo)
+1. **Collects** UCC-1 filing data from state Secretary of State portals — 4 collectors implemented (CA API, TX bulk, FL vendor, NY portal scraper) with per-state strategies (API, bulk download, vendor feed, scrape) and fallback. FL and NY are credential-gated and fail closed when unconfigured.
+2. **Enriches** each filing with free public data (SEC EDGAR, OSHA, USPTO, Census Bureau) plus optional, key-gated sources (SAM.gov, D&B, Clearbit, ZoomInfo) that fail closed — returning a named error, never fabricated data — when no API key is configured
 3. **Scores** every prospect 0--100 on financing likelihood, assigns a health grade (A--F), and flags growth signals (hiring, permits, equipment purchases, expansion)
 4. **Delivers** results through a React web dashboard, REST API, or CLI tool
 
@@ -77,7 +77,7 @@ npm run scrape -- batch -i companies.csv -o ./results
 # Export scored MCA leads as JSON + CSV batches (requires database)
 npm run scrape -- lead-export --min-score 70 --limit 100 --output-dir ./lead-export
 
-# List all 50 state agents
+# List state collectors (4 implemented: CA, TX, FL, NY)
 npm run scrape -- list-states
 ```
 
@@ -107,14 +107,15 @@ A non-zero exit from the first command means the API is not up.
         │              │
 ┌───────▼──────┐ ┌─────▼───────┐ ┌────────────────────┐
 │ PostgreSQL   │ │   Redis 7   │ │ Agent Orchestrator  │
-│ 9 migrations │ │ cache/queue │ │ 60+ collectors      │
+│ 9 migrations │ │ cache/queue │ │ 4 state collectors  │
 │ multitenancy │ │             │ │ circuit breakers     │
 └──────────────┘ └─────────────┘ └─────┬──────────────┘
                                        │
                     ┌──────────────────▼────────────────┐
-                    │  50 State SOS Agents               │
-                    │  CA · TX · NY · FL · IL · ...      │
-                    │  + SEC · OSHA · USPTO · Census     │
+                    │  State SOS Collectors (4 live)      │
+                    │  CA · TX · FL · NY                  │
+                    │  + SEC · OSHA · USPTO · Census      │
+                    │  + SAM.gov · D&B · Clearbit · Zoom  │
                     └────────────────────────────────────┘
 ```
 
@@ -165,17 +166,17 @@ Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 
 ### Data Tiers
 
-| Tier           | Sources                                                     | Cost         |
-| -------------- | ----------------------------------------------------------- | ------------ |
-| **Free / OSS** | SEC EDGAR, OSHA, USPTO, Census, SAM.gov                     | $0           |
-| **Paid**       | + D&B, Clearbit, Experian, ZoomInfo, Google Places, NewsAPI | Subscription |
+| Tier                    | Sources                                                           | Cost               |
+| ----------------------- | ----------------------------------------------------------------- | ------------------ |
+| **Free / OSS (no key)** | SEC EDGAR, OSHA, USPTO, Census                                    | $0                 |
+| **Optional, key-gated** | SAM.gov, D&B, Clearbit, ZoomInfo (fail closed without an API key) | Provider-dependent |
 
 ---
 
 ## Key Features
 
-- **50-state UCC collection** -- autonomous agents for every Secretary of State portal, with per-state fallback strategies (API, bulk download, vendor feed, scrape)
-- **ML-based lead scoring** -- priority score (0--100), health grade, growth signal detection, revenue estimation, competitive position analysis
+- **Multi-state UCC collection** -- 4 implemented collectors (CA API, TX bulk, FL vendor, NY portal scraper) with per-state fallback strategies (API, bulk download, vendor feed, scrape); FL and NY are credential-gated and fail closed when unconfigured. 47 states remain on the roadmap.
+- **Transparent rules-based lead scoring** -- priority score (0--100) from a weighted, inspectable formula, health grade, growth signal detection, revenue estimation. An **optional, experimental ML model** (logistic regression) can be attached per request; it is opt-in, low-confidence, and trained on synthetic seed data pending validation against real outcomes — the rules-based score stays authoritative.
 - **Compliance built in** -- CA SB 1235 and NY CFDL disclosure calculators, TCPA consent tracking, suppression list management, immutable audit trail
 - **Full broker workflow** -- prospect dashboard, deal pipeline (Kanban), contact CRM, unified communications inbox (email/SMS/voice), bank statement underwriting (Plaid)
 - **Production infrastructure** -- Terraform-provisioned AWS (VPC, RDS, ElastiCache, S3), Vercel frontend deployment, Docker Compose for local dev, Kubernetes manifests for container orchestration
@@ -184,25 +185,22 @@ Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 
 ## Testing
 
-2,055 tests across 91 files. Zero failures.
+3,321 tests across 156 files, zero failures (verified). The suite is split across two runners:
 
 ```bash
-npm test                       # Full suite
-npm run test:coverage          # V8 coverage report
-npm run test:server            # Server-side only
-npm run test:e2e               # Playwright end-to-end
+npm test                       # Web suite (jsdom):   2,005 tests / 83 files
+npm run test:server            # Server suite (node):  1,316 tests / 73 files (+6 skipped)
+npm run test:coverage          # V8 coverage report (web)
+npm run test:e2e               # Playwright end-to-end (3 specs, run separately)
 ```
 
-| Category            | Tests | Scope                                              |
-| ------------------- | ----- | -------------------------------------------------- |
-| Frontend components | ~500  | React dashboard, pipeline, inbox, forms            |
-| Server services     | ~400  | All 27 domain services                             |
-| State agents        | ~250  | 50 state-specific collectors + fallback strategies |
-| Agentic system      | ~200  | Agent engine, orchestration, council               |
-| Data pipeline       | ~150  | Quality checks, enrichment, stale data detection   |
-| Server routes       | ~150  | API endpoints, webhook verification                |
-| Integration + E2E   | ~100  | Cross-service workflows                            |
-| Security            | ~55   | XSS prevention, input sanitization                 |
+| Suite                  | Runner         | Tests     | Files   |
+| ---------------------- | -------------- | --------- | ------- |
+| Web (`npm test`)       | Vitest + jsdom | 2,005     | 83      |
+| Server (`test:server`) | Vitest + node  | 1,316     | 73      |
+| **Total**              |                | **3,321** | **156** |
+
+Counts are reproducible from the test runners above; the previous "2,055 tests / 91 files" badge was inaccurate (and the web run had been failing on a config-glob bug + a jsdom localStorage regression, both now fixed).
 
 ---
 
@@ -258,7 +256,7 @@ Provisions: VPC with multi-AZ subnets, RDS PostgreSQL (encrypted, Multi-AZ), Ela
 1. Fork and create a feature branch: `git checkout -b feature/your-feature`
 2. Install: `npm install --legacy-peer-deps`
 3. Develop: `npm run dev:full`
-4. Test: `npm test` (all 2,055 tests must pass)
+4. Test: `npm test` and `npm run test:server` (all tests must pass — 3,321 across both suites)
 5. Lint: `npm run lint`
 6. Commit: `git commit -m "feat: description"` ([Conventional Commits](https://www.conventionalcommits.org/))
 7. Open a Pull Request

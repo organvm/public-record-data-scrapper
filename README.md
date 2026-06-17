@@ -5,7 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tests: 2,055](https://img.shields.io/badge/tests-2%2C055%20passing-brightgreen)](https://github.com/organvm-iii-ergon/public-record-data-scrapper)
-[![Deploy: Vercel](https://img.shields.io/badge/deploy-Vercel-black?logo=vercel)](https://public-record-data-scrapper.vercel.app)
+[![Live: GitHub Pages](https://img.shields.io/badge/live-GitHub%20Pages-2ea44f?logo=github)](https://a-organvm.github.io/public-record-data-scrapper/)
+[![Release](https://img.shields.io/github/v/release/a-organvm/public-record-data-scrapper?sort=semver&display_name=tag)](https://github.com/a-organvm/public-record-data-scrapper/releases)
 
 ---
 
@@ -77,6 +78,86 @@ npm run scrape -- batch -i companies.csv -o ./results
 # List all 50 state agents
 npm run scrape -- list-states
 ```
+
+---
+
+## Install & Run (Production)
+
+The platform ships as two backend processes (API server + queue worker) plus a
+static web dashboard. There are two ways to get a production build.
+
+### Option A — Download a packaged release
+
+Every version tag publishes checksummed artifacts on the
+[Releases page](https://github.com/a-organvm/public-record-data-scrapper/releases):
+
+```bash
+TAG=v1.0.0                      # pick the latest release tag
+curl -L -O https://github.com/a-organvm/public-record-data-scrapper/releases/download/$TAG/ucc-mca-server-$TAG.tar.gz
+curl -L -O https://github.com/a-organvm/public-record-data-scrapper/releases/download/$TAG/SHA256SUMS.txt
+sha256sum -c SHA256SUMS.txt --ignore-missing      # verify integrity
+
+mkdir ucc-mca && tar -xzf ucc-mca-server-$TAG.tar.gz -C ucc-mca && cd ucc-mca
+npm install --omit=dev --legacy-peer-deps         # install runtime deps only
+
+# Provide required config (see SECURITY.md / .env.example): JWT_SECRET,
+# DATABASE_URL, REDIS_URL, and any webhook secrets.
+node server.cjs        # API server  → http://localhost:3000
+node worker.cjs        # queue worker (separate process)
+```
+
+The compiled dashboard (`ucc-mca-web-$TAG.tar.gz`) is static — serve it from any
+static host (GitHub Pages, Cloudflare Pages, Vercel, S3+CDN).
+
+### Option B — Build from source
+
+```bash
+npm install --legacy-peer-deps
+npm run build:render    # web (apps/web/dist) + server.cjs + worker.cjs (dist/)
+npm start               # runs dist/server.cjs (API server)
+npm run start:worker    # runs dist/worker.cjs (queue worker)
+```
+
+### Container
+
+```bash
+docker build -t ucc-mca .
+docker run -p 3000:3000 --env-file .env ucc-mca   # CMD: node dist/server.cjs
+```
+
+### Smoke test
+
+After the server is up, confirm the runner is live. The check polls
+`/api/health` until it returns `{"status":"ok"}`:
+
+```bash
+npm run smoke                                   # checks http://localhost:3000
+SMOKE_URL=https://api.your-domain.com npm run smoke
+curl -fsS http://localhost:3000/api/health      # raw equivalent
+```
+
+A healthy response looks like:
+
+```json
+{ "status": "ok", "timestamp": "2026-06-15T09:00:00.000Z", "uptime": 12.34 }
+```
+
+### Releasing
+
+Maintainers publish a build by pushing a semver tag — the
+[`release` workflow](.github/workflows/release.yml) builds the bundles and
+attaches the packaged artifacts above:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The web dashboard auto-deploys to GitHub Pages on every push to `main` via the
+[`pages` workflow](.github/workflows/pages.yml).
+
+> **Deploying to production?** See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for
+> the required secrets (the server fails closed on boot without them), migration
+> ordering, branch-protection guardrails, and the smoke-test flow.
 
 ---
 

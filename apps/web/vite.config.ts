@@ -12,6 +12,10 @@ const appRoot = dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   root: appRoot,
+  // Base public path. Defaults to '/' for root deployments (Vercel/Cloudflare
+  // Pages). The GitHub Pages workflow sets VITE_BASE=/public-record-data-scrapper/
+  // so built asset URLs resolve under the project subpath.
+  base: process.env.VITE_BASE || '/',
   plugins: [
     react(),
     tailwindcss(),

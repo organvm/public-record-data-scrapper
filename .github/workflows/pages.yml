@@ -1,0 +1,83 @@
+# ============================================================================
+# Deploy the web dashboard (apps/web) to GitHub Pages
+# ----------------------------------------------------------------------------
+# Activation fix for issue #254: the Pages route was serving raw Vite source
+# entrypoints (/src/main.tsx) instead of a built production artifact. This
+# workflow builds the SPA and publishes the compiled output so the public URL
+# (https://<owner>.github.io/<repo>/) serves a real, shipped product surface.
+#
+#   * push to main           → build + deploy to GitHub Pages
+#   * workflow_dispatch       → manual redeploy
+#
+# Repo setup (one-time): Settings → Pages → Build and deployment →
+#   Source = "GitHub Actions".
+# ============================================================================
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Least privilege for the GitHub Pages deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; never cancel an in-progress prod deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        # --ignore-scripts avoids lifecycle scripts (postinstall) on the runner.
+        run: npm ci --ignore-scripts || npm install --legacy-peer-deps --ignore-scripts
+
+      - name: Build SPA (project subpath base)
+        env:
+          # Project Pages are served under /<repo>/ — set the Vite base so all
+          # built asset URLs resolve correctly. Read by apps/web/vite.config.ts.
+          VITE_BASE: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - name: Add SPA fallback + disable Jekyll
+        run: |
+          # Pages serves a static SPA: route deep links to index.html and stop
+          # Jekyll from filtering files that start with an underscore.
+          cp apps/web/dist/index.html apps/web/dist/404.html
+          touch apps/web/dist/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

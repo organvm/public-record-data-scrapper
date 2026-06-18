@@ -1,0 +1,102 @@
+# ============================================================================
+# Release — build & publish a packaged artifact on version tags
+# ----------------------------------------------------------------------------
+# Activation path for issue #254: pushing a `v*` tag builds the production
+# bundle (frontend dist + server + worker) and publishes a GitHub Release with
+# a runnable tarball attached. Publishing the release also fires
+# `notify-feature-released.yml` (release: published).
+#
+#   git tag v1.2.3 && git push origin v1.2.3
+#
+# The attached `ucc-mca-platform-<tag>.tar.gz` unpacks to a directory that runs
+# with only production deps:
+#   tar -xzf ucc-mca-platform-v1.2.3.tar.gz && cd package
+#   npm ci --omit=dev && node dist/server.cjs
+# ============================================================================
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.2.3). Must already exist.'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        # actions/checkout v4.3.0
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        # actions/setup-node v4.4.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build production bundle (frontend + server + worker)
+        run: npm run build:render
+
+      - name: Resolve release tag
+        id: tag
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble runnable package
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          STAGE="package"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/scripts"
+          cp -r dist "$STAGE/dist"
+          cp -r database "$STAGE/database"
+          cp package.json package-lock.json "$STAGE/"
+          cp scripts/migrate.ts "$STAGE/scripts/" 2>/dev/null || true
+          cp scripts/ensure-main-branch.mjs "$STAGE/scripts/" 2>/dev/null || true
+          cat > "$STAGE/RUN.md" <<'EOF'
+          # Running this release
+
+          ```bash
+          npm ci --omit=dev        # install production dependencies
+          npm run db:migrate       # apply database migrations (needs DATABASE_URL)
+          node dist/server.cjs     # start the API server (port 3000)
+          node dist/worker.cjs     # start the background worker (separate process)
+          ```
+
+          Smoke test once the server is up:
+
+          ```bash
+          curl -fsS http://localhost:3000/api/health
+          ```
+          EOF
+          tar -czf "ucc-mca-platform-${TAG}.tar.gz" "$STAGE"
+          ls -lh "ucc-mca-platform-${TAG}.tar.gz"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          ASSET="ucc-mca-platform-${TAG}.tar.gz"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --title "$TAG" \
+              --generate-notes
+          fi

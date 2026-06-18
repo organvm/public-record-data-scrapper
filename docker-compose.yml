@@ -78,7 +78,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["node", "dist/server/worker.js"]
+    command: ["node", "dist/worker.cjs"]
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/ucc_mca

@@ -78,6 +78,15 @@ npm run scrape -- batch -i companies.csv -o ./results
 npm run scrape -- list-states
 ```
 
+### Smoke test (verify a running server)
+
+```bash
+curl -fsS http://localhost:3000/api/health        # liveness — expects HTTP 200
+curl -fsS http://localhost:3000/api/health/detailed   # dependency status (DB, Redis)
+```
+
+A non-zero exit from the first command means the API is not up.
+
 ---
 
 ## Architecture
@@ -200,6 +209,31 @@ npm run test:e2e               # Playwright end-to-end
 ```bash
 docker-compose --profile development up -d    # Full stack
 docker-compose ps                             # Verify health
+```
+
+### Production build & releases
+
+```bash
+npm run build:render      # frontend dist/ + bundled dist/server.cjs + dist/worker.cjs
+npm start                 # run the API server   (node dist/server.cjs)
+npm run start:worker      # run the BullMQ worker (node dist/worker.cjs)
+```
+
+Tagged releases are published automatically: pushing a `v*` tag runs
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which builds
+the production bundle and attaches a runnable `ucc-mca-platform-<tag>.tar.gz` to
+a GitHub Release.
+
+```bash
+git tag v1.2.3 && git push origin v1.2.3   # → builds + publishes the release
+```
+
+Download and run a release artifact:
+
+```bash
+tar -xzf ucc-mca-platform-v1.2.3.tar.gz && cd package
+npm ci --omit=dev && node dist/server.cjs
+curl -fsS http://localhost:3000/api/health   # smoke test
 ```
 
 ### Production (AWS via Terraform)

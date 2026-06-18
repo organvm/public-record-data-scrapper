@@ -7,8 +7,16 @@
 # build or a failing server test, so it can be marked a required status check
 # in branch protection on `main` (the one step that needs repo-admin).
 #
-# Verified green at introduction: `npm run build:render` + `npm run test:server`
-# (1294 server tests pass with no external services).
+# Verified green at introduction: `npm run build:render` + the server test
+# suite (1294 tests pass with no external services).
+#
+# Coverage thresholds are deliberately NOT enforced here: the repo currently
+# sits at ~67% lines vs its declared 80% target, and backend-tests.yml already
+# treats coverage as an informational warning. Raising coverage to 80% is
+# tracked debt, not a per-PR blocker — so this gate runs tests with
+# `--coverage.enabled=false` and enforces only test correctness + a clean build.
+# (vitest.config.server.ts enforces the 80% thresholds whenever CI=true, which
+# is why coverage must be explicitly disabled for this correctness-only gate.)
 #
 # Typecheck is run as a non-blocking signal for now: the build intentionally
 # uses `tsc -b --noCheck` and frontend TS debt is tracked in #236. Flip
@@ -53,8 +61,8 @@ jobs:
         continue-on-error: true
         run: npx tsc --noEmit || echo "::warning::TypeScript reported errors (non-blocking; tracked in #236)"
 
-      - name: Server tests
-        run: npm run test:server
+      - name: Server tests (correctness only — coverage gate stays informational)
+        run: npx vitest run --config vitest.config.server.ts --coverage.enabled=false
 
       - name: Production build (frontend + server + worker bundle)
         run: npm run build:render

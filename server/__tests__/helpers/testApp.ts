@@ -45,12 +45,12 @@ export function createTestApp(): Express {
  * Generates a valid JWT token for testing.
  *
  * @param userId - The user ID to embed in the token
- * @param options - Optional email, role, and orgId
+ * @param options - Optional email, role, orgId, and tier
  * @returns A valid JWT token string
  */
 export function generateTestToken(
   userId: string = 'test-user-123',
-  options: { email?: string; role?: string; orgId?: string | null } = {}
+  options: { email?: string; role?: string; orgId?: string | null; tier?: string } = {}
 ): string {
   const payload: Record<string, unknown> = {
     sub: userId,
@@ -64,6 +64,10 @@ export function generateTestToken(
     payload.org_id = options.orgId || 'test-org'
   }
 
+  if (options.tier) {
+    payload.tier = options.tier
+  }
+
   return jwt.sign(payload, config.jwt.secret, {
     expiresIn: '1h'
   })
@@ -73,12 +77,12 @@ export function generateTestToken(
  * Creates an authorization header value for testing.
  *
  * @param userId - The user ID for the token
- * @param options - Optional email, role, and orgId
+ * @param options - Optional email, role, orgId, and tier
  * @returns Authorization header value (Bearer token)
  */
 export function createAuthHeader(
   userId: string = 'test-user-123',
-  options: { email?: string; role?: string; orgId?: string | null } = {}
+  options: { email?: string; role?: string; orgId?: string | null; tier?: string } = {}
 ): string {
   return `Bearer ${generateTestToken(userId, options)}`
 }

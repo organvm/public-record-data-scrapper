@@ -8,6 +8,7 @@ import { QualificationService } from '../services/QualificationService'
 import { UnderwritingService } from '../services/UnderwritingService'
 import type { UnderwritingFeatures } from '../services/UnderwritingService'
 import { getResolvedDataTier, type ResolvedDataTier } from '../middleware/dataTier'
+import { tierGate } from '../middleware/tierGate'
 
 const router = Router()
 
@@ -236,6 +237,7 @@ router.get(
 // POST /api/prospects - Create prospect
 router.post(
   '/',
+  tierGate,
   validateRequest({ body: createProspectSchema }),
   asyncHandler(async (req, res) => {
     const prospectsService = new ProspectsService()

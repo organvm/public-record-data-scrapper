@@ -39,9 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -52,7 +52,7 @@ jobs:
       # Apply D1 migrations to the REMOTE staging DB BEFORE deploying the Worker,
       # so the new code never goes live against an unmigrated/stale schema.
       - name: Apply D1 migrations (staging)
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -62,7 +62,7 @@ jobs:
       - name: Deploy Worker (staging)
         # TODO: SHA-pin this action (replace the tag with the commit SHA it
         # resolves to) before trusting it in production CI.
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -74,7 +74,7 @@ jobs:
       # - name: Build SPA
       #   run: npm ci && npm run build      # produces dist/ (apps/web)
       # - name: Deploy SPA to Pages
-      #   uses: cloudflare/wrangler-action@v3
+      #   uses: cloudflare/wrangler-action@v4
       #   with:
       #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -86,9 +86,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -97,7 +97,7 @@ jobs:
         run: npm ci --ignore-scripts || npm install --ignore-scripts
 
       - name: Apply D1 migrations (production)
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -106,7 +106,7 @@ jobs:
 
       - name: Deploy Worker (production)
         # TODO: SHA-pin this action before trusting it in production CI.
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

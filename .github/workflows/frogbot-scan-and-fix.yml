@@ -21,9 +21,9 @@ jobs:
   create-fix-pull-requests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
-      - uses: jfrog/frogbot@d72af9f0d44a7bd0250c4d0253a164a9a96e1202  # v2.31.1
+      - uses: jfrog/frogbot@956ef69cd15162826254736bd7c2c38a3770d3b2  # v3.2.1
         env:
           # [Mandatory if the two conditions below are met]
           # 1. The project uses npm, yarn 2, NuGet or .NET to download its dependencies

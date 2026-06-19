@@ -29,7 +29,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: 'Checkout repository'
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - name: 'Dependency Review'
         uses: actions/dependency-review-action@46a3c492319c890177366b6ef46d6b4f89743ed4
         # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.

@@ -43,11 +43,11 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Terraform
         # TODO: SHA-pin this action (could not resolve offline). Pin hashicorp/setup-terraform to a full release SHA.
-        uses: hashicorp/setup-terraform@v3.1.2
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
@@ -70,7 +70,7 @@ jobs:
 
       - name: Comment Format Check Result
         if: github.event_name == 'pull_request' && steps.fmt.outcome == 'failure'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -88,7 +88,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run tfsec
         # TODO: SHA-pin this action (could not resolve offline). Pin aquasecurity/tfsec-action to a full release SHA.
@@ -105,11 +105,11 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Terraform
         # TODO: SHA-pin this action (could not resolve offline). Pin hashicorp/setup-terraform to a full release SHA.
-        uses: hashicorp/setup-terraform@v3.1.2
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
@@ -133,7 +133,7 @@ jobs:
       - name: Comment Plan Result
         if: github.event_name == 'pull_request'
         # TODO: SHA-pin this action (could not resolve offline). actions/github-script v7.0.1
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           # Pass plan stdout via env so it is never interpolated into the JS
           # template literal (prevents script breakout via terraform output).
@@ -183,11 +183,11 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Terraform
         # TODO: SHA-pin this action (could not resolve offline). Pin hashicorp/setup-terraform to a full release SHA.
-        uses: hashicorp/setup-terraform@v3.1.2
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
@@ -243,11 +243,11 @@ jobs:
           echo "Destroy confirmed by ${{ github.actor }} on ref ${{ github.ref }}"
 
       - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Terraform
         # TODO: SHA-pin this action (could not resolve offline). Pin hashicorp/setup-terraform to a full release SHA.
-        uses: hashicorp/setup-terraform@v3.1.2
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}

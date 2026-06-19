@@ -342,6 +342,35 @@ describe('ScoringService', () => {
 
       expect(nyScore).toBeGreaterThan(baseScore)
     })
+
+    it('should add the MCA-adjacency boost additively', () => {
+      const baseInput = {
+        intentScore: 60,
+        healthScore: 60,
+        positionScore: 60
+      }
+
+      const boostedInput = {
+        ...baseInput,
+        mcaAdjacencyBoost: 10
+      }
+
+      const baseScore = service.calculateCompositeScore(baseInput)
+      const boostedScore = service.calculateCompositeScore(boostedInput)
+
+      expect(boostedScore).toBe(baseScore + 10)
+    })
+
+    it('should clamp the boost at 100', () => {
+      const score = service.calculateCompositeScore({
+        intentScore: 100,
+        healthScore: 100,
+        positionScore: 100,
+        mcaAdjacencyBoost: 10
+      })
+
+      expect(score).toBe(100)
+    })
   })
 
   describe('getGrade', () => {
@@ -460,6 +489,49 @@ describe('ScoringService', () => {
       mockQuery.mockResolvedValueOnce([])
 
       await expect(service.scoreProspect('non-existent')).rejects.toThrow()
+    })
+
+    it('should boost MCA-adjacent prospects with a recent equipment purchase', async () => {
+      const recentDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10)
+
+      const mockProspect = {
+        company_name: 'Growth Mfg Co',
+        industry: 'manufacturing',
+        state: 'CA',
+        default_date: null,
+        time_since_default: null
+      }
+
+      // Filing with equipment collateral financed by a non-MCA lender.
+      const equipmentFilings = [
+        {
+          status: 'active',
+          filing_date: recentDate,
+          secured_party: 'Balboa Capital',
+          collateral_description: 'One 2024 CNC milling machine'
+        }
+      ]
+      // Same filing but without the equipment signal (no secured party / desc).
+      const plainFilings = [{ status: 'active', filing_date: recentDate }]
+
+      // Score WITH the equipment signal.
+      mockQuery
+        .mockResolvedValueOnce([mockProspect])
+        .mockResolvedValueOnce(equipmentFilings)
+        .mockResolvedValueOnce([])
+      const boosted = await service.scoreProspect('prospect-eq')
+
+      // Score WITHOUT the equipment signal.
+      mockQuery
+        .mockResolvedValueOnce([mockProspect])
+        .mockResolvedValueOnce(plainFilings)
+        .mockResolvedValueOnce([])
+      const plain = await service.scoreProspect('prospect-eq')
+
+      expect(boosted.compositeScore).toBeGreaterThan(plain.compositeScore)
+      expect(boosted.factors.some((f) => f.name.includes('Equipment'))).toBe(true)
     })
 
     it('should handle prospect without health data', async () => {

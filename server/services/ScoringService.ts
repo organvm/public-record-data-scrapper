@@ -11,6 +11,7 @@
  */
 
 import { database } from '../database/connection'
+import { EquipmentLifecycleDetector } from './EquipmentLifecycleDetector'
 
 export interface IntentScoreInput {
   daysSinceLastFiling: number
@@ -44,6 +45,12 @@ export interface CompositeScoreInput {
   positionScore: number
   industryRiskModifier?: number
   stateModifier?: number
+  /**
+   * Additive boost (points) for MCA-adjacent signals such as a recent
+   * equipment purchase financed outside the MCA channel. Applied after
+   * multiplicative modifiers and before the 0-100 clamp.
+   */
+  mcaAdjacencyBoost?: number
 }
 
 export interface ScoringResult {
@@ -128,9 +135,11 @@ const STATE_MODIFIERS: Record<string, number> = {
 
 export class ScoringService {
   private config: ScoringConfig
+  private equipmentDetector: EquipmentLifecycleDetector
 
   constructor(config: Partial<ScoringConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config }
+    this.equipmentDetector = new EquipmentLifecycleDetector()
   }
 
   /**
@@ -291,6 +300,13 @@ export class ScoringService {
       modified *= input.stateModifier
     }
 
+    // MCA-adjacency boost is additive (points), applied after the
+    // multiplicative modifiers so a fixed +10 stays a fixed +10 regardless of
+    // industry/state scaling.
+    if (input.mcaAdjacencyBoost) {
+      modified += input.mcaAdjacencyBoost
+    }
+
     return Math.min(100, Math.max(0, Math.round(modified)))
   }
 
@@ -405,12 +421,21 @@ export class ScoringService {
       throw new Error(`Prospect not found: ${prospectId}`)
     }
 
-    // Fetch UCC filings
+    // Fetch UCC filings. We also pull secured_party and the collateral
+    // description (stored in raw_data JSONB) so the equipment-lifecycle
+    // detector can run off this single query — no extra round-trip.
     const filings = await database.query<{
       status: string
       filing_date: string
+      secured_party?: string
+      collateral_description?: string | null
     }>(
-      `SELECT uf.status, uf.filing_date
+      `SELECT uf.status, uf.filing_date, uf.secured_party,
+              COALESCE(
+                uf.raw_data->>'collateral_description',
+                uf.raw_data->>'collateral',
+                uf.raw_data->>'description'
+              ) AS collateral_description
        FROM ucc_filings uf
        JOIN prospect_ucc_filings puf ON uf.id = puf.ucc_filing_id
        WHERE puf.prospect_id = $1
@@ -497,12 +522,25 @@ export class ScoringService {
     const industryModifier = INDUSTRY_RISK_MODIFIERS[industry] || 1
     const stateModifier = STATE_MODIFIERS[state] || 1
 
+    // Detect equipment-lifecycle signals from the filings already fetched.
+    // A recent equipment purchase financed outside the MCA channel marks an
+    // MCA-adjacent prospect that warrants a score boost.
+    const equipmentSignal = this.equipmentDetector.analyzeFilings(
+      filings.map((f) => ({
+        filingDate: f.filing_date,
+        collateralDescription: f.collateral_description,
+        securedParty: f.secured_party,
+        status: f.status
+      }))
+    )
+
     const compositeScore = this.calculateCompositeScore({
       intentScore,
       healthScore,
       positionScore,
       industryRiskModifier: industryModifier,
-      stateModifier: stateModifier
+      stateModifier: stateModifier,
+      mcaAdjacencyBoost: equipmentSignal.scoreBoost
     })
 
     const grade = this.getGrade(compositeScore)
@@ -534,6 +572,15 @@ export class ScoringService {
         weight: this.config.compositePositionWeight
       }
     ]
+
+    if (equipmentSignal.isMcaAdjacent) {
+      factors.push({
+        name: 'Recent Equipment Purchase (MCA-adjacent)',
+        value: equipmentSignal.recentEquipmentFilingCount,
+        impact: 'positive',
+        weight: equipmentSignal.scoreBoost
+      })
+    }
 
     if (healthData) {
       factors.push({

@@ -5,12 +5,21 @@ import type { Express } from 'express'
 import { NotFoundError } from '../../errors'
 
 // Use vi.hoisted to ensure mocks are available when vi.mock runs
-const { mockList, mockGetById, mockCreate, mockUpdate, mockDelete } = vi.hoisted(() => ({
-  mockList: vi.fn(),
-  mockGetById: vi.fn(),
-  mockCreate: vi.fn(),
-  mockUpdate: vi.fn(),
-  mockDelete: vi.fn()
+const { mockList, mockGetById, mockCreate, mockUpdate, mockDelete, mockQuery } = vi.hoisted(
+  () => ({
+    mockList: vi.fn(),
+    mockGetById: vi.fn(),
+    mockCreate: vi.fn(),
+    mockUpdate: vi.fn(),
+    mockDelete: vi.fn(),
+    mockQuery: vi.fn()
+  })
+)
+
+vi.mock('../../database/connection', () => ({
+  database: {
+    query: mockQuery
+  }
 }))
 
 // Mock the ProspectsService
@@ -31,7 +40,7 @@ describe('Prospects API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     app = createTestApp()
-    authHeader = createAuthHeader()
+    authHeader = createAuthHeader('test-user-123', { tier: 'professional' })
   })
 
   describe('GET /api/prospects', () => {
@@ -276,6 +285,33 @@ describe('Prospects API', () => {
         })
 
       expect(response.status).toBe(400)
+    })
+
+    it('should return an upsell CTA for free users at the prospect cap', async () => {
+      mockQuery.mockResolvedValueOnce([{ count: 10 }])
+      const freeAuthHeader = createAuthHeader('free-user', { orgId: 'free-org', tier: 'free' })
+
+      const response = await request(app)
+        .post('/api/prospects')
+        .set('Authorization', freeAuthHeader)
+        .send({
+          company_name: 'Test',
+          state: 'NY',
+          industry: 'technology'
+        })
+
+      expect(response.status).toBe(402)
+      expect(response.body.error.code).toBe('TIER_UPGRADE_REQUIRED')
+      expect(response.body.error.details).toEqual(
+        expect.objectContaining({
+          reason: 'free_quota_exhausted',
+          cta: expect.objectContaining({
+            action: 'upgrade_plan',
+            href: '/pricing'
+          })
+        })
+      )
+      expect(mockCreate).not.toHaveBeenCalled()
     })
   })
 

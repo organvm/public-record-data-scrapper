@@ -1,111 +1,46 @@
-name: TypeScript/Node.js CI
+name: CI
 
 on:
-  push:
-    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main, master, develop ]
+  push:
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  ci:
+    name: Lint, Test, and Build
     runs-on: ubuntu-latest
-    continue-on-error: true
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
+    timeout-minutes: 30
+
+    env:
+      CI: true
 
     steps:
-      - name: Checkout code
-        # actions/checkout v4.3.0
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        # actions/setup-node v4.4.0
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: ${{ matrix.node-version }}
-
-      - name: Detect package manager
-        id: detect
-        run: |
-          if [ -f "pnpm-lock.yaml" ]; then
-            echo "pm=pnpm" >> $GITHUB_OUTPUT
-          elif [ -f "yarn.lock" ]; then
-            echo "pm=yarn" >> $GITHUB_OUTPUT
-          elif [ -f "package-lock.json" ] || [ -f "package.json" ]; then
-            echo "pm=npm" >> $GITHUB_OUTPUT
-          else
-            echo "pm=none" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Install pnpm
-        if: steps.detect.outputs.pm == 'pnpm'
-        run: npm install -g pnpm
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        if: steps.detect.outputs.pm != 'none'
-        # --ignore-scripts prevents untrusted PR dependency lifecycle scripts
-        # (postinstall, etc.) from achieving RCE on the CI runner.
-        run: |
-          if [ "${{ steps.detect.outputs.pm }}" == "pnpm" ]; then
-            pnpm install --ignore-scripts || true
-          elif [ "${{ steps.detect.outputs.pm }}" == "yarn" ]; then
-            yarn install --ignore-scripts || true
-          else
-            npm ci --ignore-scripts || npm install --ignore-scripts || true
-          fi
+        run: npm ci --ignore-scripts
 
-      - name: Lint with ESLint
-        continue-on-error: true
-        if: steps.detect.outputs.pm != 'none'
-        run: |
-          if [ "${{ steps.detect.outputs.pm }}" == "pnpm" ]; then
-            pnpm run lint || echo "::warning::ESLint found issues"
-          elif [ "${{ steps.detect.outputs.pm }}" == "yarn" ]; then
-            yarn lint || echo "::warning::ESLint found issues"
-          else
-            npm run lint || echo "::warning::ESLint found issues"
-          fi
+      - name: Lint
+        run: npm run lint
 
-      - name: Type check with tsc
-        continue-on-error: true
-        if: steps.detect.outputs.pm != 'none' && hashFiles('tsconfig.json') != ''
-        run: |
-          if [ -f "tsconfig.json" ]; then
-            npx tsc --noEmit || echo "::warning::TypeScript found type errors"
-          else
-            echo "::notice::No tsconfig.json found, skipping type checking"
-          fi
-
-      - name: Run tests
-        if: steps.detect.outputs.pm != 'none'
-        run: |
-          if [ "${{ steps.detect.outputs.pm }}" == "pnpm" ]; then
-            pnpm test -- --coverage || echo "::notice::No tests configured"
-          elif [ "${{ steps.detect.outputs.pm }}" == "yarn" ]; then
-            yarn test --coverage || echo "::notice::No tests configured"
-          else
-            npm test -- --coverage || echo "::notice::No tests configured"
-          fi
-
-      - name: Upload coverage to Codecov
-        if: success() && hashFiles('coverage/lcov.info') != ''
-        # TODO: SHA-pin this action (could not resolve offline). Pin codecov/codecov-action to a full release SHA.
-        uses: codecov/codecov-action@v4.6.0
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
-          flags: unittests
-          name: codecov-${{ matrix.node-version }}
+      - name: Test
+        run: npm test
 
       - name: Build
-        if: steps.detect.outputs.pm != 'none'
-        run: |
-          if [ "${{ steps.detect.outputs.pm }}" == "pnpm" ]; then
-            pnpm run build || echo "::notice::No build script configured"
-          elif [ "${{ steps.detect.outputs.pm }}" == "yarn" ]; then
-            yarn build || echo "::notice::No build script configured"
-          else
-            npm run build || echo "::notice::No build script configured"
-          fi
+        run: npm run build

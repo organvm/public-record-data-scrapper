@@ -70,10 +70,11 @@ export function PricingPage() {
       .catch(() => setStatus({ configured: false, provider: 'none' }))
   }, [])
 
-  async function handleCheckout() {
+  async function handleCheckout(tierName: string) {
     setLoading(true)
     try {
-      const res = await fetch('/api/billing/checkout', { method: 'POST' })
+      const tier = encodeURIComponent(tierName.toLowerCase())
+      const res = await fetch(`/api/billing/checkout?tier=${tier}`, { method: 'POST' })
       const data = await res.json()
       if (data.url) {
         window.location.href = data.url
@@ -121,7 +122,7 @@ export function PricingPage() {
               ))}
             </ul>
             <button
-              onClick={tier.name === 'Enterprise' ? undefined : handleCheckout}
+              onClick={tier.name === 'Enterprise' ? undefined : () => handleCheckout(tier.name)}
               disabled={loading || !status?.configured}
               style={{
                 width: '100%',

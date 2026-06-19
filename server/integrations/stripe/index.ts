@@ -58,6 +58,69 @@ export async function createCheckoutSession(
 export type SubscriptionTier = 'free' | 'starter' | 'professional' | 'enterprise'
 
 /**
+ * The paid tiers a customer can self-select at checkout. 'free' is excluded —
+ * it is the unentitled baseline, not something you purchase.
+ */
+export const CHECKOUT_TIERS = ['starter', 'professional', 'enterprise'] as const
+
+export type CheckoutTier = (typeof CHECKOUT_TIERS)[number]
+
+/**
+ * Aliases customers / the UI may send for each purchasable tier. Normalized to
+ * lower-case before lookup so casing and common synonyms resolve cleanly.
+ */
+const CHECKOUT_TIER_ALIASES: Record<string, CheckoutTier> = {
+  starter: 'starter',
+  start: 'starter',
+  basic: 'starter',
+  professional: 'professional',
+  pro: 'professional',
+  growth: 'professional',
+  enterprise: 'enterprise',
+  scale: 'enterprise',
+  business: 'enterprise'
+}
+
+/**
+ * Normalize an arbitrary requested-tier value (query param, body field) to a
+ * recognized purchasable tier, or `null` when it is missing/unrecognized.
+ */
+export function normalizeCheckoutTier(value: unknown): CheckoutTier | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) {
+    return null
+  }
+  return CHECKOUT_TIER_ALIASES[normalized] ?? null
+}
+
+/**
+ * Resolve a purchasable tier to its configured Stripe Price id. The reverse of
+ * {@link mapPriceToTier}, reading the same environment variables so the buy
+ * side and the webhook side stay in lock-step:
+ *   STRIPE_PRICE_STARTER (or STRIPE_PRICE_ID), STRIPE_PRICE_PROFESSIONAL,
+ *   STRIPE_PRICE_ENTERPRISE
+ *
+ * Returns `null` when no price is configured for the tier. Callers translate
+ * that into a 503 (tier offered but not wired up yet) so a missing env var
+ * never silently bills the wrong plan.
+ */
+export function mapTierToPrice(tier: CheckoutTier): string | null {
+  switch (tier) {
+    case 'starter':
+      return process.env.STRIPE_PRICE_STARTER || process.env.STRIPE_PRICE_ID || null
+    case 'professional':
+      return process.env.STRIPE_PRICE_PROFESSIONAL || null
+    case 'enterprise':
+      return process.env.STRIPE_PRICE_ENTERPRISE || null
+    default:
+      return null
+  }
+}
+
+/**
  * Map a Stripe Price id to an internal subscription tier.
  *
  * The mapping is configured via environment so that price ids (which differ per

@@ -1,7 +1,7 @@
 /**
  * Billing routes — Stripe checkout and webhook handling.
  *
- * POST /api/billing/checkout — create a checkout session
+ * POST /api/billing/checkout — create a checkout session (optional ?tier=)
  * POST /api/billing/webhook  — handle Stripe webhook events
  * GET  /api/billing/status   — check if billing is configured
  *
@@ -18,7 +18,9 @@ import {
   createCheckoutSession,
   constructWebhookEvent,
   isStripeConfigured,
-  mapPriceToTier
+  mapPriceToTier,
+  mapTierToPrice,
+  normalizeCheckoutTier
 } from '../integrations/stripe'
 import { database } from '../database/connection'
 
@@ -283,9 +285,25 @@ router.post(
       return
     }
 
-    const priceId = process.env.STRIPE_PRICE_ID
+    // Which plan is the customer buying? Read from the query string (the router
+    // is mounted with express.raw for the webhook, so req.body is a Buffer here,
+    // not parsed JSON). Default to 'starter' to preserve the prior single-SKU
+    // behavior, which resolves to STRIPE_PRICE_STARTER || STRIPE_PRICE_ID.
+    const requestedTier = req.query.tier ?? req.query.plan
+    const tier = requestedTier === undefined ? 'starter' : normalizeCheckoutTier(requestedTier)
+    if (!tier) {
+      res.status(400).json({
+        error: 'Unknown plan',
+        details: { requestedTier, supportedTiers: ['starter', 'professional', 'enterprise'] }
+      })
+      return
+    }
+
+    const priceId = mapTierToPrice(tier)
     if (!priceId) {
-      res.status(503).json({ error: 'No price configured' })
+      // The tier is recognized but no Stripe price is wired up for it yet —
+      // surface a 503 rather than billing the wrong plan.
+      res.status(503).json({ error: `No price configured for the ${tier} plan` })
       return
     }
 
@@ -302,7 +320,8 @@ router.post(
       successUrl: `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${baseUrl}/billing/cancel`,
       metadata: {
-        source: 'public-record-data-scrapper'
+        source: 'public-record-data-scrapper',
+        tier
       }
     })
 

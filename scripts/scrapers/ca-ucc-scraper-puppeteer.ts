@@ -13,9 +13,7 @@
 import type { Browser, Page } from 'puppeteer'
 import { BaseScraper, ScraperConfig, ScraperResult, UCCFiling } from './base-scraper'
 
-// @ts-expect-error - puppeteer-extra types are not included
 import puppeteerExtra from 'puppeteer-extra'
-// @ts-expect-error - puppeteer-extra-plugin-stealth types are not included
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 
 // Enable stealth mode

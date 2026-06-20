@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests: 3,321](https://img.shields.io/badge/tests-3%2C321%20passing-brightgreen)](https://github.com/organvm-iii-ergon/public-record-data-scrapper)
+[![Tests: 3,399](https://img.shields.io/badge/tests-3%2C399%20passing-brightgreen)](https://github.com/organvm-iii-ergon/public-record-data-scrapper)
 [![Deploy: Vercel](https://img.shields.io/badge/deploy-Vercel-black?logo=vercel)](https://public-record-data-scrapper.vercel.app)
 
 ---
@@ -150,17 +150,17 @@ public-record-data-scrapper/
 
 The Express server exposes a RESTful API documented at `/api/docs` when running.
 
-| Method  | Endpoint                   | Description                                  |
-| ------- | -------------------------- | -------------------------------------------- |
-| `GET`   | `/api/prospects`           | List prospects with filtering and pagination |
-| `GET`   | `/api/prospects/export/leads` | Export scored MCA leads as JSON or CSV |
-| `GET`   | `/api/prospects/:id`       | Prospect detail with enrichment data         |
-| `POST`  | `/api/prospects/:id/claim` | Claim a prospect for outreach                |
-| `POST`  | `/api/prospects/:id/score` | Trigger re-scoring                           |
-| `GET`   | `/api/deals`               | List deals with pipeline stage filter        |
-| `PATCH` | `/api/deals/:id/stage`     | Move deal to next pipeline stage             |
-| `POST`  | `/api/communications/send` | Send email or SMS                            |
-| `GET`   | `/api/compliance/report`   | Generate compliance report                   |
+| Method  | Endpoint                      | Description                                  |
+| ------- | ----------------------------- | -------------------------------------------- |
+| `GET`   | `/api/prospects`              | List prospects with filtering and pagination |
+| `GET`   | `/api/prospects/export/leads` | Export scored MCA leads as JSON or CSV       |
+| `GET`   | `/api/prospects/:id`          | Prospect detail with enrichment data         |
+| `POST`  | `/api/prospects/:id/claim`    | Claim a prospect for outreach                |
+| `POST`  | `/api/prospects/:id/score`    | Trigger re-scoring                           |
+| `GET`   | `/api/deals`                  | List deals with pipeline stage filter        |
+| `PATCH` | `/api/deals/:id/stage`        | Move deal to next pipeline stage             |
+| `POST`  | `/api/communications/send`    | Send email or SMS                            |
+| `GET`   | `/api/compliance/report`      | Generate compliance report                   |
 
 Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 
@@ -185,22 +185,23 @@ Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 
 ## Testing
 
-3,321 tests across 156 files, zero failures (verified). The suite is split across two runners:
+3,399 passing tests across 168 files (plus 6 skipped server tests), zero failures on a clean run (verified, branch rebased onto `main`). `npm test` runs two Vitest projects; the server suite is a third:
 
 ```bash
-npm test                       # Web suite (jsdom):   2,005 tests / 83 files
-npm run test:server            # Server suite (node):  1,316 tests / 73 files (+6 skipped)
+npm test                       # Client suites:  2,029 tests / 88 files (apps/web jsdom + root)
+npm run test:server            # Server (node):   1,370 tests / 80 files (+6 skipped)
 npm run test:coverage          # V8 coverage report (web)
 npm run test:e2e               # Playwright end-to-end (3 specs, run separately)
 ```
 
-| Suite                  | Runner         | Tests     | Files   |
-| ---------------------- | -------------- | --------- | ------- |
-| Web (`npm test`)       | Vitest + jsdom | 2,005     | 83      |
-| Server (`test:server`) | Vitest + node  | 1,316     | 73      |
-| **Total**              |                | **3,321** | **156** |
+| Suite                           | Runner         | Tests     | Files   |
+| ------------------------------- | -------------- | --------- | ------- |
+| Web — `apps/web` (`npm test`)   | Vitest + jsdom | 2,005     | 83      |
+| Web — root project (`npm test`) | Vitest         | 24        | 5       |
+| Server (`test:server`)          | Vitest + node  | 1,370     | 80      |
+| **Total**                       |                | **3,399** | **168** |
 
-Counts are reproducible from the test runners above; the previous "2,055 tests / 91 files" badge was inaccurate (and the web run had been failing on a config-glob bug + a jsdom localStorage regression, both now fixed).
+Counts are reproducible from the test runners above. The server suite carries one pre-existing, order-dependent flaky test (`outreach` briefing "cache warm") that passes in isolation and on re-run; it is unrelated to this branch. The web run's earlier config-glob bug + jsdom localStorage regression were fixed here.
 
 ---
 

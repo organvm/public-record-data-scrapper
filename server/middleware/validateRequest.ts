@@ -1,10 +1,15 @@
 import { Request, Response, NextFunction } from 'express'
 import { ZodSchema, ZodError, ZodIssue } from 'zod'
+import { createRequestLogger, logger } from '../utils/logger'
 
 interface ValidationSchemas {
   body?: ZodSchema
   query?: ZodSchema
   params?: ZodSchema
+}
+
+interface RequestWithCorrelation extends Request {
+  correlationId?: string
 }
 
 export const validateRequest = (schemas: ValidationSchemas) => {
@@ -32,6 +37,8 @@ export const validateRequest = (schemas: ValidationSchemas) => {
       next()
     } catch (error) {
       if (error instanceof ZodError) {
+        const correlationId = (req as RequestWithCorrelation).correlationId
+        const requestLogger = correlationId ? createRequestLogger(correlationId) : logger
         // Zod 4.x uses 'issues', Zod 3.x uses 'errors'
         const issues: ZodIssue[] = error.issues || []
         const errorMessages = issues.map((err) => ({
@@ -39,12 +46,22 @@ export const validateRequest = (schemas: ValidationSchemas) => {
           message: err.message
         }))
 
+        requestLogger.warn('Request validation failed', {
+          event: 'http.validation_error',
+          path: req.path,
+          method: req.method,
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          details: errorMessages
+        })
+
         return res.status(400).json({
           error: {
             message: 'Validation failed',
             code: 'VALIDATION_ERROR',
             statusCode: 400,
-            details: errorMessages
+            details: errorMessages,
+            ...(correlationId && { correlationId })
           }
         })
       }

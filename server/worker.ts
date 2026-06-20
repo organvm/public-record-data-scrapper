@@ -10,23 +10,23 @@ import { createVelocityAnalysisWorker } from './queue/workers/velocityAnalysisWo
 import { createPortalProbeWorker } from './queue/workers/portalProbeWorker'
 import { redisConnection } from './queue/connection'
 import { config } from './config'
+import { createServiceLogger } from './utils/logger'
 
 type ClosableWorker = {
   close: () => Promise<unknown>
 }
+
+const workerLogger = createServiceLogger('WorkerProcess')
 
 class WorkerProcess {
   private workers: ClosableWorker[] = []
   private shuttingDown = false
 
   async start() {
-    console.log('')
-    console.log('🔧 Starting Worker Process')
-    console.log('─────────────────────────────────────')
-    console.log(`  Environment: ${config.server.env}`)
-    console.log(`  Redis:       ${config.redis.host}:${config.redis.port}`)
-    console.log('─────────────────────────────────────')
-    console.log('')
+    workerLogger.info('Worker process starting', {
+      env: config.server.env,
+      redis: `${config.redis.host}:${config.redis.port}`
+    })
 
     try {
       // Connect to database
@@ -38,7 +38,7 @@ class WorkerProcess {
       // Start workers — one consumer per queue the scheduler enqueues into.
       // Every worker registered here is also drained by the 30s graceful
       // shutdown handler below (via the shared this.workers list).
-      console.log('Starting workers...')
+      workerLogger.info('Starting queue workers')
       this.workers.push(createIngestionWorker())
       this.workers.push(createEnrichmentWorker())
       this.workers.push(createHealthWorker())
@@ -48,13 +48,9 @@ class WorkerProcess {
       this.workers.push(createVelocityAnalysisWorker())
       this.workers.push(createPortalProbeWorker())
 
-      console.log('')
-      console.log('✓ Worker process started successfully')
-      console.log('  Workers are now processing jobs from the queues')
-      console.log('  Press Ctrl+C to stop')
-      console.log('')
+      workerLogger.info('Worker process started successfully', { workerCount: this.workers.length })
     } catch (error) {
-      console.error('Failed to start worker process:', error)
+      workerLogger.error('Failed to start worker process', toError(error))
       process.exit(1)
     }
   }
@@ -62,24 +58,23 @@ class WorkerProcess {
   async shutdown(signal?: string) {
     // Guard against duplicate SIGTERM/SIGINT triggering concurrent shutdowns.
     if (this.shuttingDown) {
-      console.log('Shutdown already in progress, ignoring duplicate signal')
+      workerLogger.warn('Shutdown already in progress, ignoring duplicate signal', { signal })
       return
     }
     this.shuttingDown = true
 
-    console.log('')
-    console.log(`Shutting down worker process${signal ? ` (${signal})` : ''}...`)
+    workerLogger.info('Worker process shutdown started', { signal })
 
     // Force exit if graceful shutdown hangs (e.g. a job won't drain in time).
     const forceExitTimer = setTimeout(() => {
-      console.error('✗ Worker graceful shutdown timed out after 30s — forcing exit')
+      workerLogger.error('Worker graceful shutdown timed out after 30s, forcing exit')
       process.exit(1)
     }, 30_000)
     forceExitTimer.unref()
 
     try {
       // Close workers (drains in-flight jobs)
-      console.log('Closing workers...')
+      workerLogger.info('Closing workers', { workerCount: this.workers.length })
       await Promise.all(this.workers.map((worker) => worker.close()))
 
       // Close queues
@@ -91,11 +86,11 @@ class WorkerProcess {
       // Disconnect from database
       await database.disconnect()
 
-      console.log('✓ Worker process shutdown complete')
+      workerLogger.info('Worker process shutdown complete')
       clearTimeout(forceExitTimer)
       process.exit(0)
     } catch (error) {
-      console.error('✗ Error during worker shutdown:', error)
+      workerLogger.error('Error during worker shutdown', toError(error))
       clearTimeout(forceExitTimer)
       process.exit(1)
     }
@@ -105,7 +100,7 @@ class WorkerProcess {
 // Start worker process
 const worker = new WorkerProcess()
 worker.start().catch((error) => {
-  console.error('Fatal error during worker startup:', error)
+  workerLogger.error('Fatal error during worker startup', toError(error))
   process.exit(1)
 })
 
@@ -119,10 +114,14 @@ process.on('SIGINT', () => {
 
 // Process-level safety nets
 process.on('unhandledRejection', (reason) => {
-  console.error('[FATAL] Unhandled promise rejection:', reason)
+  workerLogger.error('Unhandled promise rejection', toError(reason))
   void worker.shutdown('unhandledRejection')
 })
 process.on('uncaughtException', (error) => {
-  console.error('[FATAL] Uncaught exception:', error)
+  workerLogger.error('Uncaught exception', toError(error))
   void worker.shutdown('uncaughtException')
 })
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error))
+}

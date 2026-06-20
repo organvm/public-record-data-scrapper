@@ -18,6 +18,7 @@ import { orgContextMiddleware } from './middleware/orgContext'
 import { httpsRedirect } from './middleware/httpsRedirect'
 import { dataTierRouter } from './middleware/dataTier'
 import { auditMiddleware } from './middleware/auditMiddleware'
+import { createServiceLogger } from './utils/logger'
 
 // Import routes
 import prospectsRouter from './routes/prospects'
@@ -48,6 +49,8 @@ import {
 } from './queue/queues'
 import { jobScheduler } from './queue/scheduler'
 import { redisConnection } from './queue/connection'
+
+const serverLogger = createServiceLogger('Server')
 
 export class Server {
   private app: Express
@@ -228,9 +231,9 @@ export class Server {
           res.type('text/yaml').sendFile(openApiPath)
         })
 
-        console.log('[Server] Swagger UI enabled at /api/docs')
+        serverLogger.info('Swagger UI enabled', { path: '/api/docs' })
       } else {
-        console.warn('[Server] OpenAPI spec not found at', openApiPath)
+        serverLogger.warn('OpenAPI spec not found', { openApiPath })
 
         // Serve placeholder when spec is missing
         this.app.get('/api/docs', (req, res) => {
@@ -241,7 +244,7 @@ export class Server {
         })
       }
     } catch (error) {
-      console.error('[Server] Failed to load OpenAPI spec:', error)
+      serverLogger.error('Failed to load OpenAPI spec', toError(error))
 
       // Serve error message when spec fails to load
       this.app.get('/api/docs', (req, res) => {
@@ -269,7 +272,7 @@ export class Server {
     try {
       validateConfig()
     } catch (error) {
-      console.error('Configuration error:', error instanceof Error ? error.message : error)
+      serverLogger.error('Configuration validation failed', toError(error))
       process.exit(1)
     }
 
@@ -277,26 +280,26 @@ export class Server {
     try {
       await database.connect()
     } catch (error) {
-      console.error('Failed to connect to database:', error)
+      serverLogger.error('Failed to connect to database', toError(error))
       process.exit(1)
     }
 
     // Initialize telemetry persistence and hydrate from database
     initTelemetryPersistence(database)
     if (config.telemetry.skipHydration) {
-      console.warn('[telemetry] Startup hydration skipped by config')
+      serverLogger.warn('Telemetry startup hydration skipped by config')
     } else {
       const hydratedCount = await hydrateTelemetryFromDatabase({
         historyLimitPerState: config.telemetry.hydrateHistoryLimit
       })
-      console.log(`[telemetry] Hydrated ${hydratedCount} states from database`)
+      serverLogger.info('Telemetry hydrated from database', { hydratedCount })
     }
 
     // Initialize job queues
     try {
       initializeQueues()
     } catch (error) {
-      console.error('Failed to initialize job queues:', error)
+      serverLogger.error('Failed to initialize job queues', toError(error))
       process.exit(1)
     }
 
@@ -304,41 +307,38 @@ export class Server {
     try {
       await jobScheduler.start()
     } catch (error) {
-      console.error('Failed to start job scheduler:', error)
+      serverLogger.error('Failed to start job scheduler', toError(error))
       process.exit(1)
     }
 
     // Start server (retain the HTTP server handle so we can drain it on shutdown)
     this.httpServer = this.app.listen(port, host, () => {
-      console.log('')
-      console.log('🚀 UCC-MCA Intelligence API Server')
-      console.log('─────────────────────────────────────')
-      console.log(`  Environment: ${config.server.env}`)
-      console.log(`  Server:      http://${host}:${port}`)
-      console.log(`  Health:      http://${host}:${port}/api/health`)
-      console.log(`  Jobs:        http://${host}:${port}/api/jobs`)
-      console.log(`  Database:    ${this.maskConnectionString(config.database.url)}`)
-      console.log(`  Redis:       ${config.redis.host}:${config.redis.port}`)
-      console.log(`  Docs:        http://${host}:${port}/api/docs`)
-      console.log('─────────────────────────────────────')
-      console.log('')
+      serverLogger.info('Server started', {
+        env: config.server.env,
+        host,
+        port,
+        healthUrl: `http://${host}:${port}/api/health`,
+        jobsUrl: `http://${host}:${port}/api/jobs`,
+        docsUrl: `http://${host}:${port}/api/docs`,
+        database: this.maskConnectionString(config.database.url),
+        redis: `${config.redis.host}:${config.redis.port}`
+      })
     })
   }
 
   async shutdown(signal?: string): Promise<void> {
     // Guard against repeated SIGTERM/SIGINT triggering concurrent shutdowns.
     if (this.shuttingDown) {
-      console.log('Shutdown already in progress, ignoring duplicate signal')
+      serverLogger.warn('Shutdown already in progress, ignoring duplicate signal', { signal })
       return
     }
     this.shuttingDown = true
 
-    console.log('')
-    console.log(`Shutting down server${signal ? ` (${signal})` : ''}...`)
+    serverLogger.info('Server shutdown started', { signal })
 
     // Force exit if graceful shutdown hangs (e.g. a connection won't drain).
     const forceExitTimer = setTimeout(() => {
-      console.error('✗ Graceful shutdown timed out after 30s — forcing exit')
+      serverLogger.error('Graceful shutdown timed out after 30s, forcing exit')
       process.exit(1)
     }, 30_000)
     forceExitTimer.unref()
@@ -366,11 +366,11 @@ export class Server {
       // Disconnect from database
       await database.disconnect()
 
-      console.log('✓ Server shutdown complete')
+      serverLogger.info('Server shutdown complete')
       clearTimeout(forceExitTimer)
       process.exit(0)
     } catch (error) {
-      console.error('✗ Error during shutdown:', error)
+      serverLogger.error('Error during shutdown', toError(error))
       clearTimeout(forceExitTimer)
       process.exit(1)
     }
@@ -401,7 +401,7 @@ const invokedDirectly = process.argv[1] === fileURLToPath(import.meta.url)
 if (invokedDirectly) {
   const server = new Server()
   server.start().catch((error) => {
-    console.error('Fatal error during server startup:', error)
+    serverLogger.error('Fatal error during server startup', toError(error))
     process.exit(1)
   })
 
@@ -417,13 +417,17 @@ if (invokedDirectly) {
   // Process-level safety nets: log loudly and shut down cleanly rather than
   // leaving the process in an undefined state.
   process.on('unhandledRejection', (reason) => {
-    console.error('[FATAL] Unhandled promise rejection:', reason)
+    serverLogger.error('Unhandled promise rejection', toError(reason))
     void server.shutdown('unhandledRejection')
   })
   process.on('uncaughtException', (error) => {
-    console.error('[FATAL] Uncaught exception:', error)
+    serverLogger.error('Uncaught exception', toError(error))
     void server.shutdown('uncaughtException')
   })
 }
 
 export default Server
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error))
+}

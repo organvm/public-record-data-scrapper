@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express'
 import { config } from '../config'
 import { ServiceError, isServiceError } from '../errors'
+import { createRequestLogger, logger } from '../utils/logger'
 
 // Extended request type with correlation ID
 interface RequestWithCorrelation extends Request {
@@ -9,8 +10,11 @@ interface RequestWithCorrelation extends Request {
 
 export interface AppError extends Error {
   statusCode?: number
+  status?: number
   code?: string
   details?: Record<string, unknown>
+  type?: string
+  body?: unknown
 }
 
 export class HttpError extends Error implements AppError {
@@ -33,19 +37,36 @@ export const errorHandler = (
   _next: NextFunction
 ) => {
   const correlationId = req.correlationId
+  const requestLogger = correlationId ? createRequestLogger(correlationId) : logger
+
+  if (isJsonParseError(err)) {
+    requestLogger.warn('Invalid JSON request body', {
+      event: 'http.validation_error',
+      path: req.path,
+      method: req.method,
+      statusCode: 400,
+      code: 'INVALID_JSON'
+    })
+
+    return res.status(400).json({
+      error: {
+        message: 'Malformed JSON request body',
+        code: 'INVALID_JSON',
+        statusCode: 400,
+        ...(correlationId && { correlationId })
+      }
+    })
+  }
 
   // Handle ServiceError instances with rich error info
   if (isServiceError(err)) {
-    console.error('[ERROR]', {
-      timestamp: new Date().toISOString(),
+    requestLogger.error('Request failed with service error', err, {
+      event: 'http.error',
       path: req.path,
       method: req.method,
       statusCode: err.statusCode,
       code: err.code,
-      message: err.message,
-      details: err.details,
-      stack: config.server.env === 'development' ? err.stack : undefined,
-      correlationId
+      details: err.details
     })
 
     return res.status(err.statusCode).json({
@@ -64,19 +85,17 @@ export const errorHandler = (
   // errors that may carry internal details in their message, so in production
   // we mask the message regardless of statusCode. Only ServiceError instances
   // (handled above) are considered "safe to surface" client errors.
-  const statusCode = err.statusCode || 500
+  const statusCode = err.statusCode || err.status || 500
   const rawMessage = err.message || 'Internal Server Error'
   const isProduction = config.server.env === 'production'
 
   // Log error - omit stack trace in production
-  console.error('[ERROR]', {
-    timestamp: new Date().toISOString(),
+  requestLogger.error('Request failed with unexpected error', err, {
+    event: 'http.error',
     path: req.path,
     method: req.method,
     statusCode,
-    message: rawMessage,
-    stack: config.server.env === 'development' ? err.stack : undefined,
-    correlationId
+    code: err.code || 'INTERNAL_ERROR'
   })
 
   // In production, never leak the raw message of an unknown error. For client
@@ -86,7 +105,9 @@ export const errorHandler = (
   let responseMessage: string
   if (isProduction) {
     responseMessage =
-      statusCode >= 400 && statusCode < 500 ? 'Request could not be processed' : 'Internal Server Error'
+      statusCode >= 400 && statusCode < 500
+        ? 'Request could not be processed'
+        : 'Internal Server Error'
   } else {
     responseMessage = rawMessage
   }
@@ -104,13 +125,28 @@ export const errorHandler = (
 }
 
 export const notFoundHandler = (req: Request, res: Response) => {
+  const correlationId = (req as RequestWithCorrelation).correlationId
+
   res.status(404).json({
     error: {
       message: `Route ${req.method} ${req.path} not found`,
       code: 'NOT_FOUND',
-      statusCode: 404
+      statusCode: 404,
+      ...(correlationId && { correlationId })
     }
   })
+}
+
+function isJsonParseError(err: AppError | ServiceError): boolean {
+  if (!(err instanceof SyntaxError)) {
+    return false
+  }
+
+  const candidate = err as AppError
+  return (
+    (candidate.statusCode === 400 || candidate.status === 400) &&
+    (candidate.type === 'entity.parse.failed' || 'body' in candidate)
+  )
 }
 
 // Async error wrapper

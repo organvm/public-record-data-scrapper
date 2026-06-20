@@ -11,9 +11,16 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Pin discovery to this app's own root and source tree. Without this, a
+    // root-level `vitest` invocation lets the default `**/*.{test,spec}` glob
+    // escape into sibling workspaces (notably the node-environment server
+    // suite), producing spurious failures. Keep the web run hermetic.
+    root: __dirname,
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     setupFiles: [resolve(__dirname, 'src/test/setup.ts')],
     exclude: [
       'node_modules/**',
+      'dist/**',
       '**/tests/e2e/**' // Playwright E2E tests are run separately
     ],
     coverage: {

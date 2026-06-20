@@ -68,7 +68,7 @@ Direct prominent links at the top of README.md:
 - Embedded HTML5 video player
 - Direct download button
 - Live demo launch button
-- Platform statistics display (526 tests, 60+ AI agents, 50 states, 100% coverage)
+- Platform statistics display (3,321 tests, 4 state collectors, 8 enrichment sources, 0 critical/high CVEs)
 - Professional gradient design
 - Fully responsive layout
 
@@ -90,22 +90,22 @@ README.md                          # Updated with prominent links
 
 ### 4. Access Points Summary
 
-| Location      | Type            | Link/Path                                          |
-| ------------- | --------------- | -------------------------------------------------- |
-| README Header | Direct Link     | `./public/videos/EXECUTIVE_VIDEO_SCRIPT.mp4`       |
-| README Header | Live Demo       | `https://public-record-data-scrapper.vercel.app`   |
-| In-App Banner | Download Button | `/public/videos/EXECUTIVE_VIDEO_SCRIPT.mp4`        |
-| In-App Banner | Access Page     | `/access.html`                                     |
-| Access Page   | Video Player    | Embedded with `/videos/EXECUTIVE_VIDEO_SCRIPT.mp4` |
-| Access Page   | Demo Button     | `/` (main app)                                     |
+| Location      | Type            | Link/Path                                                                                                                                  |
+| ------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| README Header | Direct Link     | `./public/videos/EXECUTIVE_VIDEO_SCRIPT.mp4`                                                                                               |
+| README Header | SPA Demo        | `https://public-record-data-scrapper.vercel.app` (UI + synthetic data; real `/api` backend requires deployment — see `docs/DEPLOYMENT.md`) |
+| In-App Banner | Download Button | `/public/videos/EXECUTIVE_VIDEO_SCRIPT.mp4`                                                                                                |
+| In-App Banner | Access Page     | `/access.html`                                                                                                                             |
+| Access Page   | Video Player    | Embedded with `/videos/EXECUTIVE_VIDEO_SCRIPT.mp4`                                                                                         |
+| Access Page   | Demo Button     | `/` (main app)                                                                                                                             |
 
 ### 5. Deployment Status
 
 - ✅ Video file committed (4.1 MB)
 - ✅ All UI components created
 - ✅ README updated
-- ✅ Build successful (9.2s)
-- ✅ Zero vulnerabilities
+- ✅ Build successful (web + server bundle)
+- ✅ 0 critical / 0 high dependency vulnerabilities (17 moderate remain, confined to the Expo/React-Native mobile toolchain — see evidence ledger)
 - ✅ No lint errors
 - ✅ Type-safe components
 - ✅ Ready for auto-deployment via Vercel

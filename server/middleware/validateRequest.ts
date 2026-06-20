@@ -15,11 +15,19 @@ export const validateRequest = (schemas: ValidationSchemas) => {
         req.body = schemas.body.parse(req.body)
       }
 
-      // Validate query - use Object.assign to avoid getter-only property issue
+      // Validate query. In Express 5 `req.query` is a getter with no setter that
+      // re-derives the parsed querystring on each access, so mutating it in place
+      // (delete + Object.assign) does not persist — downstream handlers would read
+      // the raw, un-coerced values. Redefine it as an own data property holding the
+      // parsed/coerced result so the schema's transforms actually take effect.
       if (schemas.query) {
         const parsedQuery = schemas.query.parse(req.query)
-        Object.keys(req.query).forEach((key) => delete req.query[key])
-        Object.assign(req.query, parsedQuery)
+        Object.defineProperty(req, 'query', {
+          value: parsedQuery,
+          writable: true,
+          enumerable: true,
+          configurable: true
+        })
       }
 
       // Validate params - use Object.assign to avoid getter-only property issue

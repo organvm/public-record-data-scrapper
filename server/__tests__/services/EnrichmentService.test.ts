@@ -17,40 +17,20 @@ const sourceMocks = vi.hoisted(() => ({
   census: vi.fn()
 }))
 
-vi.mock('@public-records/core/enrichment', () => {
-  // Keyed/commercial sources default to NOT configured in the test env (no API
-  // keys), so EnrichmentService filters them out and behaves exactly as the
-  // free-source-only pipeline. The configured path is covered separately by
-  // injecting a fake keyed source via the constructor.
-  const makeKeyed = (name: string) =>
-    class {
-      getConfig() {
-        return { name }
-      }
-      isConfigured() {
-        return false
-      }
-      fetchData = vi.fn()
-    }
-  return {
-    SECEdgarSource: class {
-      fetchData = sourceMocks.sec
-    },
-    OSHASource: class {
-      fetchData = sourceMocks.osha
-    },
-    USPTOSource: class {
-      fetchData = sourceMocks.uspto
-    },
-    CensusSource: class {
-      fetchData = sourceMocks.census
-    },
-    SAMGovSource: makeKeyed('sam-gov'),
-    DnBSource: makeKeyed('dnb'),
-    ClearbitSource: makeKeyed('clearbit'),
-    ZoomInfoSource: makeKeyed('zoominfo')
+vi.mock('@public-records/core/enrichment', () => ({
+  SECEdgarSource: class {
+    fetchData = sourceMocks.sec
+  },
+  OSHASource: class {
+    fetchData = sourceMocks.osha
+  },
+  USPTOSource: class {
+    fetchData = sourceMocks.uspto
+  },
+  CensusSource: class {
+    fetchData = sourceMocks.census
   }
-})
+}))
 
 // Mock the queue accessor used by getQueueStatus.
 const queueMocks = vi.hoisted(() => ({
@@ -220,80 +200,6 @@ describe('EnrichmentService', () => {
         /INSERT INTO enrichment_logs/.test(String(c[0]))
       )
       expect(logCall?.[1]?.[1]).toBe('failed')
-    })
-
-    it('queries a configured keyed source and uses its firmographic revenue', async () => {
-      withProspect()
-      // Free sources succeed but Census returns no payroll (so revenue would be 0
-      // without a keyed source).
-      sourceMocks.sec.mockResolvedValue(ok('sec-edgar', { cik: '123', filings: [] }))
-      sourceMocks.osha.mockResolvedValue(
-        ok('osha', { violations: 0, totalPenalties: 0, recentViolations: [] })
-      )
-      sourceMocks.uspto.mockResolvedValue(ok('uspto', { trademarkCount: 0, trademarks: [] }))
-      sourceMocks.census.mockResolvedValue(
-        ok('census', { businessCount: 10, totalEmployees: 100, totalPayroll: 0 })
-      )
-
-      // Inject a configured keyed source (e.g. D&B) returning real firmographics.
-      const keyedFetch = vi
-        .fn()
-        .mockResolvedValue(
-          ok('dnb', { annualRevenue: 4200000, industry: 'Construction', creditRating: '2A2' })
-        )
-      const keyedSource = {
-        getConfig: () => ({ name: 'dnb' }),
-        isConfigured: () => true,
-        fetchData: keyedFetch
-      }
-      const keyedService = new EnrichmentService({ keyedSources: [keyedSource] })
-
-      const result = await keyedService.enrichProspect('prospect-1')
-
-      // The keyed source was queried and counts toward coverage/confidence.
-      expect(keyedFetch).toHaveBeenCalledWith(
-        expect.objectContaining({ companyName: 'Test Corp', state: 'CA' })
-      )
-      expect(result.data_sources_used).toContain('dnb')
-      expect(result.confidence).toBeCloseTo(1, 5) // 5 of 5 sources succeeded
-      // Commercial revenue is preferred over the (zero) Census proxy.
-      expect(result.estimated_revenue).toBe(4200000)
-      expect(result.industry_classification).toBe('Construction')
-
-      // estimated_revenue persisted to the prospect from the keyed figure.
-      const updateCall = mockQuery.mock.calls.find((c) =>
-        /UPDATE prospects[\s\S]*estimated_revenue/.test(String(c[0]))
-      )
-      expect(updateCall?.[1]?.[2]).toBe(4200000)
-    })
-
-    it('skips keyed sources that are not configured (no effect on confidence)', async () => {
-      withProspect()
-      sourceMocks.sec.mockResolvedValue(ok('sec-edgar', { cik: '123', filings: [] }))
-      sourceMocks.osha.mockResolvedValue(
-        ok('osha', { violations: 0, totalPenalties: 0, recentViolations: [] })
-      )
-      sourceMocks.uspto.mockResolvedValue(ok('uspto', { trademarkCount: 0, trademarks: [] }))
-      sourceMocks.census.mockResolvedValue(
-        ok('census', { businessCount: 10, totalEmployees: 100, totalPayroll: 99 })
-      )
-
-      const keyedFetch = vi.fn()
-      const unconfigured = {
-        getConfig: () => ({ name: 'clearbit' }),
-        isConfigured: () => false,
-        fetchData: keyedFetch
-      }
-      // Default constructor filters by isConfigured(); emulate that filter here.
-      const keyedService = new EnrichmentService({
-        keyedSources: [unconfigured].filter((s) => s.isConfigured())
-      })
-
-      const result = await keyedService.enrichProspect('prospect-1')
-
-      expect(keyedFetch).not.toHaveBeenCalled()
-      expect(result.data_sources_used).not.toContain('clearbit')
-      expect(result.confidence).toBeCloseTo(1, 5) // still just the 4 free sources
     })
 
     it('throws and queries no sources for a non-existent prospect', async () => {

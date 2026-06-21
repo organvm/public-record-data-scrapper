@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../config'
+import { createHash } from 'crypto'
+import { database } from '../database/connection'
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -119,7 +121,7 @@ function getVerifyOptions(): jwt.VerifyOptions {
  * Validates Bearer token from Authorization header.
  * Adds user info to request object if valid.
  */
-export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization
 
   if (!authHeader) {
@@ -138,6 +140,46 @@ export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: N
   }
 
   const token = parts[1]
+
+  if (token.startsWith('ucc_')) {
+    try {
+      const keyHash = createHash('sha256').update(token).digest('hex')
+      const result = await database.query(
+        `SELECT id, org_id, name, scopes FROM api_keys WHERE key_hash = $1 AND is_active = true`,
+        [keyHash]
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Invalid or revoked API key'
+        })
+      }
+
+      const apiKeyRecord = result.rows[0]
+      
+      // Update last_used_at without awaiting to not block the request
+      database.query(
+        `UPDATE api_keys SET last_used_at = NOW() WHERE id = $1`,
+        [apiKeyRecord.id]
+      ).catch(err => console.error('Failed to update API key last_used_at:', err))
+
+      req.user = {
+        id: `apikey_${apiKeyRecord.id}`,
+        orgId: apiKeyRecord.org_id,
+        role: 'api_client',
+        tier: 'enterprise' // API keys bypass tier limits or inherit org tier
+      }
+
+      return next()
+    } catch (error) {
+      console.error('API Key verification error:', error)
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to authenticate API key'
+      })
+    }
+  }
 
   try {
     const decoded = jwt.verify(token, config.jwt.secret, getVerifyOptions()) as JwtPayload
@@ -171,7 +213,7 @@ export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: N
  * Optional authentication middleware.
  * Adds user info to request if valid token provided, but doesn't require it.
  */
-export const optionalAuthMiddleware = (
+export const optionalAuthMiddleware = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
@@ -188,6 +230,29 @@ export const optionalAuthMiddleware = (
   }
 
   const token = parts[1]
+
+  if (token.startsWith('ucc_')) {
+    try {
+      const keyHash = createHash('sha256').update(token).digest('hex')
+      const result = await database.query(
+        `SELECT id, org_id, name, scopes FROM api_keys WHERE key_hash = $1 AND is_active = true`,
+        [keyHash]
+      )
+
+      if (result.rows.length > 0) {
+        const apiKeyRecord = result.rows[0]
+        req.user = {
+          id: `apikey_${apiKeyRecord.id}`,
+          orgId: apiKeyRecord.org_id,
+          role: 'api_client',
+          tier: 'enterprise'
+        }
+      }
+    } catch {
+      // Ignore errors for optional auth
+    }
+    return next()
+  }
 
   try {
     const decoded = jwt.verify(token, config.jwt.secret, getVerifyOptions()) as JwtPayload

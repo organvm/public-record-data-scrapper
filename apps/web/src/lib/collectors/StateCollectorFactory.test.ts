@@ -48,10 +48,8 @@ describe('StateCollectorFactory', () => {
       expect(collector).toBeUndefined()
     })
 
-    it('should fail closed for credential-gated NY without seeds configured', () => {
-      // NY uses the portal scraper but is gated on NY_UCC_DEBTOR_SEEDS, which is
-      // not set in the test env, so the collector reports isReady()=false and the
-      // factory withholds it (mirrors the FL active-contract gate).
+    it('should return undefined for states with no access methods', () => {
+      // NY has empty accessMethods array
       const collector = factory.getCollector('NY')
       expect(collector).toBeUndefined()
     })
@@ -113,12 +111,12 @@ describe('StateCollectorFactory', () => {
     it('should list all implemented states including those needing config', () => {
       const implemented = factory.getImplementedStates()
 
-      // CA, TX, FL, NY all have collector implementations. FL and NY are
-      // credential-gated (active contract / NY_UCC_DEBTOR_SEEDS) and fail closed
-      // when unconfigured, but they are still "implemented" — the collection
-      // code exists and is tested.
-      expect(implemented.length).toBe(4) // CA, TX, FL, NY
-      expect(implemented).toContain('NY')
+      // NY is intentionally excluded: it has empty accessMethods and no
+      // collector implementation, so getCollector('NY') returns undefined.
+      // Keeping it out of the implemented list keeps hasCollector()/
+      // getImplementedStates()/getCollector() consistent (no null-deref).
+      expect(implemented.length).toBe(3) // CA, TX, FL
+      expect(implemented).not.toContain('NY')
       expect(implemented).toContain('CA')
       expect(implemented).toContain('TX')
       expect(implemented).toContain('FL')
@@ -219,18 +217,18 @@ describe('StateCollectorFactory', () => {
     it('should track implemented states', () => {
       const stats = factory.getStats()
 
-      expect(stats.implemented).toBe(4) // CA, TX, FL, NY
+      expect(stats.implemented).toBe(3) // CA, TX, FL (NY has no collector)
       expect(stats.implementedStates).toContain('CA')
       expect(stats.implementedStates).toContain('TX')
       expect(stats.implementedStates).toContain('FL')
-      expect(stats.implementedStates).toContain('NY')
+      expect(stats.implementedStates).not.toContain('NY')
     })
 
     it('should track pending states', () => {
       const stats = factory.getStats()
 
-      expect(stats.pending).toBe(47) // 51 - 4
-      expect(stats.pendingStates.length).toBe(47)
+      expect(stats.pending).toBe(48) // 51 - 3
+      expect(stats.pendingStates.length).toBe(48)
     })
   })
 
@@ -247,10 +245,10 @@ describe('StateCollectorFactory', () => {
       expect(config).toBeUndefined()
     })
 
-    it('should report NY uses the scrape access method', () => {
+    it('should report NY has no access methods', () => {
       const nyConfig = factory.getStateConfig('NY')
       expect(nyConfig).toBeDefined()
-      expect(nyConfig?.accessMethods).toContain('scrape')
+      expect(nyConfig?.accessMethods).toHaveLength(0)
     })
 
     it('should report FL requires vendor agreement', () => {

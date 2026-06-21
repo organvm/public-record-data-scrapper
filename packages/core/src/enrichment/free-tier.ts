@@ -13,7 +13,6 @@
  */
 
 import { BaseDataSource, DataSourceResponse } from './base-source'
-import { readEnv, notConfiguredResponse } from './credentials'
 
 /**
  * SEC EDGAR API - Company filings and financial data
@@ -209,18 +208,10 @@ export class CensusSource extends BaseDataSource {
 }
 
 /**
- * SAM.gov Entity Management API — federal contractor registration.
- *
- * SAM.gov's public Entity Management API requires a free api.data.gov key
- * (`SAM_GOV_API_KEY`); unauthenticated requests are rejected (HTTP 403/429). The
- * key is passed via the optional constructor arg or the env var. When no key is
- * configured the source reports `isConfigured() === false` so callers can skip
- * it rather than issue a request that is guaranteed to fail.
+ * SAM.gov Federal Contracts API - Government contract awards
  */
 export class SAMGovSource extends BaseDataSource {
-  private readonly apiKey: string
-
-  constructor(apiKey?: string) {
+  constructor() {
     super({
       name: 'sam-gov',
       tier: 'free',
@@ -229,30 +220,14 @@ export class SAMGovSource extends BaseDataSource {
       retryAttempts: 3,
       retryDelay: 1000
     })
-    this.apiKey = (apiKey ?? readEnv('SAM_GOV_API_KEY')).trim()
-  }
-
-  /** Whether a usable API key is present. */
-  isConfigured(): boolean {
-    return this.apiKey.length > 0
   }
 
   async fetchData(query: Record<string, unknown>): Promise<DataSourceResponse> {
-    if (!this.isConfigured()) {
-      return notConfiguredResponse(
-        this.config.name,
-        'SAM.gov API key not configured (set SAM_GOV_API_KEY — a free api.data.gov key)'
-      )
-    }
-
     return this.executeFetch(async () => {
       const companyName = typeof query.companyName === 'string' ? query.companyName : ''
 
-      // SAM.gov entity information API (api.data.gov key required).
-      const searchUrl =
-        `https://api.sam.gov/entity-information/v3/entities` +
-        `?api_key=${encodeURIComponent(this.apiKey)}` +
-        `&legalBusinessName=${encodeURIComponent(companyName)}`
+      // SAM.gov entity information API
+      const searchUrl = `https://api.sam.gov/entity-information/v3/entities?legalBusinessName=${encodeURIComponent(companyName)}`
 
       const response = await fetch(searchUrl)
 

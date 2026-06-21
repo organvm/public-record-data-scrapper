@@ -133,10 +133,7 @@ const batchDeleteBodySchema = z.object({
 const scoreBodySchema = z
   .object({
     industry: z.string().optional(),
-    state: z.string().length(2).optional(),
-    // Opt-in: also compute the experimental, supplementary ML score. The
-    // rules-based composite remains the persisted, authoritative priority_score.
-    includeMl: z.boolean().optional()
+    state: z.string().length(2).optional()
   })
   .optional()
 
@@ -425,16 +422,11 @@ router.post(
       })
     }
 
-    const body = (req.body ?? {}) as {
-      industry?: string
-      state?: string
-      includeMl?: boolean
-    }
+    const body = (req.body ?? {}) as { industry?: string; state?: string }
     const scoringService = new ScoringService()
     const result = await scoringService.scoreProspect(req.params.id, {
       industry: body.industry,
-      state: body.state,
-      includeMl: body.includeMl === true
+      state: body.state
     })
 
     // Persist the live-computed composite as the canonical priority_score plus

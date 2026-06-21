@@ -107,11 +107,9 @@ export class RateLimiterManager {
       osha: { maxTokens: 5, refillRate: 1, refillInterval: 1000 }, // 1 req/sec
       uspto: { maxTokens: 5, refillRate: 1, refillInterval: 1000 }, // 1 req/sec
       census: { maxTokens: 5, refillRate: 1, refillInterval: 1000 }, // 1 req/sec
-      'sam-gov': { maxTokens: 5, refillRate: 1, refillInterval: 1000 }, // 1 req/sec (keyed)
       dnb: { maxTokens: 10, refillRate: 2, refillInterval: 1000 }, // 2 req/sec
       'google-places': { maxTokens: 50, refillRate: 10, refillInterval: 1000 }, // 10 req/sec
       clearbit: { maxTokens: 10, refillRate: 1, refillInterval: 1000 }, // 1 req/sec
-      zoominfo: { maxTokens: 10, refillRate: 1, refillInterval: 1000 }, // 1 req/sec
       'scraper-ca': { maxTokens: 5, refillRate: 5, refillInterval: 60000 }, // 5 req/min
       'scraper-tx': { maxTokens: 5, refillRate: 5, refillInterval: 60000 }, // 5 req/min
       'scraper-fl': { maxTokens: 5, refillRate: 5, refillInterval: 60000 } // 5 req/min

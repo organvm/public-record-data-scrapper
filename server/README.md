@@ -366,11 +366,26 @@ REDIS_PASSWORD=your-password
 - Rate limiting
 - Input validation (Zod)
 - SQL injection prevention (parameterized queries)
+- JWT authentication
+- API key authentication
+
+### API Key Authentication
+
+API Keys can be generated using the CLI script. The keys are hashed and stored securely in the `api_keys` database table.
+You can issue a new API key for a specific organization by running:
+
+```bash
+npx tsx scripts/issue-api-key.ts --org <org_id> --name "My API Key"
+```
+
+This will generate an API key prefixed with `ucc_`. You must include this key in the `Authorization` header when making API requests:
+
+```http
+Authorization: Bearer ucc_xxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
 ### Planned (Phase 4)
 
-- JWT authentication
-- API key authentication
 - Role-based access control (RBAC)
 - Data encryption
 - Audit logging

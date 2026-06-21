@@ -44,7 +44,7 @@ describe('server config', () => {
   describe('validateConfig', () => {
     const productionEnv = {
       NODE_ENV: 'production',
-      JWT_SECRET: 'example-test-jwt-secret-do-not-use',
+      JWT_SECRET: 'test-jwt-secret-that-is-long-enough',
       DATABASE_URL: 'postgresql://app_user:secret@db.example.com:5432/app',
       CORS_ORIGIN: 'https://app.example.com',
       STRIPE_WEBHOOK_SECRET: 'whsec_test',

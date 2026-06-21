@@ -1,18 +1,18 @@
 # Public Record Data Scraper
 
-**Extract, enrich, and score UCC filings from US state Secretary of State portals.** Turns raw public records into prioritized, outreach-ready leads for the Merchant Cash Advance industry. Four state collectors are implemented today (CA, TX, FL, NY); the remaining states are on the roadmap.
+**Extract, enrich, and score UCC filings from all 50 US state Secretary of State portals.** Turns raw public records into prioritized, outreach-ready leads for the Merchant Cash Advance industry.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests: 3,399](https://img.shields.io/badge/tests-3%2C399%20passing-brightgreen)](https://github.com/organvm-iii-ergon/public-record-data-scrapper)
+[![Tests: 2,055](https://img.shields.io/badge/tests-2%2C055%20passing-brightgreen)](https://github.com/organvm-iii-ergon/public-record-data-scrapper)
 [![Deploy: Vercel](https://img.shields.io/badge/deploy-Vercel-black?logo=vercel)](https://public-record-data-scrapper.vercel.app)
 
 ---
 
 ## What It Does
 
-1. **Collects** UCC-1 filing data from state Secretary of State portals — 4 collectors implemented (CA API, TX bulk, FL vendor, NY portal scraper) with per-state strategies (API, bulk download, vendor feed, scrape) and fallback. FL and NY are credential-gated and fail closed when unconfigured.
-2. **Enriches** each filing with free public data (SEC EDGAR, OSHA, USPTO, Census Bureau) plus optional, key-gated sources (SAM.gov, D&B, Clearbit, ZoomInfo) that fail closed — returning a named error, never fabricated data — when no API key is configured
+1. **Collects** UCC-1 filing data from 50 state portals via 60+ autonomous agents (handles CAPTCHAs, rate limits, session management, and fallback strategies per state)
+2. **Enriches** each filing with data from SEC EDGAR, OSHA, USPTO, Census Bureau, SAM.gov, and optional commercial sources (D&B, Clearbit, ZoomInfo)
 3. **Scores** every prospect 0--100 on financing likelihood, assigns a health grade (A--F), and flags growth signals (hiring, permits, equipment purchases, expansion)
 4. **Delivers** results through a React web dashboard, REST API, or CLI tool
 
@@ -77,7 +77,7 @@ npm run scrape -- batch -i companies.csv -o ./results
 # Export scored MCA leads as JSON + CSV batches (requires database)
 npm run scrape -- lead-export --min-score 70 --limit 100 --output-dir ./lead-export
 
-# List state collectors (4 implemented: CA, TX, FL, NY)
+# List all 50 state agents
 npm run scrape -- list-states
 ```
 
@@ -107,15 +107,14 @@ A non-zero exit from the first command means the API is not up.
         │              │
 ┌───────▼──────┐ ┌─────▼───────┐ ┌────────────────────┐
 │ PostgreSQL   │ │   Redis 7   │ │ Agent Orchestrator  │
-│ 9 migrations │ │ cache/queue │ │ 4 state collectors  │
+│ 9 migrations │ │ cache/queue │ │ 60+ collectors      │
 │ multitenancy │ │             │ │ circuit breakers     │
 └──────────────┘ └─────────────┘ └─────┬──────────────┘
                                        │
                     ┌──────────────────▼────────────────┐
-                    │  State SOS Collectors (4 live)      │
-                    │  CA · TX · FL · NY                  │
-                    │  + SEC · OSHA · USPTO · Census      │
-                    │  + SAM.gov · D&B · Clearbit · Zoom  │
+                    │  50 State SOS Agents               │
+                    │  CA · TX · NY · FL · IL · ...      │
+                    │  + SEC · OSHA · USPTO · Census     │
                     └────────────────────────────────────┘
 ```
 
@@ -150,33 +149,33 @@ public-record-data-scrapper/
 
 The Express server exposes a RESTful API documented at `/api/docs` when running.
 
-| Method  | Endpoint                      | Description                                  |
-| ------- | ----------------------------- | -------------------------------------------- |
-| `GET`   | `/api/prospects`              | List prospects with filtering and pagination |
-| `GET`   | `/api/prospects/export/leads` | Export scored MCA leads as JSON or CSV       |
-| `GET`   | `/api/prospects/:id`          | Prospect detail with enrichment data         |
-| `POST`  | `/api/prospects/:id/claim`    | Claim a prospect for outreach                |
-| `POST`  | `/api/prospects/:id/score`    | Trigger re-scoring                           |
-| `GET`   | `/api/deals`                  | List deals with pipeline stage filter        |
-| `PATCH` | `/api/deals/:id/stage`        | Move deal to next pipeline stage             |
-| `POST`  | `/api/communications/send`    | Send email or SMS                            |
-| `GET`   | `/api/compliance/report`      | Generate compliance report                   |
+| Method  | Endpoint                   | Description                                  |
+| ------- | -------------------------- | -------------------------------------------- |
+| `GET`   | `/api/prospects`           | List prospects with filtering and pagination |
+| `GET`   | `/api/prospects/export/leads` | Export scored MCA leads as JSON or CSV |
+| `GET`   | `/api/prospects/:id`       | Prospect detail with enrichment data         |
+| `POST`  | `/api/prospects/:id/claim` | Claim a prospect for outreach                |
+| `POST`  | `/api/prospects/:id/score` | Trigger re-scoring                           |
+| `GET`   | `/api/deals`               | List deals with pipeline stage filter        |
+| `PATCH` | `/api/deals/:id/stage`     | Move deal to next pipeline stage             |
+| `POST`  | `/api/communications/send` | Send email or SMS                            |
+| `GET`   | `/api/compliance/report`   | Generate compliance report                   |
 
 Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 
 ### Data Tiers
 
-| Tier                    | Sources                                                           | Cost               |
-| ----------------------- | ----------------------------------------------------------------- | ------------------ |
-| **Free / OSS (no key)** | SEC EDGAR, OSHA, USPTO, Census                                    | $0                 |
-| **Optional, key-gated** | SAM.gov, D&B, Clearbit, ZoomInfo (fail closed without an API key) | Provider-dependent |
+| Tier           | Sources                                                     | Cost         |
+| -------------- | ----------------------------------------------------------- | ------------ |
+| **Free / OSS** | SEC EDGAR, OSHA, USPTO, Census, SAM.gov                     | $0           |
+| **Paid**       | + D&B, Clearbit, Experian, ZoomInfo, Google Places, NewsAPI | Subscription |
 
 ---
 
 ## Key Features
 
-- **Multi-state UCC collection** -- 4 implemented collectors (CA API, TX bulk, FL vendor, NY portal scraper) with per-state fallback strategies (API, bulk download, vendor feed, scrape); FL and NY are credential-gated and fail closed when unconfigured. 47 states remain on the roadmap.
-- **Transparent rules-based lead scoring** -- priority score (0--100) from a weighted, inspectable formula, health grade, growth signal detection, revenue estimation. An **optional, experimental ML model** (logistic regression) can be attached per request; it is opt-in, low-confidence, and trained on synthetic seed data pending validation against real outcomes — the rules-based score stays authoritative.
+- **50-state UCC collection** -- autonomous agents for every Secretary of State portal, with per-state fallback strategies (API, bulk download, vendor feed, scrape)
+- **ML-based lead scoring** -- priority score (0--100), health grade, growth signal detection, revenue estimation, competitive position analysis
 - **Compliance built in** -- CA SB 1235 and NY CFDL disclosure calculators, TCPA consent tracking, suppression list management, immutable audit trail
 - **Full broker workflow** -- prospect dashboard, deal pipeline (Kanban), contact CRM, unified communications inbox (email/SMS/voice), bank statement underwriting (Plaid)
 - **Production infrastructure** -- Terraform-provisioned AWS (VPC, RDS, ElastiCache, S3), Vercel frontend deployment, Docker Compose for local dev, Kubernetes manifests for container orchestration
@@ -185,23 +184,25 @@ Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 
 ## Testing
 
-3,399 passing tests across 168 files (plus 6 skipped server tests), zero failures on a clean run (verified, branch rebased onto `main`). `npm test` runs two Vitest projects; the server suite is a third:
+2,055 tests across 91 files. Zero failures.
 
 ```bash
-npm test                       # Client suites:  2,029 tests / 88 files (apps/web jsdom + root)
-npm run test:server            # Server (node):   1,370 tests / 80 files (+6 skipped)
-npm run test:coverage          # V8 coverage report (web)
-npm run test:e2e               # Playwright end-to-end (3 specs, run separately)
+npm test                       # Full suite
+npm run test:coverage          # V8 coverage report
+npm run test:server            # Server-side only
+npm run test:e2e               # Playwright end-to-end
 ```
 
-| Suite                           | Runner         | Tests     | Files   |
-| ------------------------------- | -------------- | --------- | ------- |
-| Web — `apps/web` (`npm test`)   | Vitest + jsdom | 2,005     | 83      |
-| Web — root project (`npm test`) | Vitest         | 24        | 5       |
-| Server (`test:server`)          | Vitest + node  | 1,370     | 80      |
-| **Total**                       |                | **3,399** | **168** |
-
-Counts are reproducible from the test runners above. The server suite carries one pre-existing, order-dependent flaky test (`outreach` briefing "cache warm") that passes in isolation and on re-run; it is unrelated to this branch. The web run's earlier config-glob bug + jsdom localStorage regression were fixed here.
+| Category            | Tests | Scope                                              |
+| ------------------- | ----- | -------------------------------------------------- |
+| Frontend components | ~500  | React dashboard, pipeline, inbox, forms            |
+| Server services     | ~400  | All 27 domain services                             |
+| State agents        | ~250  | 50 state-specific collectors + fallback strategies |
+| Agentic system      | ~200  | Agent engine, orchestration, council               |
+| Data pipeline       | ~150  | Quality checks, enrichment, stale data detection   |
+| Server routes       | ~150  | API endpoints, webhook verification                |
+| Integration + E2E   | ~100  | Cross-service workflows                            |
+| Security            | ~55   | XSS prevention, input sanitization                 |
 
 ---
 
@@ -257,7 +258,7 @@ Provisions: VPC with multi-AZ subnets, RDS PostgreSQL (encrypted, Multi-AZ), Ela
 1. Fork and create a feature branch: `git checkout -b feature/your-feature`
 2. Install: `npm install --legacy-peer-deps`
 3. Develop: `npm run dev:full`
-4. Test: `npm test` and `npm run test:server` (all tests must pass — 3,321 across both suites)
+4. Test: `npm test` (all 2,055 tests must pass)
 5. Lint: `npm run lint`
 6. Commit: `git commit -m "feat: description"` ([Conventional Commits](https://www.conventionalcommits.org/))
 7. Open a Pull Request

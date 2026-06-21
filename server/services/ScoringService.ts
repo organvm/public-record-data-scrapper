@@ -7,19 +7,11 @@
  * - Position Score: Stack position estimation
  * - Composite Score: Weighted combination
  *
- * The composite score is a TRANSPARENT, rules-based weighted formula (see
- * DEFAULT_CONFIG and the INDUSTRY_RISK_MODIFIERS / STATE_MODIFIERS tables) and
- * is the product default. An OPTIONAL machine-learning score (logistic
- * regression, see {@link MLScoringStrategy}) can be attached via the `includeMl`
- * option; it is supplementary, low-confidence, and clearly labeled as trained on
- * synthetic seed data until validated against real outcomes.
- *
  * Formula based on MCA industry research and best practices.
  */
 
 import { database } from '../database/connection'
 import { EquipmentLifecycleDetector } from './EquipmentLifecycleDetector'
-import { mlScoringStrategy, type MlScoreOutput } from './MLScoringStrategy'
 
 export interface IntentScoreInput {
   daysSinceLastFiling: number
@@ -76,12 +68,6 @@ export interface ScoringResult {
   }[]
   recommendation: 'high_priority' | 'moderate_priority' | 'low_priority' | 'pass'
   narrative: string
-  /**
-   * Optional supplementary ML score (only present when scored with
-   * `includeMl: true`). The rules-based `compositeScore` remains authoritative;
-   * this is experimental and carries its own (low) confidence + warning.
-   */
-  mlScoring?: MlScoreOutput
 }
 
 export interface ScoringConfig {
@@ -125,8 +111,8 @@ const DEFAULT_CONFIG: ScoringConfig = {
 // Industry risk modifiers (lower = higher risk)
 const INDUSTRY_RISK_MODIFIERS: Record<string, number> = {
   restaurant: 0.85,
-  retail: 0.9,
-  construction: 0.8,
+  retail: 0.90,
+  construction: 0.80,
   healthcare: 0.95,
   manufacturing: 0.88,
   services: 0.92,
@@ -170,8 +156,7 @@ export class ScoringService {
       recencyScore = 90 - (input.daysSinceLastFiling - 30) * 0.3
     } else if (input.daysSinceLastFiling <= 365) {
       recencyScore = 72 - (input.daysSinceLastFiling - 90) * 0.1
-    } else if (input.daysSinceLastFiling <= 1095) {
-      // 3 years
+    } else if (input.daysSinceLastFiling <= 1095) { // 3 years
       recencyScore = 44.5 - (input.daysSinceLastFiling - 365) * 0.02
     } else {
       recencyScore = Math.max(10, 30 - (input.daysSinceLastFiling - 1095) * 0.01)
@@ -198,11 +183,7 @@ export class ScoringService {
       const terminatedRatio = input.terminatedFilings / input.totalFilings
 
       // Terminated is better (paid off), lapsed is neutral, active is concerning
-      patternScore =
-        50 +
-        terminatedRatio * 30 +
-        lapsedRatio * 10 -
-        (input.activeFilings / input.totalFilings) * 20
+      patternScore = 50 + terminatedRatio * 30 + lapsedRatio * 10 - (input.activeFilings / input.totalFilings) * 20
     }
 
     // Trend adjustment
@@ -292,7 +273,7 @@ export class ScoringService {
         score -= 30 // Too leveraged
       } else if (paymentBurden > 0.15) {
         score -= 15
-      } else if (paymentBurden > 0.1) {
+      } else if (paymentBurden > 0.10) {
         score -= 5
       }
       // Low burden is good - no penalty
@@ -381,24 +362,19 @@ export class ScoringService {
     // Intent insight
     if (result.intentScore >= 70) {
       parts.push(`Recent UCC activity suggests active financing interest.`)
-    } else if (Number.isFinite(daysSinceDefault) && daysSinceDefault > 1095) {
-      // 3+ years
+    } else if (Number.isFinite(daysSinceDefault) && daysSinceDefault > 1095) { // 3+ years
       // Guard against missing/NULL time_since_default so we never render
       // "NaN years ago".
-      parts.push(
-        `Last default was ${Math.round(daysSinceDefault / 365)} years ago, indicating potential recovery.`
-      )
+      parts.push(`Last default was ${Math.round(daysSinceDefault / 365)} years ago, indicating potential recovery.`)
     }
 
     // Health insight
     if (result.healthScore >= 75) {
       parts.push(`Business health indicators are positive.`)
     } else if (result.healthScore < 50) {
-      const healthFactors = result.factors.filter(
-        (f) => f.impact === 'negative' && f.name.includes('health')
-      )
+      const healthFactors = result.factors.filter(f => f.impact === 'negative' && f.name.includes('health'))
       if (healthFactors.length > 0) {
-        parts.push(`Health concerns include: ${healthFactors.map((f) => f.name).join(', ')}.`)
+        parts.push(`Health concerns include: ${healthFactors.map(f => f.name).join(', ')}.`)
       }
     }
 
@@ -427,8 +403,6 @@ export class ScoringService {
     options: {
       industry?: string
       state?: string
-      /** Attach an optional, supplementary ML score (default: false). */
-      includeMl?: boolean
     } = {}
   ): Promise<ScoringResult> {
     // Fetch prospect data
@@ -492,12 +466,12 @@ export class ScoringService {
       : 9999
 
     // Count filing statuses
-    const activeFilings = filings.filter((f) => f.status === 'active').length
-    const lapsedFilings = filings.filter((f) => f.status === 'lapsed').length
-    const terminatedFilings = filings.filter((f) => f.status === 'terminated').length
+    const activeFilings = filings.filter(f => f.status === 'active').length
+    const lapsedFilings = filings.filter(f => f.status === 'lapsed').length
+    const terminatedFilings = filings.filter(f => f.status === 'terminated').length
 
     // Determine trend
-    const recentFilings = filings.filter((f) => {
+    const recentFilings = filings.filter(f => {
       const daysAgo = (Date.now() - new Date(f.filing_date).getTime()) / (1000 * 60 * 60 * 24)
       return daysAgo <= 365
     }).length
@@ -528,8 +502,7 @@ export class ScoringService {
       // to 2.5 stars (a penalty). Use == null so a legitimate 0 sentiment is
       // honored rather than defaulting to a neutral 3.
       avgRating: healthData?.avg_sentiment == null ? 3 : 1 + healthData.avg_sentiment * 4,
-      sentimentTrend:
-        (healthData?.sentiment_trend as 'improving' | 'stable' | 'declining') || 'stable',
+      sentimentTrend: (healthData?.sentiment_trend as 'improving' | 'stable' | 'declining') || 'stable',
       violationCount: healthData?.violation_count || 0,
       yearsInBusiness: 3, // Default, would need enrichment
       hasWebsite: true, // Would need enrichment
@@ -583,23 +556,13 @@ export class ScoringService {
       {
         name: 'UCC Recency',
         value: daysSinceLastFiling,
-        impact:
-          daysSinceLastFiling < 365
-            ? 'positive'
-            : daysSinceLastFiling > 1095
-              ? 'negative'
-              : 'neutral',
+        impact: daysSinceLastFiling < 365 ? 'positive' : daysSinceLastFiling > 1095 ? 'negative' : 'neutral',
         weight: this.config.intentRecencyWeight
       },
       {
         name: 'Filing History',
         value: filings.length,
-        impact:
-          filings.length > 0 && filings.length < 5
-            ? 'positive'
-            : filings.length > 6
-              ? 'negative'
-              : 'neutral',
+        impact: filings.length > 0 && filings.length < 5 ? 'positive' : filings.length > 6 ? 'negative' : 'neutral',
         weight: this.config.intentVolumeWeight
       },
       {
@@ -623,12 +586,7 @@ export class ScoringService {
       factors.push({
         name: 'Review Sentiment',
         value: healthData.avg_sentiment,
-        impact:
-          healthData.avg_sentiment > 0.6
-            ? 'positive'
-            : healthData.avg_sentiment < 0.4
-              ? 'negative'
-              : 'neutral',
+        impact: healthData.avg_sentiment > 0.6 ? 'positive' : healthData.avg_sentiment < 0.4 ? 'negative' : 'neutral',
         weight: this.config.healthReviewWeight
       })
 
@@ -673,33 +631,15 @@ export class ScoringService {
       Number.isFinite(prospect.time_since_default) ? prospect.time_since_default : 0
     )
 
-    // Optional supplementary ML score, computed from the SAME fetched signals
-    // (no extra queries). Kept separate from the authoritative rules-based score.
-    let mlScoring: MlScoreOutput | undefined
-    if (options.includeMl) {
-      mlScoring = mlScoringStrategy.score({
-        daysSinceLastFiling,
-        totalFilings: filings.length,
-        activeFilings,
-        lapsedFilings,
-        terminatedFilings,
-        timeSinceDefault: Number.isFinite(prospect.time_since_default)
-          ? prospect.time_since_default
-          : 0,
-        reviewCount: healthData?.review_count ?? 0,
-        avgSentiment: healthData?.avg_sentiment ?? 0.5,
-        violationCount: healthData?.violation_count ?? 0,
-        healthScore: healthData?.score ?? healthScore
-      })
-    }
-
-    return { ...result, narrative, ...(mlScoring ? { mlScoring } : {}) }
+    return { ...result, narrative }
   }
 
   /**
    * Batch score multiple prospects
    */
-  async scoreProspects(prospectIds: string[]): Promise<Map<string, ScoringResult>> {
+  async scoreProspects(
+    prospectIds: string[]
+  ): Promise<Map<string, ScoringResult>> {
     const results = new Map<string, ScoringResult>()
 
     for (const id of prospectIds) {

@@ -6,6 +6,7 @@ import { ProspectDetailDialog } from '@/components/ProspectDetailDialog'
 import { StaleDataWarning } from '@/components/StaleDataWarning'
 import { QuickAccessBanner } from '@/components/QuickAccessBanner'
 import { DemoTour } from '@/components/DemoTour'
+import { SubscriptionGate } from '@/components/SubscriptionGate'
 
 // Layout components
 import { Header, LoadingAndErrorState, TabNavigation, MobileBottomNav } from '@/components/layout'
@@ -237,44 +238,62 @@ function App() {
             </TabsContent>
 
             <TabsContent value="intelligence" className="space-y-4 sm:space-y-6">
-              <IntelligenceTab competitors={data.competitors} />
+              <SubscriptionGate>
+                <IntelligenceTab competitors={data.competitors} />
+              </SubscriptionGate>
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
-              <AnalyticsTab
-                prospects={data.prospects}
-                portfolio={data.portfolio}
-                dataTier={dataTier}
-                usePreviewData={useDemoData}
-              />
+              <SubscriptionGate>
+                <AnalyticsTab
+                  prospects={data.prospects}
+                  portfolio={data.portfolio}
+                  dataTier={dataTier}
+                  usePreviewData={useDemoData}
+                />
+              </SubscriptionGate>
             </TabsContent>
 
             <TabsContent value="requalification" className="space-y-4 sm:space-y-6">
-              <RequalificationTab />
+              <SubscriptionGate>
+                <RequalificationTab />
+              </SubscriptionGate>
             </TabsContent>
 
             <TabsContent value="coverage" className="space-y-4 sm:space-y-6">
-              <CoverageTab />
+              <SubscriptionGate>
+                <CoverageTab />
+              </SubscriptionGate>
             </TabsContent>
 
             <TabsContent value="deals" className="space-y-4 sm:space-y-6">
-              <DealsTab />
+              <SubscriptionGate>
+                <DealsTab />
+              </SubscriptionGate>
             </TabsContent>
 
             <TabsContent value="contacts" className="space-y-4 sm:space-y-6">
-              <ContactsTab />
+              <SubscriptionGate>
+                <ContactsTab />
+              </SubscriptionGate>
             </TabsContent>
 
             <TabsContent value="communications" className="space-y-4 sm:space-y-6">
-              <CommunicationsTab />
+              <SubscriptionGate>
+                <CommunicationsTab />
+              </SubscriptionGate>
             </TabsContent>
 
             <TabsContent value="compliance" className="space-y-4 sm:space-y-6">
-              <ComplianceTab />
+              <SubscriptionGate>
+                <ComplianceTab />
+              </SubscriptionGate>
             </TabsContent>
 
             <TabsContent value="agentic" className="space-y-4 sm:space-y-6">
-              <AgenticTab agentic={agentic} competitors={data.competitors} />
+              <SubscriptionGate>
+                <AgenticTab agentic={agentic} competitors={data.competitors} />
+              </SubscriptionGate>
             </TabsContent>
             <MobileBottomNav />
           </Tabs>

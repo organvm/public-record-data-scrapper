@@ -38,6 +38,9 @@ const sharedOptions = {
     'jsonwebtoken', 'express', 'compression', 'cors', 'helmet',
     'swagger-ui-express', 'yamljs', 'zod', 'dotenv', 'uuid',
     'dompurify', 'marked',
+    // Optional native macOS watcher dependency pulled through transitive tooling.
+    // Bundling it makes esbuild try to load fsevents.node; keep it runtime-resolved.
+    'fsevents',
   ],
   sourcemap: true,
   minify: false,

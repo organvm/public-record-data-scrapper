@@ -11,6 +11,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Cold CI runs spend enough CPU on concurrent jsdom workers and transforms
+    // that otherwise-fast interaction tests can exceed Vitest's 5s default.
+    testTimeout: 15000,
     // Pin discovery to this app's own root and source tree. Without this, a
     // root-level `vitest` invocation lets the default `**/*.{test,spec}` glob
     // escape into sibling workspaces (notably the node-environment server

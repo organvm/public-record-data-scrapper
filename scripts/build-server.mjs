@@ -34,7 +34,7 @@ const sharedOptions = {
     'assert', 'console',
     // npm packages — keep external (installed via npm install)
     'pg-native', 'bullmq', 'ioredis', 'pg',
-    'puppeteer', 'sharp',
+    'puppeteer', 'sharp', 'fsevents',
     'jsonwebtoken', 'express', 'compression', 'cors', 'helmet',
     'swagger-ui-express', 'yamljs', 'zod', 'dotenv', 'uuid',
     'dompurify', 'marked',

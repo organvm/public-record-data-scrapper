@@ -14,8 +14,8 @@
 import type { StateCollector } from './types'
 import { createCAApiCollector } from './state-collectors/CAApiCollector'
 import { createTXBulkCollector } from './state-collectors/TXBulkCollector'
-import { FLVendorCollector, createFLVendorCollector } from './state-collectors/FLVendorCollector'
-import { NYScraperCollector, createNYScraperCollector } from './state-collectors/NYScraperCollector'
+import { createFLVendorCollector } from './state-collectors/FLVendorCollector'
+import { createNYScraperCollector } from './state-collectors/NYScraperCollector'
 
 /**
  * Access method types for state data
@@ -162,15 +162,52 @@ const STATE_CONFIGS: Record<string, StateConfig> = {
 }
 
 /**
+ * A concrete collector implementation for one state.
+ *
+ * `build()` instantiates the collector and applies any credential gate, so it
+ * returns `undefined` when the state is implemented but unconfigured (e.g. FL
+ * without an active contract, NY without NY_UCC_DEBTOR_SEEDS). Each state is
+ * served by exactly one access method; the factory only builds when the
+ * requested method matches `method`.
+ */
+interface CollectorBuilder {
+  method: AccessMethod
+  build: () => StateCollector | undefined
+}
+
+/**
+ * Apply the credential gate shared by FL and NY: only expose a collector once
+ * it reports `isReady()`, so an unconfigured state fails closed rather than
+ * running an empty/fabricated collection.
+ */
+function whenReady(collector: { isReady(): boolean } | null): StateCollector | undefined {
+  return collector?.isReady() ? (collector as unknown as StateCollector) : undefined
+}
+
+/**
+ * Registry of concrete state collector implementations, keyed by state code.
+ * Replaces the per-method switch ladders: adding a state is a single entry.
+ */
+const COLLECTOR_BUILDERS: Record<string, CollectorBuilder> = {
+  CA: { method: 'api', build: () => createCAApiCollector() ?? undefined },
+  TX: { method: 'bulk', build: () => createTXBulkCollector() ?? undefined },
+  FL: { method: 'vendor', build: () => whenReady(createFLVendorCollector()) },
+  NY: { method: 'scrape', build: () => whenReady(createNYScraperCollector()) }
+}
+
+/**
  * Enhanced State Collector Factory
  * Creates and manages state-specific collectors with tiered fallback support
  */
 export class StateCollectorFactory {
   private registry: StateCollectorRegistry = new Map()
-  private apiRegistry: Map<string, StateCollector> = new Map()
-  private bulkRegistry: Map<string, StateCollector> = new Map()
-  private vendorRegistry: Map<string, StateCollector> = new Map()
-  private scraperRegistry: Map<string, StateCollector> = new Map()
+  /** Per-method caches for getCollectorByMethod(), one registry per access method */
+  private methodRegistries: Record<AccessMethod, StateCollectorRegistry> = {
+    api: new Map(),
+    bulk: new Map(),
+    vendor: new Map(),
+    scrape: new Map()
+  }
   private config: Required<FactoryConfig>
   private accessAttempts: AccessAttempt[] = []
   private costTracking: Map<string, CostTracking> = new Map()
@@ -231,16 +268,7 @@ export class StateCollectorFactory {
    * Get the appropriate registry for an access method
    */
   private getRegistryForMethod(method: AccessMethod): Map<string, StateCollector> {
-    switch (method) {
-      case 'api':
-        return this.apiRegistry
-      case 'bulk':
-        return this.bulkRegistry
-      case 'vendor':
-        return this.vendorRegistry
-      case 'scrape':
-        return this.scraperRegistry
-    }
+    return this.methodRegistries[method]
   }
 
   /**
@@ -266,87 +294,19 @@ export class StateCollectorFactory {
   }
 
   /**
-   * Create collector for a specific access method
+   * Create collector for a specific state and access method.
+   *
+   * Each state is served by a single access method (see COLLECTOR_BUILDERS).
+   * Returns undefined when no implementation exists for the state, when the
+   * requested method is not the state's method, or when a credential-gated
+   * collector (FL/NY) is unconfigured and fails closed.
    */
   private createCollectorForMethod(
     stateCode: string,
     method: AccessMethod
   ): StateCollector | undefined {
-    switch (method) {
-      case 'api':
-        return this.createApiCollector(stateCode)
-      case 'bulk':
-        return this.createBulkCollector(stateCode)
-      case 'vendor':
-        return this.createVendorCollector(stateCode)
-      case 'scrape':
-        return this.createScraperCollector(stateCode)
-    }
-  }
-
-  /**
-   * Create API-based collector
-   */
-  private createApiCollector(stateCode: string): StateCollector | undefined {
-    switch (stateCode) {
-      case 'CA':
-        return createCAApiCollector() || undefined
-      default:
-        return undefined
-    }
-  }
-
-  /**
-   * Create bulk download collector
-   */
-  private createBulkCollector(stateCode: string): StateCollector | undefined {
-    switch (stateCode) {
-      case 'TX':
-        return createTXBulkCollector() || undefined
-      default:
-        return undefined
-    }
-  }
-
-  /**
-   * Create vendor-based collector
-   */
-  private createVendorCollector(stateCode: string): StateCollector | undefined {
-    switch (stateCode) {
-      case 'FL': {
-        const collector = createFLVendorCollector()
-        // Only return if contract is active
-        if (collector && (collector as FLVendorCollector).isReady()) {
-          return collector
-        }
-        return undefined
-      }
-      default:
-        return undefined
-    }
-  }
-
-  /**
-   * Create scraper-based collector.
-   *
-   * Mirrors the FL vendor gate: the collector is only returned when it reports
-   * isReady() (i.e. its required configuration is present), so an unconfigured
-   * state fails closed via getCollector() returning undefined rather than
-   * running an empty/fabricated collection.
-   */
-  private createScraperCollector(stateCode: string): StateCollector | undefined {
-    switch (stateCode) {
-      case 'NY': {
-        const collector = createNYScraperCollector()
-        // Only expose NY once debtor seeds are configured (NY_UCC_DEBTOR_SEEDS).
-        if (collector && (collector as NYScraperCollector).isReady()) {
-          return collector
-        }
-        return undefined
-      }
-      default:
-        return undefined
-    }
+    const builder = COLLECTOR_BUILDERS[stateCode]
+    return builder?.method === method ? builder.build() : undefined
   }
 
   /**
@@ -557,12 +517,10 @@ export class StateCollectorFactory {
    * collection code exists and is tested — but fail closed when unconfigured.
    */
   getImplementedStates(): string[] {
-    return [
-      'CA', // California - API (CA_SOS_API_KEY)
-      'TX', // Texas - Bulk (TX_SOSDIRECT_API_KEY + account)
-      'FL', // Florida - Vendor (requires active contract)
-      'NY' // New York - Portal scraper (requires NY_UCC_DEBTOR_SEEDS)
-    ]
+    // Derived from COLLECTOR_BUILDERS so the implemented set stays in lockstep
+    // with the wired-up collectors: CA (API), TX (bulk), FL (vendor, requires
+    // active contract), NY (portal scraper, requires NY_UCC_DEBTOR_SEEDS).
+    return Object.keys(COLLECTOR_BUILDERS)
   }
 
   /**
@@ -639,10 +597,9 @@ export class StateCollectorFactory {
    */
   clearCache(): void {
     this.registry.clear()
-    this.apiRegistry.clear()
-    this.bulkRegistry.clear()
-    this.vendorRegistry.clear()
-    this.scraperRegistry.clear()
+    for (const registry of Object.values(this.methodRegistries)) {
+      registry.clear()
+    }
   }
 
   /**

@@ -104,6 +104,29 @@ describe('StateCollectorFactory', () => {
     })
   })
 
+  describe('getCollectorByMethod()', () => {
+    it('should return undefined for an implemented state when uncredentialed', () => {
+      // CA is API-backed but CA_SOS_API_KEY is unset in the test env.
+      expect(factory.getCollectorByMethod('CA', 'api')).toBeUndefined()
+    })
+
+    it('should return undefined when the method does not match the state', () => {
+      // CA is served by 'api' only; requesting any other method must not build.
+      expect(factory.getCollectorByMethod('CA', 'bulk')).toBeUndefined()
+      expect(factory.getCollectorByMethod('CA', 'vendor')).toBeUndefined()
+      expect(factory.getCollectorByMethod('CA', 'scrape')).toBeUndefined()
+    })
+
+    it('should return undefined for unimplemented states regardless of method', () => {
+      expect(factory.getCollectorByMethod('IL', 'api')).toBeUndefined()
+      expect(factory.getCollectorByMethod('IL', 'scrape')).toBeUndefined()
+    })
+
+    it('should normalize the state code', () => {
+      expect(factory.getCollectorByMethod('ca', 'api')).toBeUndefined()
+    })
+  })
+
   describe('getAllCollectors()', () => {
     it('should return map of collectors', () => {
       const collectors = factory.getAllCollectors()

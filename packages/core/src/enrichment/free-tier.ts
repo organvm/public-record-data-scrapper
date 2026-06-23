@@ -211,7 +211,9 @@ export class CensusSource extends BaseDataSource {
  * SAM.gov Federal Contracts API - Government contract awards
  */
 export class SAMGovSource extends BaseDataSource {
-  constructor() {
+  private readonly apiKey: string
+
+  constructor(apiKey?: string) {
     super({
       name: 'sam-gov',
       tier: 'free',
@@ -220,14 +222,28 @@ export class SAMGovSource extends BaseDataSource {
       retryAttempts: 3,
       retryDelay: 1000
     })
+    this.apiKey = (apiKey ?? '').trim()
+  }
+
+  isConfigured(): boolean {
+    return this.apiKey.length > 0
   }
 
   async fetchData(query: Record<string, unknown>): Promise<DataSourceResponse> {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        error: 'SAM.gov API key not configured',
+        data: null,
+        source: this.config.name,
+        timestamp: new Date().toISOString()
+      }
+    }
     return this.executeFetch(async () => {
       const companyName = typeof query.companyName === 'string' ? query.companyName : ''
 
       // SAM.gov entity information API
-      const searchUrl = `https://api.sam.gov/entity-information/v3/entities?legalBusinessName=${encodeURIComponent(companyName)}`
+      const searchUrl = `https://api.sam.gov/entity-information/v3/entities?api_key=${this.apiKey}&legalBusinessName=${encodeURIComponent(companyName)}`
 
       const response = await fetch(searchUrl)
 

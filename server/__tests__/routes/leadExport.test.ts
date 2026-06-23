@@ -74,20 +74,22 @@ describe('Lead export API', () => {
     expect(response.body.batch.id).toBe('lead-export-2026-06-19T00-00-00-000Z')
     expect(response.body.leads[0].mca_score).toBe(91)
     expect(mockExportLeads).toHaveBeenCalledWith({
-      state: 'CA',
+      state: 'ca',
       industry: undefined,
       status: 'new',
-      minScore: 80,
+      minScore: '80',
       maxScore: undefined,
-      limit: 5,
-      offset: 10
+      limit: '5',
+      offset: '10'
     })
   })
 
   it('returns a CSV lead export batch', async () => {
     const batch = leadExportBatch()
     mockExportLeads.mockResolvedValueOnce(batch)
-    mockSerializeLeadExportCsv.mockReturnValueOnce('prospect_id,company_name\nprospect-1,Acme Bistro')
+    mockSerializeLeadExportCsv.mockReturnValueOnce(
+      'prospect_id,company_name\nprospect-1,Acme Bistro'
+    )
 
     const response = await request(app)
       .get('/api/prospects/export/leads?format=csv')

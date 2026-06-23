@@ -85,7 +85,9 @@ describe('Competitive Intelligence Routes', () => {
       const response = await request(app).get('/api/competitive/saturation/INVALID')
 
       expect(response.status).toBe(400)
-      expect(response.body).toMatchObject({ error: 'Invalid state code' })
+      expect(response.body).toMatchObject({
+        error: { code: 'VALIDATION_ERROR', message: 'Validation failed' }
+      })
     })
 
     it('returns 500 when the service throws', async () => {

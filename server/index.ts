@@ -426,4 +426,41 @@ if (invokedDirectly) {
   })
 }
 
+/**
+ * Build the Express app for a SERVERLESS host (e.g. a Vercel Node function).
+ *
+ * Unlike `Server.start()`, this does NOT bind a port, start the BullMQ workers,
+ * or the cron scheduler — a serverless function is request-scoped and the
+ * background workers run elsewhere. It makes a single best-effort database
+ * connection (memoized across warm invocations) so DB-backed routes work when
+ * `DATABASE_URL` is configured; if the connection is absent or fails, those
+ * routes fail closed through the normal error handler rather than hanging.
+ *
+ * The promise is cached so a warm Lambda/Vercel container reuses one app + pool.
+ */
+let serverlessAppPromise: Promise<Express> | null = null
+export function getServerlessApp(): Promise<Express> {
+  if (!serverlessAppPromise) {
+    serverlessAppPromise = (async () => {
+      const server = new Server()
+      if (process.env.DATABASE_URL) {
+        try {
+          await database.connect()
+        } catch (error) {
+          console.error(
+            '[serverless] database connect failed; DB-backed routes will return errors:',
+            error
+          )
+        }
+      } else {
+        console.warn(
+          '[serverless] DATABASE_URL not set; only stateless routes (health, docs) will work.'
+        )
+      }
+      return server.getApp()
+    })()
+  }
+  return serverlessAppPromise
+}
+
 export default Server

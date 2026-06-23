@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import { validateRequest } from '../../middleware/validateRequest'
@@ -7,6 +7,7 @@ describe('validateRequest middleware', () => {
   let mockReq: Partial<Request>
   let mockRes: Partial<Response>
   let mockNext: NextFunction
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     mockReq = {
@@ -19,6 +20,11 @@ describe('validateRequest middleware', () => {
       json: vi.fn().mockReturnThis()
     }
     mockNext = vi.fn()
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    consoleWarnSpy.mockRestore()
   })
 
   describe('body validation', () => {
@@ -94,6 +100,28 @@ describe('validateRequest middleware', () => {
 
       expect(details).toContainEqual(expect.objectContaining({ field: 'name' }))
       expect(details).toContainEqual(expect.objectContaining({ field: 'email' }))
+    })
+
+    it('includes correlation ID when validation fails with request context', () => {
+      mockReq = {
+        ...mockReq,
+        correlationId: 'correlation-1',
+        body: {
+          name: '',
+          email: 'invalid-email'
+        }
+      } as Partial<Request>
+
+      const middleware = validateRequest({ body: bodySchema })
+      middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.objectContaining({
+            correlationId: 'correlation-1'
+          })
+        })
+      )
     })
   })
 

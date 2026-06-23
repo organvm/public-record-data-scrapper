@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Request, Response, NextFunction } from 'express'
 import {
   errorHandler,
@@ -21,6 +21,8 @@ describe('errorHandler middleware', () => {
   let mockReq: Partial<Request>
   let mockRes: Partial<Response>
   let mockNext: NextFunction
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     mockReq = {
@@ -33,7 +35,13 @@ describe('errorHandler middleware', () => {
       json: vi.fn().mockReturnThis()
     }
     mockNext = vi.fn()
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore()
+    consoleWarnSpy.mockRestore()
   })
 
   it('handles generic errors with 500 status', () => {
@@ -141,15 +149,36 @@ describe('errorHandler middleware', () => {
 
     errorHandler(error, mockReq as Request, mockRes as Response, mockNext)
 
-    expect(console.error).toHaveBeenCalledWith(
-      '[ERROR]',
-      expect.objectContaining({
-        path: '/test',
-        method: 'GET',
-        message: 'Test error',
+    const serialized = String(consoleErrorSpy.mock.calls[0][0])
+    expect(serialized).toContain('Request failed with unexpected error')
+    expect(serialized).toContain('"path":"/test"')
+    expect(serialized).toContain('"method":"GET"')
+    expect(serialized).toContain('Test error')
+    expect(serialized).toContain('[test-correlation-id]')
+  })
+
+  it('handles malformed JSON body parser errors', () => {
+    const error = new SyntaxError('Unexpected token }') as SyntaxError & {
+      statusCode: number
+      type: string
+      body: string
+    }
+    error.statusCode = 400
+    error.type = 'entity.parse.failed'
+    error.body = '{"bad":}'
+
+    errorHandler(error, mockReq as Request, mockRes as Response, mockNext)
+
+    expect(mockRes.status).toHaveBeenCalledWith(400)
+    expect(mockRes.json).toHaveBeenCalledWith({
+      error: {
+        message: 'Malformed JSON request body',
+        code: 'INVALID_JSON',
+        statusCode: 400,
         correlationId: 'test-correlation-id'
-      })
-    )
+      }
+    })
+    expect(consoleWarnSpy.mock.calls[0][0]).toContain('Invalid JSON request body')
   })
 })
 

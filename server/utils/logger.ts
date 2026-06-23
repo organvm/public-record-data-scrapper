@@ -26,6 +26,19 @@ interface LogEntry {
   correlationId?: string
 }
 
+// Sensitive keys are redacted from every structured log context. Keep this list
+// broad because log context can be built from request, CLI, and integration data.
+const SENSITIVE_KEYS = [
+  'password',
+  'token',
+  'secret',
+  'apiKey',
+  'api_key',
+  'authorization',
+  'creditCard',
+  'ssn'
+]
+
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
@@ -119,7 +132,7 @@ export interface Logger {
 function createLogger(defaultContext?: LogContext): Logger {
   const mergeContext = (context?: LogContext): LogContext | undefined => {
     if (!defaultContext && !context) return undefined
-    return { ...defaultContext, ...context }
+    return sanitizeContext({ ...defaultContext, ...context })
   }
 
   return {
@@ -143,7 +156,7 @@ function createLogger(defaultContext?: LogContext): Logger {
 
     error: (message: string, error?: Error, context?: LogContext) => {
       if (!shouldLog('error')) return
-      const entry = createLogEntry('error', message, error, mergeContext(context))
+      const entry = createLogEntry('error', message, mergeContext(context), error)
       console.error(formatLogEntry(entry))
     },
 
@@ -220,17 +233,6 @@ export async function withTiming<T>(
 /**
  * Sanitize sensitive data from log context
  */
-const SENSITIVE_KEYS = [
-  'password',
-  'token',
-  'secret',
-  'apiKey',
-  'api_key',
-  'authorization',
-  'creditCard',
-  'ssn'
-]
-
 export function sanitizeContext(context: LogContext): LogContext {
   const sanitized: LogContext = {}
 
@@ -244,6 +246,10 @@ export function sanitizeContext(context: LogContext): LogContext {
       sanitized[key] = '[REDACTED]'
     } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       sanitized[key] = sanitizeContext(value as LogContext)
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value.map((item) =>
+        item && typeof item === 'object' ? sanitizeContext(item as LogContext) : item
+      )
     } else {
       sanitized[key] = value
     }

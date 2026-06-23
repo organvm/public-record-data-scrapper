@@ -11,7 +11,7 @@ describe('requestLogger middleware', () => {
   let mockReq: Partial<Request>
   let mockRes: Partial<Response>
   let mockNext: NextFunction
-  let consoleSpy: ReturnType<typeof vi.spyOn>
+  let consoleInfoSpy: ReturnType<typeof vi.spyOn>
   let finishCallback: (() => void) | undefined
 
   beforeEach(() => {
@@ -27,6 +27,7 @@ describe('requestLogger middleware', () => {
     }
     mockRes = {
       statusCode: 200,
+      setHeader: vi.fn(),
       on: vi.fn((event: string, callback: () => void) => {
         if (event === 'finish') {
           finishCallback = callback
@@ -34,13 +35,23 @@ describe('requestLogger middleware', () => {
       })
     }
     mockNext = vi.fn()
-    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
   })
 
   afterEach(() => {
-    consoleSpy.mockRestore()
+    consoleInfoSpy.mockRestore()
     finishCallback = undefined
   })
+
+  function findLogContext(message: string): Record<string, unknown> {
+    const call = consoleInfoSpy.mock.calls.find((current) => String(current[0]).includes(message))
+    expect(call).toBeDefined()
+
+    const serialized = String(call![0])
+    const jsonStart = serialized.indexOf('{')
+    expect(jsonStart).toBeGreaterThanOrEqual(0)
+    return JSON.parse(serialized.slice(jsonStart))
+  }
 
   it('adds correlation ID to request', () => {
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
@@ -48,6 +59,38 @@ describe('requestLogger middleware', () => {
     expect((mockReq as Request & { correlationId: string }).correlationId).toBe(
       'mock-correlation-id'
     )
+    expect(mockRes.setHeader).toHaveBeenCalledWith('X-Correlation-ID', 'mock-correlation-id')
+  })
+
+  it('accepts valid caller-provided correlation ID', () => {
+    mockReq.headers = {
+      'x-correlation-id': 'external-request-123',
+      'user-agent': 'test-agent'
+    }
+
+    requestLogger(mockReq as Request, mockRes as Response, mockNext)
+
+    expect((mockReq as Request & { correlationId: string }).correlationId).toBe(
+      'external-request-123'
+    )
+    expect(mockRes.setHeader).toHaveBeenCalledWith('X-Correlation-ID', 'external-request-123')
+  })
+
+  it('rejects invalid caller-provided correlation ID', () => {
+    mockReq.headers = {
+      'x-correlation-id': 'bad id with spaces',
+      'user-agent': 'test-agent'
+    }
+
+    requestLogger(mockReq as Request, mockRes as Response, mockNext)
+
+    expect((mockReq as Request & { correlationId: string }).correlationId).toBe(
+      'mock-correlation-id'
+    )
+    expect(findLogContext('HTTP request received')).toMatchObject({
+      requestIdSource: 'generated',
+      rejectedRequestIdHeader: true
+    })
   })
 
   it('calls next', () => {
@@ -59,17 +102,13 @@ describe('requestLogger middleware', () => {
   it('logs incoming request with details', () => {
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
 
-    expect(consoleSpy).toHaveBeenCalledWith('[REQUEST]', expect.any(String))
-
-    const logCall = consoleSpy.mock.calls[0]
-    const logData = JSON.parse(logCall[1] as string)
-
-    expect(logData).toMatchObject({
-      correlationId: 'mock-correlation-id',
+    expect(findLogContext('HTTP request received')).toMatchObject({
+      event: 'http.request',
       method: 'GET',
       path: '/api/test',
       ip: '127.0.0.1',
-      userAgent: 'test-agent'
+      userAgent: 'test-agent',
+      requestIdSource: 'generated'
     })
   })
 
@@ -81,13 +120,9 @@ describe('requestLogger middleware', () => {
       finishCallback()
     }
 
-    // Find the RESPONSE log call
-    const responseCall = consoleSpy.mock.calls.find((call) => call[0] === '[RESPONSE]')
-    expect(responseCall).toBeDefined()
-
-    const logData = JSON.parse(responseCall![1] as string)
+    const logData = findLogContext('HTTP response completed')
     expect(logData).toMatchObject({
-      correlationId: 'mock-correlation-id',
+      event: 'http.response',
       method: 'GET',
       path: '/api/test',
       statusCode: 200
@@ -105,8 +140,7 @@ describe('requestLogger middleware', () => {
 
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
 
-    const logCall = consoleSpy.mock.calls[0]
-    const logData = JSON.parse(logCall[1] as string)
+    const logData = findLogContext('HTTP request received')
 
     expect(logData.query).toEqual({
       page: '1',
@@ -129,8 +163,7 @@ describe('requestLogger middleware', () => {
 
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
 
-    const logCall = consoleSpy.mock.calls[0]
-    const logData = JSON.parse(logCall[1] as string)
+    const logData = findLogContext('HTTP request received')
 
     expect(logData.query).toEqual({
       authorization: '[REDACTED]',
@@ -147,8 +180,7 @@ describe('requestLogger middleware', () => {
 
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
 
-    const logCall = consoleSpy.mock.calls[0]
-    const logData = JSON.parse(logCall[1] as string)
+    const logData = findLogContext('HTTP request received')
 
     expect(logData.query).toEqual({})
   })
@@ -165,11 +197,8 @@ describe('requestLogger middleware', () => {
       finishCallback()
     }
 
-    const responseCall = consoleSpy.mock.calls.find((call) => call[0] === '[RESPONSE]')
-    expect(responseCall).toBeDefined()
-
-    const logData = JSON.parse(responseCall![1] as string)
-    expect(logData.duration).toMatch(/\d+ms/)
+    const logData = findLogContext('HTTP response completed')
+    expect(logData.durationMs).toBeGreaterThanOrEqual(0)
 
     vi.useRealTimers()
   })
@@ -184,9 +213,8 @@ describe('requestLogger middleware', () => {
 
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
 
-    const logCall = consoleSpy.mock.calls[0]
-    const logData = JSON.parse(logCall[1] as string)
-    const body = JSON.parse(logData.body)
+    const logData = findLogContext('HTTP request received')
+    const body = JSON.parse(logData.body as string)
 
     expect(body).toEqual({
       username: 'testuser',
@@ -208,9 +236,8 @@ describe('requestLogger middleware', () => {
 
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
 
-    const logCall = consoleSpy.mock.calls[0]
-    const logData = JSON.parse(logCall[1] as string)
-    const body = JSON.parse(logData.body)
+    const logData = findLogContext('HTTP request received')
+    const body = JSON.parse(logData.body as string)
 
     expect(body.user.credentials.password).toBe('[REDACTED]')
     expect(body.user.email).toBe('test@example.com')
@@ -221,10 +248,21 @@ describe('requestLogger middleware', () => {
 
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
 
-    const logCall = consoleSpy.mock.calls[0]
-    const logData = JSON.parse(logCall[1] as string)
+    const logData = findLogContext('HTTP request received')
 
     expect(logData.body).toBeUndefined()
+  })
+
+  it('summarizes raw Buffer bodies without logging contents', () => {
+    mockReq.body = Buffer.from('{"secret":"payload"}')
+
+    requestLogger(mockReq as Request, mockRes as Response, mockNext)
+
+    const logData = findLogContext('HTTP request received')
+    expect(JSON.parse(logData.body as string)).toEqual({
+      type: 'Buffer',
+      length: 20
+    })
   })
 
   it('truncates large body payloads', () => {
@@ -234,9 +272,8 @@ describe('requestLogger middleware', () => {
 
     requestLogger(mockReq as Request, mockRes as Response, mockNext)
 
-    const logCall = consoleSpy.mock.calls[0]
-    const logData = JSON.parse(logCall[1] as string)
+    const logData = findLogContext('HTTP request received')
 
-    expect(logData.body.endsWith('...[TRUNCATED]')).toBe(true)
+    expect((logData.body as string).endsWith('...[TRUNCATED]')).toBe(true)
   })
 })

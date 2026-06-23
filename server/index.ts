@@ -38,6 +38,7 @@ import complianceRouter from './routes/compliance'
 import discoveryRouter from './routes/discovery'
 import metricsRouter from './routes/metrics'
 import agenticRouter from './routes/agentic'
+import scrapeRouter from './routes/scrape'
 
 // Import queue infrastructure
 import {
@@ -164,6 +165,7 @@ export class Server {
     this.app.use('/api/compliance', authMiddleware, orgContextMiddleware, complianceRouter)
     this.app.use('/api/discovery', authMiddleware, orgContextMiddleware, discoveryRouter)
     this.app.use('/api/agentic', authMiddleware, orgContextMiddleware, agenticRouter)
+    this.app.use('/api/scrape', authMiddleware, scrapeRouter)
 
     // Root endpoint
     this.app.get('/', (req, res) => {
@@ -186,6 +188,7 @@ export class Server {
           communications: '/api/communications',
           compliance: '/api/compliance',
           discovery: '/api/discovery',
+          scrape: '/api/scrape',
           metrics: '/api/metrics',
           webhooks: '/api/webhooks'
         }

@@ -1815,6 +1815,58 @@ paths:
         '401':
           description: Missing or invalid credentials
 
+  /api/scrape/readiness/{stateCode}:
+    get:
+      tags:
+        - Scrape
+      summary: Check state-level UCC scrape readiness
+      description: >
+        Check whether on-demand search is currently available for a state without
+        running a full scrape query.
+      parameters:
+        - name: stateCode
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 2
+          description: Two-letter US state code (case-insensitive)
+      security:
+        - apiKeyAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Readiness response for the requested state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      state:
+                        type: string
+                        example: CA
+                      canSearch:
+                        type: boolean
+                        example: true
+                      reason:
+                        type: string
+                        example: Collector ready for state: CA
+                  meta:
+                    type: object
+                    properties:
+                      requestedAt:
+                        type: string
+                        format: date-time
+        '400':
+          description: Validation failed
+
   # ===========================================
   # API Key Management (admin only)
   # ===========================================

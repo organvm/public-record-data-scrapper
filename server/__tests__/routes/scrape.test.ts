@@ -1,164 +1,216 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import request from 'supertest'
 import express, { Express } from 'express'
-import { z } from 'zod'
+import scrapeRouter from '../../routes/scrape'
 
-// Create a minimal Express app for testing
-const createTestApp = (): Express => {
-  const app = express()
-  app.use(express.json())
+const mockSearch = vi.fn()
+const mockGetStateReadiness = vi.fn()
 
-  // Mock auth middleware that sets req.user
-  app.use((req, res, next) => {
-    ;(req as any).user = { orgId: 'test-org', role: 'user' } // eslint-disable-line @typescript-eslint/no-explicit-any
-    next()
-  })
-
-  // Mock validation middleware
-  app.use((req, res, next) => {
-    next()
-  })
-
-  // Simple test route to validate request/response format
-  app.post('/api/scrape/ucc', (req, res) => {
-    const { company_name, state } = req.body
-
-    if (!company_name || !state) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'Missing required fields',
-          code: 'VALIDATION_ERROR',
-          statusCode: 400
-        }
-      })
-    }
-
-    if (state.toUpperCase() === 'XX') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: 'No UCC data available for state: XX',
-          code: 'UCC_SEARCH_FAILED',
-          statusCode: 400
-        }
-      })
-    }
-
-    res.json({
-      success: true,
-      data: {
-        filings: [],
-        total: 0,
-        state: state.toUpperCase(),
-        companyName: company_name,
-        timestamp: new Date().toISOString()
-      },
-      meta: {
-        requestedAt: new Date().toISOString()
-      }
-    })
-  })
-
-  return app
-}
+vi.mock('../../services/UCCSearchService', () => ({
+  UCCSearchService: vi.fn(() => ({
+    search: mockSearch,
+    getStateReadiness: mockGetStateReadiness
+  }))
+}))
 
 describe('POST /api/scrape/ucc', () => {
   let app: Express
 
+  const buildTestApp = () => {
+    const testApp = express()
+    testApp.use(express.json())
+
+    testApp.use((req, _res, next) => {
+      ;(req as { user: { orgId: string; role: string } }).user = {
+        orgId: 'test-org',
+        role: 'user'
+      }
+      next()
+    })
+
+    testApp.use('/api/scrape', scrapeRouter)
+    return testApp
+  }
+
   beforeEach(() => {
-    app = createTestApp()
+    mockSearch.mockReset()
+    mockGetStateReadiness.mockReset()
+    mockGetStateReadiness.mockReturnValue({
+      state: 'CA',
+      canSearch: true,
+      reason: 'Collector ready for state: CA'
+    })
+    app = buildTestApp()
   })
 
-  it('should return 400 when company_name is missing', async () => {
-    const res = await request(app).post('/api/scrape/ucc').send({
-      state: 'CA'
+  it('returns 400 for missing required body fields', async () => {
+    const response = await request(app).post('/api/scrape/ucc').send({ state: 'CA' })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error.code).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns an explicit unavailable-state error before searching', async () => {
+    mockGetStateReadiness.mockReturnValue({
+      state: 'XX',
+      canSearch: false,
+      reason: 'No UCC data available for state: XX'
     })
 
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-    expect(res.body.error.code).toBe('VALIDATION_ERROR')
-  })
-
-  it('should return 400 when state is missing', async () => {
-    const res = await request(app).post('/api/scrape/ucc').send({
-      company_name: 'Test Corp'
-    })
-
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-  })
-
-  it('should return 400 when state is not available', async () => {
-    const res = await request(app).post('/api/scrape/ucc').send({
+    const response = await request(app).post('/api/scrape/ucc').send({
       company_name: 'Test Corp',
       state: 'XX'
     })
 
-    expect(res.status).toBe(400)
-    expect(res.body.success).toBe(false)
-    expect(res.body.error.code).toBe('UCC_SEARCH_FAILED')
+    expect(response.status).toBe(400)
+    expect(response.body.success).toBe(false)
+    expect(response.body.error.code).toBe('UCC_STATE_UNAVAILABLE')
+    expect(response.body.error.details).toMatchObject({ state: 'XX' })
+    expect(response.body.error.details.readinessEndpoint).toBe('/api/scrape/readiness/XX')
+    expect(mockSearch).not.toHaveBeenCalled()
   })
 
-  it('should return 200 with success response for valid request', async () => {
-    const res = await request(app).post('/api/scrape/ucc').send({
-      company_name: 'Test Corp',
+  it('returns success for supported state requests', async () => {
+    mockSearch.mockResolvedValue({
+      filings: [],
+      total: 0,
       state: 'CA',
-      limit: 100
+      companyName: 'Test Corp',
+      timestamp: '2026-06-24T00:00:00.000Z'
     })
 
-    expect(res.status).toBe(200)
-    expect(res.body.success).toBe(true)
-    expect(res.body.data).toBeDefined()
-    expect(res.body.data.filings).toBeInstanceOf(Array)
-    expect(res.body.data.total).toBeGreaterThanOrEqual(0)
-    expect(res.body.data.state).toBe('CA')
-    expect(res.body.data.companyName).toBe('Test Corp')
-    expect(res.body.data.timestamp).toBeDefined()
+    const response = await request(app).post('/api/scrape/ucc').send({
+      company_name: 'Test Corp',
+      state: 'ca',
+      limit: 50
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.body.success).toBe(true)
+    expect(response.body.data.state).toBe('CA')
+    expect(mockSearch).toHaveBeenCalledWith({
+      companyName: 'Test Corp',
+      state: 'CA',
+      limit: 50
+    })
   })
 
-  it('should normalize state code to uppercase', async () => {
-    const res = await request(app).post('/api/scrape/ucc').send({
+  it('enforces state normalization before calling service methods', async () => {
+    mockSearch.mockResolvedValue({
+      filings: [],
+      total: 0,
+      state: 'CA',
+      companyName: 'Test Corp',
+      timestamp: '2026-06-24T00:00:00.000Z'
+    })
+
+    await request(app).post('/api/scrape/ucc').send({
       company_name: 'Test Corp',
       state: 'ca'
     })
 
-    expect(res.status).toBe(200)
-    expect(res.body.data.state).toBe('CA')
-  })
-
-  it('should reject invalid state code length in real implementation', () => {
-    // In the actual route, this is enforced by zod schema: .length(2)
-    // The mock app above doesn't enforce this, so this test documents the behavior
-    const stateSchema = z.string().length(2)
-
-    expect(() => stateSchema.parse('California')).toThrow()
-    expect(() => stateSchema.parse('CA')).not.toThrow()
-  })
-
-  it('should accept optional limit parameter', async () => {
-    const res = await request(app).post('/api/scrape/ucc').send({
-      company_name: 'Test Corp',
+    expect(mockGetStateReadiness).toHaveBeenCalledWith('CA')
+    expect(mockSearch).toHaveBeenCalledWith({
+      companyName: 'Test Corp',
       state: 'CA',
-      limit: 50
+      limit: 100
+    })
+  })
+
+  it('returns 401 when auth is missing', async () => {
+    const noAuthApp = express()
+    noAuthApp.use(express.json())
+    noAuthApp.use('/api/scrape', scrapeRouter)
+
+    const response = await request(noAuthApp).post('/api/scrape/ucc').send({
+      company_name: 'Test Corp',
+      state: 'CA'
     })
 
-    expect(res.status).toBe(200)
-    expect(res.body.success).toBe(true)
+    expect(response.status).toBe(401)
+    expect(response.body.error).toBe('Unauthorized')
+    expect(mockGetStateReadiness).not.toHaveBeenCalled()
+    expect(mockSearch).not.toHaveBeenCalled()
   })
+})
 
-  it('should enforce maximum limit of 1000', async () => {
-    // This validation happens in the route schema
-    const res = await request(app).post('/api/scrape/ucc').send({
-      company_name: 'Test Corp',
-      state: 'CA',
-      limit: 5000
+describe('GET /api/scrape/readiness/:stateCode', () => {
+  let app: Express
+
+  const buildTestApp = () => {
+    const testApp = express()
+    testApp.use(express.json())
+
+    testApp.use((req, _res, next) => {
+      ;(req as { user: { orgId: string; role: string } }).user = {
+        orgId: 'test-org',
+        role: 'user'
+      }
+      next()
     })
 
-    // Depending on validation implementation, this should either:
-    // 1. Return 400 (if schema rejects it)
-    // 2. Clamp to 1000 (if schema transforms it)
-    // For now, we accept both behaviors
-    expect([200, 400]).toContain(res.status)
+    testApp.use('/api/scrape', scrapeRouter)
+    return testApp
+  }
+
+  beforeEach(() => {
+    mockGetStateReadiness.mockReset()
+    mockGetStateReadiness.mockReturnValue({
+      state: 'CA',
+      canSearch: true,
+      reason: 'Collector ready for state: CA'
+    })
+    app = buildTestApp()
+  })
+
+  it('returns availability for a supported state', async () => {
+    const response = await request(app).get('/api/scrape/readiness/ca')
+
+    expect(response.status).toBe(200)
+    expect(response.body.success).toBe(true)
+    expect(response.body.data).toMatchObject({
+      state: 'CA',
+      canSearch: true,
+      reason: 'Collector ready for state: CA'
+    })
+    expect(mockGetStateReadiness).toHaveBeenCalledWith('CA')
+  })
+
+  it('returns blocked status for unavailable states', async () => {
+    mockGetStateReadiness.mockReturnValue({
+      state: 'XX',
+      canSearch: false,
+      reason: 'No UCC data available for state: XX'
+    })
+
+    const response = await request(app).get('/api/scrape/readiness/xx')
+
+    expect(response.status).toBe(200)
+    expect(response.body.success).toBe(true)
+    expect(response.body.data).toMatchObject({
+      state: 'XX',
+      canSearch: false,
+      reason: 'No UCC data available for state: XX'
+    })
+    expect(mockGetStateReadiness).toHaveBeenCalledWith('XX')
+  })
+
+  it('returns 400 for invalid state payload', async () => {
+    const response = await request(app).get('/api/scrape/readiness/ABC')
+
+    expect(response.status).toBe(400)
+    expect(response.body.error.code).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns 401 when auth is missing', async () => {
+    const noAuthApp = express()
+    noAuthApp.use(express.json())
+    noAuthApp.use('/api/scrape', scrapeRouter)
+
+    const response = await request(noAuthApp).get('/api/scrape/readiness/ca')
+
+    expect(response.status).toBe(401)
+    expect(response.body.error).toBe('Unauthorized')
+    expect(mockGetStateReadiness).not.toHaveBeenCalled()
   })
 })

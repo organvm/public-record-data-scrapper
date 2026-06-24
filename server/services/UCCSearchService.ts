@@ -24,6 +24,12 @@ export interface UCCSearchResponse {
   timestamp: string
 }
 
+export interface UCCStateReadiness {
+  state: string
+  canSearch: boolean
+  reason: string
+}
+
 export class UCCSearchService {
   private factory: StateCollectorFactory
 
@@ -37,6 +43,12 @@ export class UCCSearchService {
 
   async search(req: UCCSearchRequest): Promise<UCCSearchResponse> {
     const normalizedState = req.state.toUpperCase()
+    const readiness = this.getStateReadiness(normalizedState)
+
+    if (!readiness.canSearch) {
+      throw new Error(readiness.reason)
+    }
+
     const collector = this.factory.getCollector(normalizedState)
 
     if (!collector) {
@@ -51,6 +63,25 @@ export class UCCSearchService {
       state: normalizedState,
       companyName: req.companyName,
       timestamp: new Date().toISOString()
+    }
+  }
+
+  getStateReadiness(state: string): UCCStateReadiness {
+    const normalizedState = state.toUpperCase()
+    const collector = this.factory.getCollector(normalizedState)
+
+    if (!collector) {
+      return {
+        state: normalizedState,
+        canSearch: false,
+        reason: `No UCC data available for state: ${normalizedState}`
+      }
+    }
+
+    return {
+      state: normalizedState,
+      canSearch: true,
+      reason: `Collector ready for state: ${normalizedState}`
     }
   }
 }

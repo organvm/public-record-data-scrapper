@@ -33,6 +33,29 @@ const searchUCCSchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).default(100)
 })
 
+const readinessSchema = z.object({
+  stateCode: z.string().length(2).transform((s) => s.toUpperCase())
+})
+
+// GET /api/scrape/readiness/:stateCode - Check if a state can be searched right now
+router.get(
+  '/readiness/:stateCode',
+  requireRole('user', 'admin'),
+  validateRequest({ params: readinessSchema }),
+  asyncHandler(async (req, res) => {
+    const searchService = new UCCSearchService()
+    const state = req.params.stateCode
+
+    res.json({
+      success: true,
+      data: searchService.getStateReadiness(state),
+      meta: {
+        requestedAt: new Date().toISOString()
+      }
+    })
+  })
+)
+
 // POST /api/scrape/ucc - Search for UCC filings by company name
 router.post(
   '/ucc',
@@ -41,6 +64,23 @@ router.post(
   asyncHandler(async (req, res) => {
     const searchService = new UCCSearchService()
     const body = req.body as z.infer<typeof searchUCCSchema>
+    const readiness = searchService.getStateReadiness(body.state)
+
+    if (!readiness.canSearch) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: readiness.reason,
+          code: 'UCC_STATE_UNAVAILABLE',
+          statusCode: 400,
+          details: {
+            state: readiness.state,
+            readinessEndpoint: `/api/scrape/readiness/${readiness.state}`
+          }
+        }
+      })
+      return
+    }
 
     try {
       const result = await searchService.search({

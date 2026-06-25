@@ -26,7 +26,7 @@ const querySchema = z.object({
     .transform((v) => Math.min(Math.max(Number(v), 1), MAX_PAGE_LIMIT))
     .default('20'),
   state: z.string().length(2).optional(),
-  industry: z.string().optional(),
+  industry: z.string().max(100).optional(),
   min_score: z.string().regex(/^\d+$/).transform(Number).optional(),
   max_score: z.string().regex(/^\d+$/).transform(Number).optional(),
   status: z.enum(['all', 'unclaimed', 'claimed', 'contacted']).optional(),
@@ -52,7 +52,7 @@ const exportQuerySchema = z
       .regex(/^[A-Za-z]{2}$/)
       .transform((v) => v.toUpperCase())
       .optional(),
-    industry: z.string().optional(),
+    industry: z.string().max(100).optional(),
     status: z
       .enum([
         'new',
@@ -90,7 +90,7 @@ const exportQuerySchema = z
   })
 
 const createProspectSchema = z.object({
-  company_name: z.string().min(1),
+  company_name: z.string().min(1).max(255),
   state: z.string().length(2),
   industry: z.enum([
     'restaurant',
@@ -114,14 +114,14 @@ const idParamSchema = z.object({
 // A claiming user identifier. The dashboard sends a display name ('Current
 // User') rather than a UUID, so this is a non-empty string, not z.uuid().
 const claimBodySchema = z.object({
-  user: z.string().min(1)
+  user: z.string().min(1).max(255)
 })
 
 const MAX_BATCH_SIZE = 100
 
 const batchClaimBodySchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(MAX_BATCH_SIZE),
-  user: z.string().min(1)
+  user: z.string().min(1).max(255)
 })
 
 const batchDeleteBodySchema = z.object({

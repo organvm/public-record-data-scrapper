@@ -78,7 +78,36 @@ export class Server {
     this.app.use(httpsRedirect)
 
     // Security headers
-    this.app.use(helmet())
+    this.app.use(
+      helmet({
+        // Content Security Policy: restrict script/style/font/image sources
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"], // Swagger UI needs unsafe-inline
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", 'data:', 'https:'],
+            fontSrc: ["'self'"],
+            connectSrc: ["'self'"],
+            frameSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: []
+          }
+        },
+        // Strict-Transport-Security for HTTPS enforcement
+        hsts: {
+          maxAge: 31536000, // 1 year
+          includeSubDomains: true,
+          preload: true
+        },
+        // Prevent MIME type sniffing
+        noSniff: true,
+        // Prevent clickjacking
+        xssFilter: true,
+        // Referrer policy
+        referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+      })
+    )
     this.app.use(
       cors({
         origin: config.cors.origin,

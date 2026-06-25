@@ -108,10 +108,10 @@ const templatesQuerySchema = z
   .strict()
 
 const attachmentSchema = z.object({
-  name: z.string().min(1),
-  url: z.string().url(),
+  name: z.string().min(1).max(255),
+  url: z.string().url().max(2048),
   size: z.number().int().nonnegative(),
-  mimeType: z.string().min(1)
+  mimeType: z.string().min(1).max(100)
 })
 
 const sendEmailSchema = z
@@ -122,13 +122,13 @@ const sendEmailSchema = z
     deal_id: z.string().uuid().optional(),
     template_id: z.string().uuid().optional(),
     sent_by: z.string().uuid().optional(),
-    to_address: z.string().email(),
-    cc_addresses: z.array(z.string().email()).optional(),
-    bcc_addresses: z.array(z.string().email()).optional(),
-    subject: z.string().min(1),
-    body: z.string().min(1),
-    body_html: z.string().optional(),
-    attachments: z.array(attachmentSchema).optional(),
+    to_address: z.string().email().max(254),
+    cc_addresses: z.array(z.string().email().max(254)).max(50).optional(),
+    bcc_addresses: z.array(z.string().email().max(254)).max(50).optional(),
+    subject: z.string().min(1).max(255),
+    body: z.string().min(1).max(65536),
+    body_html: z.string().max(65536).optional(),
+    attachments: z.array(attachmentSchema).max(10).optional(),
     scheduled_for: z.string().datetime().optional(),
     metadata: z.record(z.string(), z.unknown()).optional()
   })
@@ -142,8 +142,8 @@ const sendSmsSchema = z
     deal_id: z.string().uuid().optional(),
     template_id: z.string().uuid().optional(),
     sent_by: z.string().uuid().optional(),
-    to_phone: z.string().min(1),
-    body: z.string().min(1),
+    to_phone: z.string().min(1).max(20),
+    body: z.string().min(1).max(4096),
     scheduled_for: z.string().datetime().optional(),
     metadata: z.record(z.string(), z.unknown()).optional()
   })
@@ -156,8 +156,8 @@ const initiateCallSchema = z
     prospect_id: z.string().uuid().optional(),
     deal_id: z.string().uuid().optional(),
     sent_by: z.string().uuid().optional(),
-    to_phone: z.string().min(1),
-    call_script: z.string().optional(),
+    to_phone: z.string().min(1).max(20),
+    call_script: z.string().max(4096).optional(),
     metadata: z.record(z.string(), z.unknown()).optional()
   })
   .strict()

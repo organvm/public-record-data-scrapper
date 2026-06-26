@@ -7,10 +7,12 @@ const mockSearch = vi.fn()
 const mockGetStateReadiness = vi.fn()
 
 vi.mock('../../services/UCCSearchService', () => ({
-  UCCSearchService: vi.fn(() => ({
-    search: mockSearch,
-    getStateReadiness: mockGetStateReadiness
-  }))
+  UCCSearchService: vi.fn(function () {
+    return {
+      search: mockSearch,
+      getStateReadiness: mockGetStateReadiness
+    }
+  })
 }))
 
 describe('POST /api/scrape/ucc', () => {

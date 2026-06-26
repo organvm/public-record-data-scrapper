@@ -18,7 +18,11 @@ export default tseslint.config(
       'react-refresh': reactRefresh
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
+      // Classic react-hooks rules only — the v7 recommended config adds React
+      // Compiler rules (react-hooks/refs, react-hooks/set-state-in-effect, etc.)
+      // that the codebase pre-dates. Tracked in #314 for a future pass.
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }]
     }
   }

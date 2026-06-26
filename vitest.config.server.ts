@@ -43,11 +43,7 @@ export default defineConfig({
         : undefined
     },
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true
-      }
-    },
+    singleFork: true,
     testTimeout: 10000,
     hookTimeout: 10000
   },

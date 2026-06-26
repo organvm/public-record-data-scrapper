@@ -1,8 +1,8 @@
 # Public Record Data Scraper — Deploy-Ready Build
 
 **Status:** ✅ DEPLOYMENT READY  
-**Build Date:** 2026-06-23  
-**Latest Commit:** 477dfc4 "Drive Public Record Data Scraper to deploy-ready (#305)"
+**Build Date:** 2026-06-26  
+**Latest Commit:** 92f6572 "fix(ci): unblock gate — Vitest 4 constructor mock + ESLint v7 react-hooks compat"
 
 ## Build Artifacts
 
@@ -31,10 +31,10 @@ Both bundles include source maps for production debugging.
 ### Server Tests
 
 ```
-Test Files:   85 passed
-Tests:        1406 passed | 6 skipped
+Test Files:   87 passed
+Tests:        1427 passed | 6 skipped
 Coverage:     71.49% statements
-Duration:     26.10s
+Duration:     31s
 ```
 
 **Key Modules Tested:**
@@ -117,16 +117,18 @@ The application is deployment-ready for:
 - **AWS ECS/Lambda** (with custom build steps for RLS validation)
 - **Self-hosted** (Docker Compose or Kubernetes)
 
-## What's Completed (PR #305)
+## What's Completed (PR #317 / 2026-06-26)
 
 - ✅ Status Dashboard component with live system health
 - ✅ Subscription tier gating
 - ✅ Enhanced CLI scraper with async job queue support
+- ✅ Async scrape job queue (POST /api/scrape/jobs + GET /api/scrape/jobs/:id)
+- ✅ API key auth for paying customers (X-API-Key / Bearer prk_…)
+- ✅ Per-key rate limiting (100 req/15min)
 - ✅ Error handling middleware (structured errors, logging)
 - ✅ Request validation middleware
-- ✅ Mobile/desktop navigation UX improvements
-- ✅ E2E test infrastructure
-- ✅ 71.5% test coverage (backend)
+- ✅ CI gate green: 87 server test files / 1427 tests pass
+- ✅ ESLint clean (0 errors) after react-hooks v7 compat fix
 
 ## Known Limitations & Backlog
 

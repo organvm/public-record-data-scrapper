@@ -189,6 +189,15 @@ public-record-data-scrapper/
 
 The Express server exposes a RESTful API documented at `/api/docs` when running.
 
+### Scrape API — auth: API key (`X-API-Key: prk_…` or `Authorization: Bearer prk_…`) or JWT
+
+| Method | Endpoint                             | Description                                   |
+| ------ | ------------------------------------ | --------------------------------------------- |
+| `GET`  | `/api/scrape/readiness/:stateCode`   | Check whether a state scraper is available    |
+| `POST` | `/api/scrape/ucc`                    | Search UCC filings by company name and state; body: `company_name`, `state`, optional `limit` (1–1000, default 100) |
+
+### Dashboard API — auth: JWT
+
 | Method  | Endpoint                      | Description                                  |
 | ------- | ----------------------------- | -------------------------------------------- |
 | `GET`   | `/api/prospects`              | List prospects with filtering and pagination |
@@ -200,6 +209,14 @@ The Express server exposes a RESTful API documented at `/api/docs` when running.
 | `PATCH` | `/api/deals/:id/stage`        | Move deal to next pipeline stage             |
 | `POST`  | `/api/communications/send`    | Send email or SMS                            |
 | `GET`   | `/api/compliance/report`      | Generate compliance report                   |
+
+### API key management — auth: JWT, role: admin
+
+| Method   | Endpoint        | Description          |
+| -------- | --------------- | -------------------- |
+| `POST`   | `/api/keys`     | Create an API key    |
+| `GET`    | `/api/keys`     | List API keys        |
+| `DELETE` | `/api/keys/:id` | Revoke an API key    |
 
 Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 

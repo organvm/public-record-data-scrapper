@@ -138,11 +138,7 @@ export const rateLimiter = async (
  * (config.rateLimit.failOpen), in which case we allow the request through.
  * Either way we log loudly.
  */
-function handleLimiterBackendError(
-  res: Response,
-  next: NextFunction,
-  error: unknown
-): void {
+function handleLimiterBackendError(res: Response, next: NextFunction, error: unknown): void {
   if (config.rateLimit.failOpen) {
     console.error(
       '[RateLimiter] Backend error — failing OPEN (RATE_LIMIT_FAIL_OPEN=true), allowing request:',
@@ -287,4 +283,176 @@ export async function closeRateLimiterConnection(): Promise<void> {
     redisClient = null
     console.log('[RateLimiter] Redis connection closed')
   }
+}
+
+// ---------------------------------------------------------------------------
+// Per-identity rate limiter
+//
+// Keyed on the authenticated user identity (req.user.id) rather than the
+// client IP. Run AFTER auth middleware so req.user is already populated.
+//
+// For API-key callers req.user.id = `apikey:<keyId>`, giving each paying
+// customer an independent quota — two customers behind the same NAT/VPN no
+// longer compete for the same slot.
+// For JWT callers req.user.id = the user UUID.
+// Falls back to IP for unauthenticated requests (shouldn't happen on the
+// protected scrape routes, but avoids a crash if it does).
+// ---------------------------------------------------------------------------
+
+function getUserIdentity(req: Request): string {
+  const user = (req as Request & { user?: { id?: string } }).user
+  return user?.id ?? getClientIp(req)
+}
+
+export const identityRateLimiter = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const identifier = getUserIdentity(req)
+  const key = `ratelimit:user:${identifier}`
+  const now = Date.now()
+  const windowStart = now - config.rateLimit.windowMs
+
+  try {
+    const redis = getRedisClient()
+    const pipeline = redis.multi()
+    pipeline.zremrangebyscore(key, 0, windowStart)
+    pipeline.zcard(key)
+    pipeline.zadd(key, now, `${now}-${Math.random().toString(36).slice(2)}`)
+    pipeline.expire(key, Math.ceil(config.rateLimit.windowMs / 1000))
+    const results = await pipeline.exec()
+
+    if (!results) {
+      return handleLimiterBackendError(
+        res,
+        next,
+        new Error('Redis transaction returned no results')
+      )
+    }
+
+    const count = (results[1]?.[1] as number) || 0
+
+    if (count >= config.rateLimit.max) {
+      const oldest = await redis.zrange(key, 0, 0, 'WITHSCORES')
+      const oldestTimestamp = oldest.length >= 2 ? parseInt(oldest[1], 10) : now
+      const retryAfter = Math.ceil((oldestTimestamp + config.rateLimit.windowMs - now) / 1000)
+
+      res.set('Retry-After', Math.max(1, retryAfter).toString())
+      res.set('X-RateLimit-Limit', config.rateLimit.max.toString())
+      res.set('X-RateLimit-Remaining', '0')
+      res.set(
+        'X-RateLimit-Reset',
+        new Date(oldestTimestamp + config.rateLimit.windowMs).toISOString()
+      )
+
+      res.status(429).json({
+        error: {
+          message: 'Too many requests. Please try again later.',
+          code: 'RATE_LIMIT_EXCEEDED',
+          statusCode: 429,
+          retryAfter: Math.max(1, retryAfter)
+        }
+      })
+      return
+    }
+
+    res.set('X-RateLimit-Limit', config.rateLimit.max.toString())
+    res.set('X-RateLimit-Remaining', Math.max(0, config.rateLimit.max - count - 1).toString())
+    res.set('X-RateLimit-Reset', new Date(now + config.rateLimit.windowMs).toISOString())
+
+    next()
+  } catch (error) {
+    return handleLimiterBackendError(res, next, error)
+  }
+}
+
+const inMemoryIdentityStore: InMemoryStore = {}
+let inMemoryIdentityCleanupTimer: ReturnType<typeof setInterval> | null = null
+
+function ensureInMemoryIdentityCleanupTimer(): void {
+  if (inMemoryIdentityCleanupTimer) return
+  inMemoryIdentityCleanupTimer = setInterval(
+    () => {
+      const now = Date.now()
+      Object.keys(inMemoryIdentityStore).forEach((key) => {
+        if (now > inMemoryIdentityStore[key].resetTime) {
+          delete inMemoryIdentityStore[key]
+        }
+      })
+    },
+    60 * 60 * 1000
+  )
+  inMemoryIdentityCleanupTimer.unref?.()
+}
+
+export const inMemoryIdentityRateLimiter = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  ensureInMemoryIdentityCleanupTimer()
+  const identifier = getUserIdentity(req)
+  const now = Date.now()
+
+  if (!inMemoryIdentityStore[identifier]) {
+    inMemoryIdentityStore[identifier] = {
+      count: 1,
+      resetTime: now + config.rateLimit.windowMs
+    }
+    return next()
+  }
+
+  const record = inMemoryIdentityStore[identifier]
+
+  if (now > record.resetTime) {
+    record.count = 1
+    record.resetTime = now + config.rateLimit.windowMs
+    return next()
+  }
+
+  record.count++
+
+  if (record.count > config.rateLimit.max) {
+    const retryAfter = Math.ceil((record.resetTime - now) / 1000)
+
+    res.set('Retry-After', retryAfter.toString())
+    res.set('X-RateLimit-Limit', config.rateLimit.max.toString())
+    res.set('X-RateLimit-Remaining', '0')
+    res.set('X-RateLimit-Reset', new Date(record.resetTime).toISOString())
+
+    res.status(429).json({
+      error: {
+        message: 'Too many requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+        statusCode: 429,
+        retryAfter
+      }
+    })
+    return
+  }
+
+  res.set('X-RateLimit-Limit', config.rateLimit.max.toString())
+  res.set('X-RateLimit-Remaining', (config.rateLimit.max - record.count).toString())
+  res.set('X-RateLimit-Reset', new Date(record.resetTime).toISOString())
+
+  next()
+}
+
+export function stopInMemoryIdentityCleanupTimer(): void {
+  if (inMemoryIdentityCleanupTimer) {
+    clearInterval(inMemoryIdentityCleanupTimer)
+    inMemoryIdentityCleanupTimer = null
+  }
+}
+
+export function createApiKeyRateLimiter(): (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => void | Promise<void> {
+  if (config.server.env === 'production' || process.env.USE_REDIS_RATE_LIMIT === 'true') {
+    return identityRateLimiter
+  }
+  return inMemoryIdentityRateLimiter
 }

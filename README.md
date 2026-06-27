@@ -177,12 +177,24 @@ The Express server exposes Swagger UI at `/api/docs` and raw OpenAPI at
 The on-demand UCC API is mounted behind API-key-or-JWT auth:
 
 ```bash
+# Check whether a state scraper is available
 curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/scrape/readiness/CA
 
+# Synchronous search — waits for results (suitable for small queries)
 curl -X POST http://localhost:3000/api/scrape/ucc \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"company_name":"Company Name","state":"CA","limit":100}'
+
+# Async search — returns 202 immediately with a jobId (use for large or slow queries)
+curl -X POST http://localhost:3000/api/scrape/jobs \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"company_name":"Company Name","state":"CA","limit":500}'
+# → {"data":{"jobId":"<uuid>","status":"pending","pollUrl":"/api/scrape/jobs/<uuid>"},...}
+
+# Poll until status is "completed" or "failed"
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/scrape/jobs/<jobId>
 ```
 
 ### Workspace exports
@@ -267,7 +279,9 @@ The Express server exposes a RESTful API documented at `/api/docs` when running.
 | Method | Endpoint                             | Description                                   |
 | ------ | ------------------------------------ | --------------------------------------------- |
 | `GET`  | `/api/scrape/readiness/:stateCode`   | Check whether a state scraper is available    |
-| `POST` | `/api/scrape/ucc`                    | Search UCC filings by company name and state; body: `company_name`, `state`, optional `limit` (1–1000, default 100) |
+| `POST` | `/api/scrape/ucc`                    | Synchronous UCC search; body: `company_name`, `state`, optional `limit` (1–1000, default 100) |
+| `POST` | `/api/scrape/jobs`                   | Enqueue async scrape (same body as above); returns 202 + `jobId` + `pollUrl` immediately |
+| `GET`  | `/api/scrape/jobs/:jobId`            | Poll async job; returns `pending`, `processing`, `completed`, or `failed` with results when done |
 
 ### Dashboard API — auth: JWT
 

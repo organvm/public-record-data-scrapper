@@ -12,12 +12,8 @@ import { config, validateConfig } from './config'
 import { database } from './database/connection'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler'
 import { requestLogger } from './middleware/requestLogger'
-import {
-  createRateLimiter,
-  createApiKeyRateLimiter,
-  closeRateLimiterConnection
-} from './middleware/rateLimiter'
-import { authMiddleware, requireRole } from './middleware/authMiddleware'
+import { createRateLimiter, closeRateLimiterConnection } from './middleware/rateLimiter'
+import { authMiddleware } from './middleware/authMiddleware'
 import { apiKeyOrJwtAuth } from './middleware/apiKeyAuth'
 import { orgContextMiddleware } from './middleware/orgContext'
 import { httpsRedirect } from './middleware/httpsRedirect'
@@ -45,7 +41,6 @@ import discoveryRouter from './routes/discovery'
 import metricsRouter from './routes/metrics'
 import agenticRouter from './routes/agentic'
 import scrapeRouter from './routes/scrape'
-import apiKeysRouter from './routes/apiKeys'
 
 // Import queue infrastructure
 import {
@@ -174,30 +169,7 @@ export class Server {
     this.app.use('/api/compliance', authMiddleware, orgContextMiddleware, complianceRouter)
     this.app.use('/api/discovery', authMiddleware, orgContextMiddleware, discoveryRouter)
     this.app.use('/api/agentic', authMiddleware, orgContextMiddleware, agenticRouter)
-
-    // API key management — JWT + admin only, so an API key can never mint or
-    // manage other keys. orgContext binds the admin's org for tenant scoping.
-    this.app.use(
-      '/api/keys',
-      authMiddleware,
-      orgContextMiddleware,
-      requireRole('admin'),
-      apiKeysRouter
-    )
-
-    // On-demand scrape (the data-as-a-service revenue endpoint). Accepts either
-    // a customer API key (X-API-Key / Bearer prk_…) or a JWT, then binds org
-    // context so per-tenant scoping/RLS applies to either credential.
-    // createApiKeyRateLimiter() runs AFTER auth so req.user.id is populated,
-    // giving each API-key customer an independent quota keyed on their key ID
-    // (not IP — two customers sharing a NAT/VPN no longer compete).
-    this.app.use(
-      '/api/scrape',
-      apiKeyOrJwtAuth,
-      orgContextMiddleware,
-      createApiKeyRateLimiter(),
-      scrapeRouter
-    )
+    this.app.use('/api/scrape', apiKeyOrJwtAuth, scrapeRouter)
 
     // Root endpoint
     this.app.get('/', (req, res) => {
@@ -221,7 +193,6 @@ export class Server {
           compliance: '/api/compliance',
           discovery: '/api/discovery',
           scrape: '/api/scrape',
-          keys: '/api/keys',
           metrics: '/api/metrics',
           webhooks: '/api/webhooks'
         }

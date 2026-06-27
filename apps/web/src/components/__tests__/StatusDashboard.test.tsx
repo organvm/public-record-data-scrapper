@@ -200,7 +200,7 @@ describe('StatusDashboard', () => {
 
     expect(screen.getByRole('heading', { name: 'Product Status' })).toBeInTheDocument()
     expect(screen.getByText('Online')).toBeInTheDocument()
-    expect(screen.getByText('Preview data')).toBeInTheDocument()
+    expect(screen.getAllByText('Preview data')[0]).toBeInTheDocument()
     expect(screen.getByText('Top States')).toBeInTheDocument()
     expect(screen.getByText('CA')).toBeInTheDocument()
 

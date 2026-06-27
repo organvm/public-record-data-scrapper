@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // Experimental generative AI features - disabled strict linting
 import type {
   Prospect,
@@ -11,6 +11,16 @@ import type {
   GrowthSignal,
   IndustryTrend
 } from '@public-records/core'
+
+/**
+ * Caller-supplied hints that bias narrative generation toward the user's
+ * focus areas and risk appetite. All fields optional.
+ */
+interface NarrativeUserPreferences {
+  industries?: string[]
+  focusAreas?: string[]
+  riskTolerance?: 'low' | 'medium' | 'high'
+}
 
 /**
  * GenerativeNarrativeEngine - AI-powered narrative and insight generation
@@ -34,20 +44,16 @@ export class GenerativeNarrativeEngine {
    */
   async generateNarrative(
     context: GenerativeContext,
-    userPreferences?: {
-      industries?: string[]
-      focusAreas?: string[]
-      riskTolerance?: 'low' | 'medium' | 'high'
-    }
+    userPreferences?: NarrativeUserPreferences
   ): Promise<GenerativeNarrative> {
     const { prospect, marketData, relationships, historicalSignals, industryTrends } = context
 
     // Build comprehensive prompt
     const prompt = this.buildNarrativePrompt(prospect, {
       marketData,
-      relationships: relationships as any,
-      historicalSignals: historicalSignals as any,
-      industryTrends: industryTrends as any,
+      relationships,
+      historicalSignals,
+      industryTrends,
       userPreferences
     })
 
@@ -161,7 +167,7 @@ Format as plain text without markdown.
       relationships?: CompanyGraph
       historicalSignals?: GrowthSignal[]
       industryTrends?: IndustryTrend[]
-      userPreferences?: any
+      userPreferences?: NarrativeUserPreferences
     }
   ): string {
     const { marketData, relationships, historicalSignals, industryTrends, userPreferences } =

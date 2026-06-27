@@ -44,7 +44,7 @@
 
 ---
 
-## Quick Start
+## Usage
 
 ```bash
 git clone https://github.com/organvm-iii-ergon/public-record-data-scrapper.git
@@ -52,43 +52,82 @@ cd public-record-data-scrapper
 npm install --legacy-peer-deps
 ```
 
-### Run with Docker (recommended)
+### Development and runtime commands
 
 ```bash
-docker-compose up -d db redis          # Start PostgreSQL + Redis
-npm run db:migrate && npm run seed     # Initialize database
-npm run dev:full                       # Start frontend + API + worker
+npm run dev                              # Run web app only (Vite)
+npm run dev:server                       # Run Express API only
+npm run dev:worker                       # Run BullMQ worker only
+npm run dev:full                         # Run web + API + worker together
+npm run build                            # Build distributable web bundle
+npm run build:server                     # Build API worker output bundle
+npm run start                            # Run built API server
+npm run start:worker                     # Run built worker
 ```
 
-Frontend: `http://localhost:5000` | API: `http://localhost:3000`
+Prerequisites for full stack/API commands:
 
-### CLI Tools
+```bash
+docker-compose up -d db redis             # PostgreSQL + Redis
+npm run db:migrate && npm run seed        # Apply schema + seed data
+```
+
+Health checks (running API on default `3000`):
+
+```bash
+curl -fsS http://localhost:3000/api/health           # Basic liveness
+curl -fsS http://localhost:3000/api/health/detailed   # Dependency status
+```
+
+### CLI tools (`npm run scrape`)
+
+The CLI is registered in `scripts/cli-scraper.ts` and executed as:
+
+```bash
+npm run scrape -- <command> [flags]
+```
+
+See command-level help with:
+
+```bash
+npm run scrape -- --help
+npm run scrape -- scrape-ucc --help
+```
 
 ```bash
 # Scrape UCC filings for a company
-npm run scrape -- scrape-ucc -c "Company Name" -s CA -o results.json
+npm run scrape -- scrape-ucc -c "Company Name" -s CA -o ./results.json
+#   required: -c|--company <name>, -s|--state <code>
+#   optional: -o|--output <file> (default: ./output.json), --csv
+#   supported states: CA, TX, FL, NY
+
+# Normalize one company name
+npm run scrape -- normalize -n "Company Name"
+#   required: -n|--name <name>
 
 # Enrich from public sources
-npm run scrape -- enrich -c "Company Name" -s CA -o enriched.json
+npm run scrape -- enrich -c "Company Name" -s CA --tier professional -o ./enriched-data.json
+#   required: -c|--company <name>, -s|--state <code>
+#   optional: -o|--output <file> (default: ./enriched-data.json), --tier <free|starter|professional>, --csv
+#   supported states: CA, TX, FL, NY
 
-# Batch process from CSV
-npm run scrape -- batch -i companies.csv -o ./results
+# Batch process CSV input
+npm run scrape -- batch -i ./companies.csv -o ./batch-results
+#   required: -i|--input <file> (CSV header + rows company,state)
+#   optional: -o|--output <dir> (default: ./batch-results), --enrich
+#   max 1,000 rows and input capped at 5MB
 
-# Export scored MCA leads as JSON + CSV batches (requires database)
-npm run scrape -- lead-export --min-score 70 --limit 100 --output-dir ./lead-export
+# Export scored leads (database-backed)
+npm run scrape -- lead-export --min-score 70 --max-score 95 --state CA --limit 100 --offset 0 --output-dir ./lead-export
+#   optional: -o|--output-dir <dir> (default: ./lead-export)
+#   optional: --format <json|csv|both> (default: both)
+#   optional: --min-score <0-100> (default: 70), --max-score <0-100>
+#   optional: --state <CA|TX|FL|NY>, --industry <name>, --status <status>
+#   optional: --limit <1-1000> (default: 100), --offset <integer> (default: 0)
 
-# List state collectors (4 implemented: CA, TX, FL, NY)
+# List available states with configured UCC collectors
 npm run scrape -- list-states
 ```
-
-### Smoke test (verify a running server)
-
-```bash
-curl -fsS http://localhost:3000/api/health        # liveness — expects HTTP 200
-curl -fsS http://localhost:3000/api/health/detailed   # dependency status (DB, Redis)
-```
-
-A non-zero exit from the first command means the API is not up.
 
 ---
 

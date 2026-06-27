@@ -12,7 +12,11 @@ import { config, validateConfig } from './config'
 import { database } from './database/connection'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler'
 import { requestLogger } from './middleware/requestLogger'
-import { createRateLimiter, closeRateLimiterConnection } from './middleware/rateLimiter'
+import {
+  createRateLimiter,
+  createApiKeyRateLimiter,
+  closeRateLimiterConnection
+} from './middleware/rateLimiter'
 import { authMiddleware, requireRole } from './middleware/authMiddleware'
 import { apiKeyOrJwtAuth } from './middleware/apiKeyAuth'
 import { orgContextMiddleware } from './middleware/orgContext'
@@ -184,7 +188,16 @@ export class Server {
     // On-demand scrape (the data-as-a-service revenue endpoint). Accepts either
     // a customer API key (X-API-Key / Bearer prk_…) or a JWT, then binds org
     // context so per-tenant scoping/RLS applies to either credential.
-    this.app.use('/api/scrape', apiKeyOrJwtAuth, orgContextMiddleware, scrapeRouter)
+    // createApiKeyRateLimiter() runs AFTER auth so req.user.id is populated,
+    // giving each API-key customer an independent quota keyed on their key ID
+    // (not IP — two customers sharing a NAT/VPN no longer compete).
+    this.app.use(
+      '/api/scrape',
+      apiKeyOrJwtAuth,
+      orgContextMiddleware,
+      createApiKeyRateLimiter(),
+      scrapeRouter
+    )
 
     // Root endpoint
     this.app.get('/', (req, res) => {

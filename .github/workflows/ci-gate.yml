@@ -57,6 +57,9 @@ jobs:
         # --ignore-scripts: don't run untrusted PR lifecycle scripts on the runner.
         run: npm ci --ignore-scripts
 
+      - name: Lint
+        run: npm run lint
+
       - name: Type check (non-blocking — see #236)
         continue-on-error: true
         run: npx tsc --noEmit || echo "::warning::TypeScript reported errors (non-blocking; tracked in #236)"

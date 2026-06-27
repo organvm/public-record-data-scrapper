@@ -20,7 +20,12 @@ vi.mock('../../config', () => ({
 }))
 
 // Import after mocking - use the in-memory rate limiter for tests
-import { inMemoryRateLimiter, createRateLimiter } from '../../middleware/rateLimiter'
+import {
+  inMemoryRateLimiter,
+  inMemoryIdentityRateLimiter,
+  createRateLimiter,
+  createApiKeyRateLimiter
+} from '../../middleware/rateLimiter'
 
 describe('inMemoryRateLimiter middleware', () => {
   let mockReq: Partial<Request>
@@ -233,5 +238,119 @@ describe('createRateLimiter factory', () => {
   it('returns in-memory rate limiter in development mode', () => {
     const limiter = createRateLimiter()
     expect(limiter).toBe(inMemoryRateLimiter)
+  })
+})
+
+describe('inMemoryIdentityRateLimiter middleware', () => {
+  let mockReq: Partial<Request> & { user?: { id?: string } }
+  let mockRes: Partial<Response>
+  let mockNext: NextFunction
+  let headers: Record<string, string>
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    headers = {}
+
+    mockReq = {
+      ip: '10.0.0.1', // shared IP for all tests — key point: identity ignores it
+      headers: {}
+    }
+    mockRes = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      set: vi.fn((key: string, value: string) => {
+        headers[key] = value
+        return mockRes
+      })
+    }
+    mockNext = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('allows the first request from a new user identity', () => {
+    mockReq.user = { id: `apikey:key-${Date.now()}` }
+
+    inMemoryIdentityRateLimiter(mockReq as Request, mockRes as Response, mockNext)
+
+    expect(mockNext).toHaveBeenCalled()
+    expect(mockRes.status).not.toHaveBeenCalled()
+  })
+
+  it('blocks requests exceeding the per-identity limit', () => {
+    mockReq.user = { id: `apikey:key-exceeded-${Date.now()}` }
+
+    for (let i = 0; i < 5; i++) {
+      inMemoryIdentityRateLimiter(mockReq as Request, mockRes as Response, mockNext)
+    }
+
+    expect(mockNext).toHaveBeenCalledTimes(5)
+
+    mockNext = vi.fn()
+    mockRes.status = vi.fn().mockReturnThis()
+    mockRes.json = vi.fn().mockReturnThis()
+
+    inMemoryIdentityRateLimiter(mockReq as Request, mockRes as Response, mockNext)
+
+    expect(mockNext).not.toHaveBeenCalled()
+    expect(mockRes.status).toHaveBeenCalledWith(429)
+    expect(mockRes.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.objectContaining({ code: 'RATE_LIMIT_EXCEEDED', statusCode: 429 })
+      })
+    )
+  })
+
+  it('isolates quotas per identity — one user exhausting limit does not throttle another', () => {
+    const user1Id = `apikey:key-user1-${Date.now()}`
+    const user2Id = `apikey:key-user2-${Date.now()}`
+
+    // Exhaust the limit for user1 (same IP as user2)
+    mockReq.user = { id: user1Id }
+    for (let i = 0; i < 5; i++) {
+      inMemoryIdentityRateLimiter(mockReq as Request, mockRes as Response, mockNext)
+    }
+
+    // user2 shares the same IP but gets its own quota slot
+    mockReq.user = { id: user2Id }
+    const freshNext = vi.fn()
+
+    inMemoryIdentityRateLimiter(mockReq as Request, mockRes as Response, freshNext)
+
+    expect(freshNext).toHaveBeenCalled()
+  })
+
+  it('resets the count after the window expires', () => {
+    mockReq.user = { id: `apikey:key-reset-${Date.now()}` }
+
+    for (let i = 0; i < 5; i++) {
+      inMemoryIdentityRateLimiter(mockReq as Request, mockRes as Response, mockNext)
+    }
+
+    vi.advanceTimersByTime(61000)
+
+    mockNext = vi.fn()
+    inMemoryIdentityRateLimiter(mockReq as Request, mockRes as Response, mockNext)
+
+    expect(mockNext).toHaveBeenCalled()
+  })
+
+  it('falls back to IP when no user is attached', () => {
+    mockReq.user = undefined
+    mockReq.ip = `fallback-ip-${Date.now()}`
+
+    inMemoryIdentityRateLimiter(mockReq as Request, mockRes as Response, mockNext)
+
+    expect(mockNext).toHaveBeenCalled()
+    expect(mockRes.status).not.toHaveBeenCalled()
+  })
+})
+
+describe('createApiKeyRateLimiter factory', () => {
+  it('returns identity-based in-memory limiter in development mode', () => {
+    const limiter = createApiKeyRateLimiter()
+    expect(limiter).toBe(inMemoryIdentityRateLimiter)
   })
 })

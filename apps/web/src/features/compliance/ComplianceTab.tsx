@@ -141,7 +141,6 @@ export function ComplianceTab() {
   }, [])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadDisclosures()
     void loadDeals()
     void loadContacts()

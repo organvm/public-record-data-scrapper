@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// Experimental generative features - disabled strict linting for AI service integration
 /**
  * Generative Intelligence Hub - Central integration point for all AI-powered features
  * Coordinates: LLM, Vector Search, Recursive Enrichment, Personalization, and Generative Content
@@ -13,8 +11,16 @@ import { ConversationAI } from './generative/ConversationAI'
 import { PersonalizationEngine } from './personalization/PersonalizationEngine'
 
 import type { Prospect } from '@public-records/core'
-import type { GenerativeConfig } from '@/types/generative'
-import type { RecursiveEnrichmentConfig } from '@/types/recursive'
+import type { GenerativeConfig, OutreachTemplate, Message } from '@/types/generative'
+import type {
+  RecursiveEnrichmentConfig,
+  EnrichmentTree,
+  EnrichmentNode
+} from '@/types/recursive'
+import type {
+  PersonalizedProspect,
+  PersonalizedDashboard
+} from '@/types/personalization'
 
 /**
  * Main hub for all generative, recursive, and personalized intelligence features
@@ -82,7 +88,7 @@ export class GenerativeIntelligenceHub {
     prospectId: string,
     depth: number = 3
   ): Promise<{
-    enrichmentTree: any
+    enrichmentTree: EnrichmentTree
     insights: string[]
     newDataPoints: number
   }> {
@@ -153,7 +159,10 @@ export class GenerativeIntelligenceHub {
   /**
    * Get personalized prospect recommendations for user
    */
-  async getPersonalizedRecommendations(userId: string, prospects: Prospect[]): Promise<any[]> {
+  async getPersonalizedRecommendations(
+    userId: string,
+    prospects: Prospect[]
+  ): Promise<PersonalizedProspect[]> {
     await this.ensureInitialized()
 
     const personalized = await this.personalization.personalizeProspects(userId, prospects)
@@ -165,7 +174,7 @@ export class GenerativeIntelligenceHub {
   /**
    * Get personalized dashboard for user
    */
-  async getPersonalizedDashboard(userId: string): Promise<any> {
+  async getPersonalizedDashboard(userId: string): Promise<PersonalizedDashboard> {
     await this.ensureInitialized()
 
     return await this.personalization.getPersonalizedDashboard(userId)
@@ -174,7 +183,7 @@ export class GenerativeIntelligenceHub {
   /**
    * Track user interaction for learning
    */
-  async trackUserInteraction(userId: string, actionType: string, data: any): Promise<void> {
+  async trackUserInteraction(userId: string, actionType: string, data: unknown): Promise<void> {
     await this.personalization.trackUserAction(userId, {
       actionType,
       timestamp: new Date(),
@@ -187,7 +196,7 @@ export class GenerativeIntelligenceHub {
   /**
    * Generate personalized outreach for prospect
    */
-  async generateOutreach(prospectId: string, userId: string): Promise<any> {
+  async generateOutreach(prospectId: string, userId: string): Promise<OutreachTemplate> {
     await this.ensureInitialized()
 
     const userProfile = await this.personalization.getUserProfile(userId)
@@ -220,7 +229,7 @@ export class GenerativeIntelligenceHub {
   /**
    * Chat with AI assistant
    */
-  async chat(sessionId: string, message: string): Promise<any> {
+  async chat(sessionId: string, message: string): Promise<Message> {
     await this.ensureInitialized()
 
     return await this.conversation.sendMessage(sessionId, message)
@@ -229,7 +238,7 @@ export class GenerativeIntelligenceHub {
   /**
    * Generate insights from data
    */
-  async generateInsights(data: any, context: string): Promise<string[]> {
+  async generateInsights(data: unknown, context: string): Promise<string[]> {
     await this.ensureInitialized()
 
     const prompt = `Analyze this data and generate actionable insights:
@@ -305,7 +314,7 @@ Provide 3-5 key insights in bullet points. Focus on:
   /**
    * Count nodes in enrichment tree
    */
-  private countNodes(node: any): number {
+  private countNodes(node: EnrichmentNode): number {
     let count = 1
     for (const child of node.childNodes || []) {
       count += this.countNodes(child)
@@ -316,7 +325,7 @@ Provide 3-5 key insights in bullet points. Focus on:
   /**
    * Generate insights from enrichment tree
    */
-  private async generateEnrichmentInsights(tree: any): Promise<string[]> {
+  private async generateEnrichmentInsights(tree: EnrichmentTree): Promise<string[]> {
     const insights: string[] = []
 
     // Analyze tree depth

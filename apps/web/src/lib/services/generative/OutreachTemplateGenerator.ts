@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // Experimental generative features - disabled strict linting for AI service integration
 /**
  * Generative Outreach Template Generator
@@ -308,7 +308,7 @@ Health Grade: ${prospectData.healthScore?.grade || 'N/A'}
 Revenue Estimate: $${prospectData.estimatedRevenue?.toLocaleString()}
 
 Growth Signals:
-${prospectData.growthSignals?.map((s: any) => `- ${s.type}: ${s.description}`).join('\n') || '- None'}
+${prospectData.growthSignals?.map((s) => `- ${s.type}: ${s.description}`).join('\n') || '- None'}
 
 Context:
 - Urgency: ${context.urgency}

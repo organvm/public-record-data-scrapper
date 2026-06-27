@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // Experimental personalization features - disabled strict linting
 
 /**
@@ -11,6 +11,8 @@ import type {
   UserPreferences,
   UserBehavior,
   UserAction,
+  UserPerformance,
+  UserSegment,
   PersonalizedProspect,
   PersonalizedDashboard,
   PersonalizedRecommendation,
@@ -18,6 +20,9 @@ import type {
   PersonalizationModel,
   PersonalizedWidget,
   PersonalizedInsight,
+  LearnedPreference,
+  TimingModel,
+  ChannelModel,
   QuickAction,
   ActivityItem,
   ChannelMetrics
@@ -94,7 +99,7 @@ export class PersonalizationEngine {
   async trackSearch(
     userId: string,
     query: string,
-    filters: any,
+    filters: Record<string, unknown>,
     resultsCount: number
   ): Promise<void> {
     await this.trackUserAction(userId, {
@@ -153,7 +158,7 @@ export class PersonalizationEngine {
     userId: string,
     prospectId: string,
     outcome: 'success' | 'failure',
-    details: any
+    details: Record<string, unknown>
   ): Promise<void> {
     await this.trackUserAction(userId, {
       actionType: 'outcome',
@@ -405,9 +410,9 @@ export class PersonalizationEngine {
   /**
    * Learn preferences from behavior
    */
-  private learnPreferences(behavior: UserBehavior): any[] {
+  private learnPreferences(behavior: UserBehavior): LearnedPreference[] {
     // Analyze successful deal characteristics
-    const preferences: any[] = []
+    const preferences: LearnedPreference[] = []
 
     // Most common industries in successful deals
     const industries = behavior.successfulDealCharacteristics.map((d) => d.industry)
@@ -428,7 +433,7 @@ export class PersonalizationEngine {
   /**
    * Build timing model
    */
-  private buildTimingModel(behavior: UserBehavior): any {
+  private buildTimingModel(behavior: UserBehavior): TimingModel {
     // Analyze time of day patterns
     const patterns = behavior.timeOfDayPatterns
 
@@ -452,7 +457,10 @@ export class PersonalizationEngine {
         confidence: 0.8
       },
       optimalFollowUpInterval: 3,
-      responsePatterns: patterns
+      // timeOfDayPatterns are TimePatterns, not ResponsePatterns — they describe
+      // activity windows, not message-response behavior. Left empty until real
+      // response-time data is collected rather than coercing a mismatched shape.
+      responsePatterns: []
     }
   }
 
@@ -461,7 +469,7 @@ export class PersonalizationEngine {
    *
    * Returns equal weights until real channel effectiveness data is collected.
    */
-  private buildChannelModel(_behavior: UserBehavior): any {
+  private buildChannelModel(_behavior: UserBehavior): ChannelModel {
     return {
       channelPreferences: {
         email: 0.5,
@@ -470,7 +478,7 @@ export class PersonalizationEngine {
         linkedin: 0.5,
         direct_mail: 0.5
       },
-      channelEffectiveness: {},
+      channelEffectiveness: {} as Record<OutreachChannel, ChannelMetrics>,
       contextualPreferences: []
     }
   }
@@ -478,7 +486,7 @@ export class PersonalizationEngine {
   /**
    * Determine user segment
    */
-  private determineUserSegment(performance: any): any {
+  private determineUserSegment(performance: UserPerformance): UserSegment {
     if (performance.conversionRate > 0.35) return 'high_performer'
     if (performance.conversionRate > 0.25) return 'growing'
     return 'struggling'

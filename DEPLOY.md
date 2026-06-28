@@ -127,9 +127,10 @@ The application is deployment-ready for:
 - ✅ Per-key rate limiting (100 req/15min)
 - ✅ Error handling middleware (structured errors, logging)
 - ✅ Request validation middleware
+- ✅ `/api/keys` router mounted — API key self-service live (PR #330)
 - ✅ Zod input validation on `/api/competitive/*` and `/api/outreach/*` routes (PR #331)
 - ✅ OpenAPI spec for `/api/scrape/ucc` endpoint (PR #328)
-- ✅ CI gate green: 88 server test files / 1453 tests pass
+- ✅ CI gate green: 89 server test files / 1465 tests pass
 - ✅ ESLint clean (0 errors)
 
 ## Known Limitations & Backlog

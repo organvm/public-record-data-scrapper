@@ -27,6 +27,7 @@ describe('POST /api/scrape/ucc', () => {
         orgId: 'test-org',
         role: 'user'
       }
+      ;(req as unknown as { dataTier: { resolved: string } }).dataTier = { resolved: 'starter-tier' }
       next()
     })
 
@@ -119,6 +120,25 @@ describe('POST /api/scrape/ucc', () => {
     })
   })
 
+  it('returns 402 when on free-tier', async () => {
+    const freeTierApp = express()
+    freeTierApp.use(express.json())
+    freeTierApp.use((req, _res, next) => {
+      ;(req as unknown as { user: { orgId: string; role: string } }).user = { orgId: 'test-org', role: 'user' }
+      ;(req as unknown as { dataTier: { resolved: string } }).dataTier = { resolved: 'free-tier' }
+      next()
+    })
+    freeTierApp.use('/api/scrape', scrapeRouter)
+
+    const response = await request(freeTierApp).post('/api/scrape/ucc').send({
+      company_name: 'Test Corp',
+      state: 'CA'
+    })
+
+    expect(response.status).toBe(402)
+    expect(response.body.error.code).toBe('TIER_UPGRADE_REQUIRED')
+  })
+
   it('returns 401 when auth is missing', async () => {
     const noAuthApp = express()
     noAuthApp.use(express.json())
@@ -148,6 +168,7 @@ describe('GET /api/scrape/readiness/:stateCode', () => {
         orgId: 'test-org',
         role: 'user'
       }
+      ;(req as any).dataTier = { resolved: 'starter-tier' }
       next()
     })
 

@@ -24,6 +24,7 @@ import { asyncHandler } from '../middleware/errorHandler'
 import { requireRole, type AuthenticatedRequest } from '../middleware/authMiddleware'
 import { UCCSearchService } from '../services/UCCSearchService'
 import { ScrapeJobService } from '../services/ScrapeJobService'
+import { getResolvedDataTier } from '../middleware/dataTier'
 
 const router = Router()
 
@@ -72,6 +73,20 @@ router.post(
   requireRole('user', 'admin'),
   validateRequest({ body: searchUCCSchema }),
   asyncHandler(async (req, res) => {
+    const dataTier = getResolvedDataTier(req)
+    if (dataTier === 'free-tier') {
+      res.status(402).json({
+        success: false,
+        error: {
+          message: 'On-demand UCC scraping requires a paid subscription',
+          code: 'TIER_UPGRADE_REQUIRED',
+          statusCode: 402,
+          details: { requiredTier: 'starter' }
+        }
+      })
+      return
+    }
+
     const searchService = new UCCSearchService()
     const body = req.body as z.infer<typeof searchUCCSchema>
     const readiness = searchService.getStateReadiness(body.state)
@@ -139,6 +154,20 @@ router.post(
   requireRole('user', 'admin'),
   validateRequest({ body: enqueueJobSchema }),
   asyncHandler(async (req: AuthenticatedRequest, res) => {
+    const dataTier = getResolvedDataTier(req)
+    if (dataTier === 'free-tier') {
+      res.status(402).json({
+        success: false,
+        error: {
+          message: 'On-demand UCC scraping requires a paid subscription',
+          code: 'TIER_UPGRADE_REQUIRED',
+          statusCode: 402,
+          details: { requiredTier: 'starter' }
+        }
+      })
+      return
+    }
+
     const body = req.body as z.infer<typeof enqueueJobSchema>
     const orgId = req.user!.orgId!
     const apiKeyId = extractApiKeyId(req.user!.id)

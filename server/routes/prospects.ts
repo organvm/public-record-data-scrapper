@@ -8,6 +8,7 @@ import { QualificationService } from '../services/QualificationService'
 import { UnderwritingService } from '../services/UnderwritingService'
 import type { UnderwritingFeatures } from '../services/UnderwritingService'
 import { LeadExportService, serializeLeadExportCsv } from '../services/LeadExportService'
+import { DeliveryService } from '../services/DeliveryService'
 import { getResolvedDataTier, type ResolvedDataTier } from '../middleware/dataTier'
 import { tierGate } from '../middleware/tierGate'
 
@@ -115,6 +116,11 @@ const idParamSchema = z.object({
 // User') rather than a UUID, so this is a non-empty string, not z.uuid().
 const claimBodySchema = z.object({
   user: z.string().min(1)
+})
+
+const deliverBodySchema = z.object({
+  integration: z.enum(['zapier', 'sfdc', 'airtable']),
+  webhookUrl: z.string().url()
 })
 
 const MAX_BATCH_SIZE = 100
@@ -615,6 +621,58 @@ router.delete(
     }
 
     res.status(204).send()
+  })
+)
+
+// POST /api/prospects/:id/deliver - Deliver prospect to external integration
+router.post(
+  '/:id/deliver',
+  validateRequest({ params: idParamSchema, body: deliverBodySchema }),
+  asyncHandler(async (req, res) => {
+    const dataTier = getResolvedDataTier(req)
+    if (dataTier === 'free-tier') {
+      return res.status(402).json({
+        error: {
+          message: 'Delivery integration requires Pro tier',
+          code: 'TIER_UPGRADE_REQUIRED',
+          statusCode: 402,
+          details: { requiredTier: 'starter' }
+        }
+      })
+    }
+
+    const prospectsService = new ProspectsService()
+    const prospect = await prospectsService.getById(req.params.id)
+
+    if (!prospect) {
+      return res.status(404).json({
+        error: {
+          message: `Prospect ${req.params.id} not found`,
+          code: 'NOT_FOUND',
+          statusCode: 404
+        }
+      })
+    }
+
+    const { integration, webhookUrl } = req.body as {
+      integration: 'zapier' | 'sfdc' | 'airtable'
+      webhookUrl: string
+    }
+
+    const deliveryService = new DeliveryService()
+    const result = await deliveryService.deliverLead(prospect, { integration, webhookUrl })
+
+    if (!result.success) {
+      return res.status(502).json({
+        error: {
+          message: result.error || 'Delivery failed',
+          code: 'DELIVERY_FAILED',
+          statusCode: 502
+        }
+      })
+    }
+
+    res.json(result)
   })
 )
 

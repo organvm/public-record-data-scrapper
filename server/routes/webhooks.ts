@@ -12,6 +12,11 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
 import { z } from 'zod'
+import DOMPurify from 'dompurify'
+import { JSDOM } from 'jsdom'
+
+const window = new JSDOM('').window
+const purify = DOMPurify(window as unknown as Window)
 import { asyncHandler } from '../middleware/errorHandler'
 import { validateRequest } from '../middleware/validateRequest'
 import {
@@ -625,7 +630,10 @@ const sendgridInboundSchema = z.object({
   to: z.string().optional(),
   subject: z.string().optional(),
   text: z.string().optional(),
-  html: z.string().optional()
+  html: z
+    .string()
+    .optional()
+    .transform((html) => (html ? purify.sanitize(html) : html))
 })
 
 /**

@@ -85,7 +85,11 @@ describe('Competitive Intelligence Routes', () => {
       const response = await request(app).get('/api/competitive/saturation/INVALID')
 
       expect(response.status).toBe(400)
-      expect(response.body).toMatchObject({ error: 'Invalid state code' })
+      expect(response.body).toMatchObject({
+        error: {
+          code: 'VALIDATION_ERROR'
+        }
+      })
     })
 
     it('returns 500 when the service throws', async () => {
@@ -173,11 +177,13 @@ describe('Competitive Intelligence Routes', () => {
       ]
       mockComputeVelocity.mockResolvedValueOnce(mockMetrics)
 
-      const response = await request(app).get('/api/competitive/velocity/prospect-123')
+      const response = await request(app).get(
+        '/api/competitive/velocity/550e8400-e29b-41d4-a716-446655440000'
+      )
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({
-        prospectId: 'prospect-123',
+        prospectId: '550e8400-e29b-41d4-a716-446655440000',
         metrics: expect.any(Array)
       })
       expect(response.body.metrics).toHaveLength(3)
@@ -186,7 +192,9 @@ describe('Competitive Intelligence Routes', () => {
     it('returns 500 when velocity service throws', async () => {
       mockComputeVelocity.mockRejectedValueOnce(new Error('Computation failed'))
 
-      const response = await request(app).get('/api/competitive/velocity/bad-id')
+      const response = await request(app).get(
+        '/api/competitive/velocity/550e8400-e29b-41d4-a716-446655440002'
+      )
 
       expect(response.status).toBe(500)
       expect(response.body).toMatchObject({ error: 'Failed to compute velocity' })
@@ -207,11 +215,13 @@ describe('Competitive Intelligence Routes', () => {
       }
       mockComputeForProspect.mockResolvedValueOnce(mockResult)
 
-      const response = await request(app).get('/api/competitive/capacity/prospect-456')
+      const response = await request(app).get(
+        '/api/competitive/capacity/550e8400-e29b-41d4-a716-446655440001'
+      )
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({
-        prospectId: 'prospect-456',
+        prospectId: '550e8400-e29b-41d4-a716-446655440001',
         score: expect.any(Number),
         input: expect.any(Object)
       })
@@ -220,7 +230,9 @@ describe('Competitive Intelligence Routes', () => {
     it('returns 500 when capacity service throws', async () => {
       mockComputeForProspect.mockRejectedValueOnce(new Error('No data'))
 
-      const response = await request(app).get('/api/competitive/capacity/bad-id')
+      const response = await request(app).get(
+        '/api/competitive/capacity/550e8400-e29b-41d4-a716-446655440002'
+      )
 
       expect(response.status).toBe(500)
       expect(response.body).toMatchObject({ error: 'Failed to compute capacity' })

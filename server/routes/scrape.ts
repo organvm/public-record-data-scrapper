@@ -35,17 +35,40 @@ function extractApiKeyId(userId: string): string | null {
 }
 
 // Validation schemas
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((char) => {
+    const code = char.charCodeAt(0)
+    return code <= 31 || code === 127
+  })
+}
+
+const safeCompanyName = z
+  .string()
+  .trim()
+  .min(2, 'company name is required')
+  .max(200, 'company name must be 200 characters or less')
+  .refine((value) => !hasControlCharacters(value), {
+    message: 'company name cannot contain control characters'
+  })
+  .transform((value) => value.replace(/\s+/g, ' '))
+
+const safeStateCode = z
+  .string()
+  .trim()
+  .length(2)
+  .transform((s) => s.toUpperCase())
+  .refine((value) => /^[A-Z]{2}$/.test(value), {
+    message: 'state must be a 2-letter code'
+  })
+
 const searchUCCSchema = z.object({
-  company_name: z.string().min(2).max(200),
-  state: z
-    .string()
-    .length(2)
-    .transform((s) => s.toUpperCase()),
+  company_name: safeCompanyName,
+  state: safeStateCode,
   limit: z.coerce.number().int().positive().max(1000).default(100)
 })
 
 const readinessSchema = z.object({
-  stateCode: z.string().length(2).transform((s) => s.toUpperCase())
+  stateCode: safeStateCode
 })
 
 // GET /api/scrape/readiness/:stateCode - Check if a state can be searched right now
@@ -136,11 +159,8 @@ router.post(
 )
 
 const enqueueJobSchema = z.object({
-  company_name: z.string().min(2).max(200),
-  state: z
-    .string()
-    .length(2)
-    .transform((s) => s.toUpperCase()),
+  company_name: safeCompanyName,
+  state: safeStateCode,
   limit: z.coerce.number().int().positive().max(1000).default(100)
 })
 

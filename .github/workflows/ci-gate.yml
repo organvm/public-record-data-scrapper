@@ -18,9 +18,8 @@
 # (vitest.config.server.ts enforces the 80% thresholds whenever CI=true, which
 # is why coverage must be explicitly disabled for this correctness-only gate.)
 #
-# Typecheck is run as a non-blocking signal for now: the build intentionally
-# uses `tsc -b --noCheck` and frontend TS debt is tracked in #236. Flip
-# `continue-on-error` to false once that debt is cleared.
+#
+# Typecheck is now enforced in this gate since TS debt has been cleared.
 # ============================================================================
 name: CI Gate
 
@@ -60,9 +59,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Type check (non-blocking — see #236)
-        continue-on-error: true
-        run: npx tsc --noEmit || echo "::warning::TypeScript reported errors (non-blocking; tracked in #236)"
+      - name: Type check
+        run: npx tsc --noEmit
 
       - name: Server tests (correctness only — coverage gate stays informational)
         run: npx vitest run --config vitest.config.server.ts --coverage.enabled=false

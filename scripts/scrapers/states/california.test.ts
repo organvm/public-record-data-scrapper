@@ -120,10 +120,7 @@ function runInDom<T>(dom: JSDOM, callback: () => T): T {
   }
 }
 
-function createPage(
-  html: string,
-  url = 'https://bizfileonline.sos.ca.gov/search/ucc'
-): PageDouble {
+function createPage(html: string, url = 'https://bizfileonline.sos.ca.gov/search/ucc'): PageDouble {
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url,
     pretendToBeVisual: true
@@ -182,7 +179,7 @@ function createPage(
         writeFileSync(options.path, 'screenshot-bytes')
       }
     }),
-    content: vi.fn(async () => dom.serialize())
+    content: vi.fn(async () => (dom as unknown as { serialize: () => string }).serialize())
   }
 
   return {
@@ -224,10 +221,8 @@ describe('CaliforniaScraper', () => {
     restoreEnv()
   })
 
-  it(
-    'fills the debtor search form, parses result rows, and reports validation errors',
-    async () => {
-      const { dom, page, rawPage } = createPage(`
+  it('fills the debtor search form, parses result rows, and reports validation errors', async () => {
+    const { dom, page, rawPage } = createPage(`
         <form>
           <label>Debtor <input name="debtorName" /></label>
           <button type="button">Search</button>
@@ -267,83 +262,76 @@ describe('CaliforniaScraper', () => {
           </tbody>
         </table>
       `)
-      const browser = mockBrowser(page)
-      const scraper = new CaliforniaScraper()
-      const expectedSearchUrl =
-        'https://bizfileonline.sos.ca.gov/search/ucc?searchType=debtor&' +
-        'searchCriteria=Acme%20Equipment%20LLC'
+    const browser = mockBrowser(page)
+    const scraper = new CaliforniaScraper()
+    const expectedSearchUrl =
+      'https://bizfileonline.sos.ca.gov/search/ucc?searchType=debtor&' +
+      'searchCriteria=Acme%20Equipment%20LLC'
 
-      const result = await scraper.search('Acme Equipment LLC')
+    const result = await scraper.search('Acme Equipment LLC')
 
-      expect(puppeteerMock.launch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          headless: true,
-          args: expect.arrayContaining(['--no-sandbox', '--window-size=1920x1080'])
-        })
-      )
-      expect(browser.newPage).toHaveBeenCalledTimes(1)
-      expect(rawPage.goto).toHaveBeenCalledWith(expectedSearchUrl, {
-        waitUntil: 'domcontentloaded',
-        timeout: 45000
+    expect(puppeteerMock.launch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headless: true,
+        args: expect.arrayContaining(['--no-sandbox', '--window-size=1920x1080'])
       })
-      const debtorInput = dom.window.document.querySelector<HTMLInputElement>(
-        'input[name="debtorName"]'
-      )
-      expect(debtorInput?.value).toBe('Acme Equipment LLC')
-      expect(dom.window.document.querySelector('[data-clicked="true"]')?.textContent).toBe(
-        'Search'
-      )
-      expect(result).toMatchObject({
-        success: true,
-        retryCount: 0,
-        searchUrl: expectedSearchUrl
-      })
-      expect(result.filings).toEqual([
-        {
-          filingNumber: 'CA-UCC-100',
-          debtorName: 'Acme Equipment LLC',
-          securedParty: 'First Bank',
-          filingDate: '2026-06-01',
-          collateral: '',
-          status: 'active',
-          filingType: 'UCC-1'
-        },
-        {
-          filingNumber: 'CA-UCC3-101',
-          debtorName: 'Acme Equipment LLC',
-          securedParty: 'Term Lender',
-          filingDate: '2026-06-08',
-          collateral: '',
-          status: 'terminated',
-          filingType: 'UCC-3'
-        }
-      ])
-      expect(result.parsingErrors).toEqual(['Filing 3 validation errors: Missing secured party'])
-      expect(rawPage.close).toHaveBeenCalledTimes(1)
-    }
-  )
+    )
+    expect(browser.newPage).toHaveBeenCalledTimes(1)
+    expect(rawPage.goto).toHaveBeenCalledWith(expectedSearchUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 45000
+    })
+    const debtorInput = dom.window.document.querySelector<HTMLInputElement>(
+      'input[name="debtorName"]'
+    )
+    expect(debtorInput?.value).toBe('Acme Equipment LLC')
+    expect(dom.window.document.querySelector('[data-clicked="true"]')?.textContent).toBe('Search')
+    expect(result).toMatchObject({
+      success: true,
+      retryCount: 0,
+      searchUrl: expectedSearchUrl
+    })
+    expect(result.filings).toEqual([
+      {
+        filingNumber: 'CA-UCC-100',
+        debtorName: 'Acme Equipment LLC',
+        securedParty: 'First Bank',
+        filingDate: '2026-06-01',
+        collateral: '',
+        status: 'active',
+        filingType: 'UCC-1'
+      },
+      {
+        filingNumber: 'CA-UCC3-101',
+        debtorName: 'Acme Equipment LLC',
+        securedParty: 'Term Lender',
+        filingDate: '2026-06-08',
+        collateral: '',
+        status: 'terminated',
+        filingType: 'UCC-3'
+      }
+    ])
+    expect(result.parsingErrors).toEqual(['Filing 3 validation errors: Missing secured party'])
+    expect(rawPage.close).toHaveBeenCalledTimes(1)
+  })
 
-  it(
-    'returns a portal-blocked failure when California anti-bot protection is detected',
-    async () => {
-      const { page, rawPage } = createPage(
-        '<main>Request unsuccessful. Incapsula incident ID.</main>'
-      )
-      mockBrowser(page)
-      const scraper = new CaliforniaScraper()
-      const expectedSearchUrl =
-        'https://bizfileonline.sos.ca.gov/search/ucc?searchType=debtor&' +
-        'searchCriteria=Acme%20LLC'
+  it('returns a portal-blocked failure when California anti-bot protection is detected', async () => {
+    const { page, rawPage } = createPage(
+      '<main>Request unsuccessful. Incapsula incident ID.</main>'
+    )
+    mockBrowser(page)
+    const scraper = new CaliforniaScraper()
+    const expectedSearchUrl =
+      'https://bizfileonline.sos.ca.gov/search/ucc?searchType=debtor&' + 'searchCriteria=Acme%20LLC'
 
-      await expect(scraper.search('Acme LLC')).resolves.toMatchObject({
-        success: false,
-        retryCount: 0,
-        error: 'California UCC portal blocked by anti-bot protection (Incapsula/Imperva).',
-        searchUrl: expectedSearchUrl
-      })
-      expect(rawPage.close).toHaveBeenCalledTimes(1)
-    }
-  )
+    await expect(scraper.search('Acme LLC')).resolves.toMatchObject({
+      success: false,
+      retryCount: 0,
+      error: 'California UCC portal blocked by anti-bot protection (Incapsula/Imperva).',
+      searchUrl: expectedSearchUrl
+    })
+    expect(rawPage.close).toHaveBeenCalledTimes(1)
+  })
 
   it('keeps a failed page open when diagnostics are requested', async () => {
     const { page, rawPage } = createPage('<main>Access denied by Incapsula.</main>')
@@ -397,8 +385,6 @@ describe('CaliforniaScraper', () => {
       'https://bizfileonline.sos.ca.gov/search/ucc?searchType=debtor&' +
       'searchCriteria=A%26B%20Equipment%20LLC'
 
-    expect(new CaliforniaScraper().getManualSearchUrl('A&B Equipment LLC')).toBe(
-      expectedUrl
-    )
+    expect(new CaliforniaScraper().getManualSearchUrl('A&B Equipment LLC')).toBe(expectedUrl)
   })
 })

@@ -27,7 +27,9 @@ describe('POST /api/scrape/ucc', () => {
         orgId: 'test-org',
         role: 'user'
       }
-      ;(req as unknown as { dataTier: { resolved: string } }).dataTier = { resolved: 'starter-tier' }
+      ;(req as unknown as { dataTier: { resolved: string } }).dataTier = {
+        resolved: 'starter-tier'
+      }
       next()
     })
 
@@ -124,7 +126,10 @@ describe('POST /api/scrape/ucc', () => {
     const freeTierApp = express()
     freeTierApp.use(express.json())
     freeTierApp.use((req, _res, next) => {
-      ;(req as unknown as { user: { orgId: string; role: string } }).user = { orgId: 'test-org', role: 'user' }
+      ;(req as unknown as { user: { orgId: string; role: string } }).user = {
+        orgId: 'test-org',
+        role: 'user'
+      }
       ;(req as unknown as { dataTier: { resolved: string } }).dataTier = { resolved: 'free-tier' }
       next()
     })
@@ -168,7 +173,9 @@ describe('GET /api/scrape/readiness/:stateCode', () => {
         orgId: 'test-org',
         role: 'user'
       }
-      ;(req as any).dataTier = { resolved: 'starter-tier' }
+      ;(req as unknown as { dataTier: { resolved: string } }).dataTier = {
+        resolved: 'starter-tier'
+      }
       next()
     })
 

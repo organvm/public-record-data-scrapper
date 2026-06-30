@@ -454,260 +454,190 @@ export class CommunicationsService {
     }
   }
 
-  /**
-   * Send an email
-   */
-  async sendEmail(input: SendEmailInput): Promise<Communication> {
-    // Validate email address
-    if (!input.toAddress || !input.toAddress.includes('@')) {
-      throw new ValidationError('Invalid email address')
+  private async dispatchOutbound(
+    channel: CommunicationChannel,
+    params: {
+      orgId: string
+      contactId?: string
+      prospectId?: string
+      dealId?: string
+      templateId?: string
+      sentBy?: string
+      toAddress?: string
+      toPhone?: string
+      ccAddresses?: string[]
+      bccAddresses?: string[]
+      subject?: string
+      body?: string
+      bodyHtml?: string
+      attachments?: Array<{ name: string; url: string; size: number; mimeType: string }>
+      scheduledFor?: string
+      metadata?: Record<string, unknown>
+    },
+    options: {
+      providerName: string
+      actionName: string
+      dispatcher: (recordId: string) => Promise<string>
     }
-
-    // TCPA / suppression compliance gate — blocks send if suppressed or no consent
+  ): Promise<Communication> {
     await this.assertSendAllowed({
-      orgId: input.orgId,
-      channel: 'email',
-      toAddress: input.toAddress,
-      contactId: input.contactId
+      orgId: params.orgId,
+      channel,
+      toAddress: params.toAddress,
+      toPhone: params.toPhone,
+      contactId: params.contactId
     })
 
     try {
-      // Create communication record with pending status
       const communicationResults = await database.query<CommunicationRow>(
         `INSERT INTO communications (
           org_id, contact_id, prospect_id, deal_id, template_id, sent_by,
-          channel, direction, to_address, cc_addresses, bcc_addresses,
+          channel, direction, to_address, to_phone, cc_addresses, bcc_addresses,
           subject, body, body_html, attachments, status, scheduled_for, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         RETURNING *`,
         [
-          input.orgId,
-          input.contactId,
-          input.prospectId,
-          input.dealId,
-          input.templateId,
-          input.sentBy,
-          'email',
+          params.orgId,
+          params.contactId ?? undefined,
+          params.prospectId ?? undefined,
+          params.dealId ?? undefined,
+          params.templateId ?? undefined,
+          params.sentBy ?? undefined,
+          channel,
           'outbound',
-          input.toAddress,
-          input.ccAddresses || [],
-          input.bccAddresses || [],
-          input.subject,
-          input.body,
-          input.bodyHtml,
-          input.attachments || [],
-          input.scheduledFor ? 'pending' : 'queued',
-          input.scheduledFor,
-          input.metadata || {}
+          params.toAddress ?? undefined,
+          params.toPhone ?? undefined,
+          params.ccAddresses || [],
+          params.bccAddresses || [],
+          params.subject ?? undefined,
+          params.body ?? undefined,
+          params.bodyHtml ?? undefined,
+          params.attachments || [],
+          params.scheduledFor ? 'pending' : channel === 'call' ? 'pending' : 'queued',
+          params.scheduledFor ?? undefined,
+          params.metadata || {}
         ]
       )
 
       const communication = this.transformCommunication(communicationResults[0])
 
-      // If not scheduled, send immediately via SendGrid
-      if (!input.scheduledFor) {
+      if (!params.scheduledFor) {
         try {
-          const result = await this.sendgridSend.sendTransactional({
-            to: input.toAddress,
-            cc: input.ccAddresses,
-            bcc: input.bccAddresses,
-            subject: input.subject,
-            text: input.body,
-            html: input.bodyHtml,
-            attachments: input.attachments
-          })
-
-          // SendGridSend.sendTransactional does NOT throw on a provider error —
-          // it resolves to { status: 'failed', errors: [...] }. Recording 'sent'
-          // for that case would fabricate a delivered message (the campaign's
-          // cardinal sin). Fail closed: mark the row failed with the named
-          // provider reason and surface a 502 via ExternalServiceError.
-          if (result.status === 'failed') {
-            const providerReason = result.errors?.join('; ') || 'SendGrid rejected the message'
-            await this.updateCommunicationStatus(
-              communication.id,
-              'failed',
-              undefined,
-              providerReason
-            )
-            throw new ExternalServiceError('SendGrid', `Failed to send email: ${providerReason}`)
-          }
-
-          // Update communication with sent status
-          await this.updateCommunicationStatus(communication.id, 'sent', result.messageId)
-
-          return { ...communication, status: 'sent', externalId: result.messageId }
+          const externalId = await options.dispatcher(communication.id)
+          const successStatus = channel === 'call' ? 'pending' : 'sent'
+          await this.updateCommunicationStatus(communication.id, successStatus, externalId)
+          return { ...communication, status: successStatus, externalId }
         } catch (sendError) {
-          // A provider-returned failure (handled above) already recorded the
-          // failed row — re-throw as-is rather than double-writing the status.
           if (sendError instanceof ExternalServiceError) throw sendError
 
-          // A thrown error (network/validation inside the adapter): record the
-          // failed status, then surface it as a 502.
           await this.updateCommunicationStatus(
             communication.id,
             'failed',
             undefined,
             sendError instanceof Error ? sendError.message : 'Unknown error'
           )
-
-          throw new ExternalServiceError('SendGrid', 'Failed to send email')
+          throw new ExternalServiceError(options.providerName, `Failed to ${options.actionName}`)
         }
       }
 
       return communication
     } catch (error) {
-      if (error instanceof ExternalServiceError || error instanceof ValidationError) throw error
-      throw new DatabaseError('Failed to send email', error instanceof Error ? error : undefined)
+      if (
+        error instanceof ExternalServiceError ||
+        error instanceof ValidationError ||
+        error instanceof ForbiddenError
+      )
+        throw error
+      throw new DatabaseError(
+        `Failed to ${options.actionName}`,
+        error instanceof Error ? error : undefined
+      )
     }
+  }
+
+  /**
+   * Send an email
+   */
+  async sendEmail(input: SendEmailInput): Promise<Communication> {
+    if (!input.toAddress || !input.toAddress.includes('@')) {
+      throw new ValidationError('Invalid email address')
+    }
+
+    return this.dispatchOutbound('email', input, {
+      providerName: 'SendGrid',
+      actionName: 'send email',
+      dispatcher: async (recordId) => {
+        const result = await this.sendgridSend.sendTransactional({
+          to: input.toAddress,
+          cc: input.ccAddresses,
+          bcc: input.bccAddresses,
+          subject: input.subject,
+          text: input.body,
+          html: input.bodyHtml,
+          attachments: input.attachments
+        })
+
+        if (result.status === 'failed') {
+          const providerReason = result.errors?.join('; ') || 'SendGrid rejected the message'
+          await this.updateCommunicationStatus(recordId, 'failed', undefined, providerReason)
+          throw new ExternalServiceError('SendGrid', `Failed to send email: ${providerReason}`)
+        }
+
+        return result.messageId
+      }
+    })
   }
 
   /**
    * Send an SMS
    */
   async sendSMS(input: SendSMSInput): Promise<Communication> {
-    // Validate phone number (basic validation)
-    const normalizedPhone = input.toPhone.replace(/\D/g, '')
+    const normalizedPhone = input.toPhone.replace(/\\D/g, '')
     if (normalizedPhone.length < 10) {
       throw new ValidationError('Invalid phone number')
     }
 
-    // TCPA / DNC compliance gate — blocks send if suppressed or no consent
-    await this.assertSendAllowed({
-      orgId: input.orgId,
-      channel: 'sms',
-      toPhone: normalizedPhone,
-      contactId: input.contactId
-    })
-
-    try {
-      // Create communication record
-      const communicationResults = await database.query<CommunicationRow>(
-        `INSERT INTO communications (
-          org_id, contact_id, prospect_id, deal_id, template_id, sent_by,
-          channel, direction, to_phone, body, status, scheduled_for, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        RETURNING *`,
-        [
-          input.orgId,
-          input.contactId,
-          input.prospectId,
-          input.dealId,
-          input.templateId,
-          input.sentBy,
-          'sms',
-          'outbound',
-          normalizedPhone,
-          input.body,
-          input.scheduledFor ? 'pending' : 'queued',
-          input.scheduledFor,
-          input.metadata || {}
-        ]
-      )
-
-      const communication = this.transformCommunication(communicationResults[0])
-
-      // If not scheduled, send immediately via Twilio
-      if (!input.scheduledFor) {
-        try {
+    return this.dispatchOutbound(
+      'sms',
+      { ...input, toPhone: normalizedPhone },
+      {
+        providerName: 'Twilio',
+        actionName: 'send SMS',
+        dispatcher: async () => {
           const result = await this.twilioSMS.send({
             to: normalizedPhone,
             body: input.body
           })
-
-          // Update communication with sent status
-          await this.updateCommunicationStatus(communication.id, 'sent', result.messageSid)
-
-          return { ...communication, status: 'sent', externalId: result.messageSid }
-        } catch (sendError) {
-          // Update communication with failed status
-          await this.updateCommunicationStatus(
-            communication.id,
-            'failed',
-            undefined,
-            sendError instanceof Error ? sendError.message : 'Unknown error'
-          )
-
-          throw new ExternalServiceError('Twilio', 'Failed to send SMS')
+          return result.messageSid
         }
       }
-
-      return communication
-    } catch (error) {
-      if (error instanceof ExternalServiceError || error instanceof ValidationError) throw error
-      throw new DatabaseError('Failed to send SMS', error instanceof Error ? error : undefined)
-    }
+    )
   }
 
   /**
    * Initiate a phone call
    */
   async initiateCall(input: InitiateCallInput): Promise<Communication> {
-    // Validate phone number
-    const normalizedPhone = input.toPhone.replace(/\D/g, '')
+    const normalizedPhone = input.toPhone.replace(/\\D/g, '')
     if (normalizedPhone.length < 10) {
       throw new ValidationError('Invalid phone number')
     }
 
-    // TCPA / DNC compliance gate — blocks call if suppressed or no consent
-    await this.assertSendAllowed({
-      orgId: input.orgId,
-      channel: 'call',
-      toPhone: normalizedPhone,
-      contactId: input.contactId
-    })
-
-    try {
-      // Create communication record
-      const communicationResults = await database.query<CommunicationRow>(
-        `INSERT INTO communications (
-          org_id, contact_id, prospect_id, deal_id, sent_by,
-          channel, direction, to_phone, body, status, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING *`,
-        [
-          input.orgId,
-          input.contactId,
-          input.prospectId,
-          input.dealId,
-          input.sentBy,
-          'call',
-          'outbound',
-          normalizedPhone,
-          input.callScript,
-          'pending',
-          input.metadata || {}
-        ]
-      )
-
-      const communication = this.transformCommunication(communicationResults[0])
-
-      // Initiate call via Twilio
-      try {
-        const result = await this.twilioVoice.initiateCall({
-          to: normalizedPhone,
-          callScript: input.callScript
-        })
-
-        // Update communication with external ID
-        await this.updateCommunicationStatus(communication.id, 'pending', result.callSid)
-
-        return { ...communication, externalId: result.callSid }
-      } catch (callError) {
-        // Update communication with failed status
-        await this.updateCommunicationStatus(
-          communication.id,
-          'failed',
-          undefined,
-          callError instanceof Error ? callError.message : 'Unknown error'
-        )
-
-        throw new ExternalServiceError('Twilio', 'Failed to initiate call')
+    return this.dispatchOutbound(
+      'call',
+      { ...input, toPhone: normalizedPhone, body: input.callScript },
+      {
+        providerName: 'Twilio',
+        actionName: 'initiate call',
+        dispatcher: async () => {
+          const result = await this.twilioVoice.initiateCall({
+            to: normalizedPhone,
+            callScript: input.callScript
+          })
+          return result.callSid
+        }
       }
-    } catch (error) {
-      if (error instanceof ExternalServiceError || error instanceof ValidationError) throw error
-      throw new DatabaseError('Failed to initiate call', error instanceof Error ? error : undefined)
-    }
+    )
   }
 
   /**

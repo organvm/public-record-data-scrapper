@@ -89,84 +89,49 @@ export class PaginationHandler {
           }
         }
 
-        // Check for Next/Previous buttons
-        const nextLabels = ['next', '›', '→', '»']
-        let nextButton = document.querySelector('.next, .next-page, [aria-label*="next" i]')
+        const findButton = (selector: string, labels: string[]): Element | null => {
+          const btn = document.querySelector(selector)
+          if (btn) return btn
 
-        if (!nextButton) {
           const elements = document.querySelectorAll('a, button')
           for (let i = 0; i < elements.length; i++) {
             const element = elements[i]
             const text = element.textContent?.trim().toLowerCase() || ''
-            let matches = false
-
-            for (let j = 0; j < nextLabels.length; j++) {
-              const label = nextLabels[j]
-              if (text === label) {
-                matches = true
-                break
-              }
+            for (let j = 0; j < labels.length; j++) {
+              const label = labels[j]
+              if (text === label) return element
 
               const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || ''
               const title = element.getAttribute('title')?.toLowerCase() || ''
-              if (ariaLabel.includes(label) || title.includes(label)) {
-                matches = true
-                break
-              }
-            }
-
-            if (matches) {
-              nextButton = element
-              break
+              if (ariaLabel.includes(label) || title.includes(label)) return element
             }
           }
+          return null
         }
+
+        // Check for Next/Previous buttons
+        const nextButton = findButton('.next, .next-page, [aria-label*="next" i]', [
+          'next',
+          '›',
+          '→',
+          '»'
+        ])
 
         if (nextButton) {
           return {
             currentPage: 1,
-            hasNextPage: !!nextButton && !nextButton.hasAttribute('disabled'),
+            hasNextPage: !nextButton.hasAttribute('disabled'),
             paginationType: 'next-prev' as const
           }
         }
 
         // Check for "Load More" button
-        const loadMoreLabels = ['load more', 'show more']
-        let loadMoreButton = document.querySelector('.load-more, .show-more')
-
-        if (!loadMoreButton) {
-          const elements = document.querySelectorAll('a, button')
-          for (let i = 0; i < elements.length; i++) {
-            const element = elements[i]
-            const text = element.textContent?.trim().toLowerCase() || ''
-            let matches = false
-
-            for (let j = 0; j < loadMoreLabels.length; j++) {
-              const label = loadMoreLabels[j]
-              if (text === label) {
-                matches = true
-                break
-              }
-
-              const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || ''
-              const title = element.getAttribute('title')?.toLowerCase() || ''
-              if (ariaLabel.includes(label) || title.includes(label)) {
-                matches = true
-                break
-              }
-            }
-
-            if (matches) {
-              loadMoreButton = element
-              break
-            }
-          }
-        }
+        const loadMoreButton = findButton('.load-more, .show-more', ['load more', 'show more'])
 
         if (loadMoreButton) {
           return {
             currentPage: 1,
-            hasNextPage: !!loadMoreButton && !loadMoreButton.hasAttribute('disabled'),
+            hasNextPage: !loadMoreButton.hasAttribute('disabled'),
             paginationType: 'load-more' as const
           }
         }
@@ -279,52 +244,38 @@ export class PaginationHandler {
    */
   private async handleNextPrevPagination(page: Page): Promise<boolean> {
     const clicked = await page.evaluate(() => {
-      const directSelector = document.querySelector(
-        '.next, .next-page, [aria-label*="next" i]'
-      ) as HTMLElement | null
-      const directVisible =
-        !!directSelector &&
-        (directSelector.offsetWidth ||
-          directSelector.offsetHeight ||
-          directSelector.getClientRects().length)
-      if (directSelector && !directSelector.hasAttribute('disabled') && directVisible) {
-        directSelector.click()
-        return true
-      }
+      const findButton = (selector: string, labels: string[]): HTMLElement | null => {
+        const btn = document.querySelector(selector) as HTMLElement | null
+        if (btn) return btn
 
-      const candidates = Array.from(document.querySelectorAll('a, button')) as HTMLElement[]
-      const labels = ['next', '›', '→', '»']
-      let nextButton: HTMLElement | null = null
+        const elements = document.querySelectorAll('a, button') as NodeListOf<HTMLElement>
+        for (let i = 0; i < elements.length; i++) {
+          const element = elements[i]
+          const text = element.textContent?.trim().toLowerCase() || ''
+          for (let j = 0; j < labels.length; j++) {
+            const label = labels[j]
+            if (text === label) return element
 
-      for (let i = 0; i < candidates.length; i++) {
-        const element = candidates[i]
-        const text = element.textContent?.trim().toLowerCase() || ''
-        let matches = false
-
-        for (let j = 0; j < labels.length; j++) {
-          const label = labels[j]
-          if (text === label) {
-            matches = true
-            break
-          }
-
-          const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || ''
-          const title = element.getAttribute('title')?.toLowerCase() || ''
-          if (ariaLabel.includes(label) || title.includes(label)) {
-            matches = true
-            break
+            const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || ''
+            const title = element.getAttribute('title')?.toLowerCase() || ''
+            if (ariaLabel.includes(label) || title.includes(label)) return element
           }
         }
-
-        if (matches) {
-          nextButton = element
-          break
-        }
+        return null
       }
 
+      const nextButton = findButton('.next, .next-page, [aria-label*="next" i]', [
+        'next',
+        '›',
+        '→',
+        '»'
+      ])
       const nextVisible =
         !!nextButton &&
-        (nextButton.offsetWidth || nextButton.offsetHeight || nextButton.getClientRects().length)
+        (nextButton.offsetWidth ||
+          nextButton.offsetHeight ||
+          nextButton.getClientRects().length > 0)
+
       if (nextButton && !nextButton.hasAttribute('disabled') && nextVisible) {
         nextButton.click()
         return true
@@ -346,52 +297,33 @@ export class PaginationHandler {
    */
   private async handleLoadMorePagination(page: Page): Promise<boolean> {
     const clicked = await page.evaluate(() => {
-      const directSelector = document.querySelector('.load-more, .show-more') as HTMLElement | null
-      const directVisible =
-        !!directSelector &&
-        (directSelector.offsetWidth ||
-          directSelector.offsetHeight ||
-          directSelector.getClientRects().length)
-      if (directSelector && !directSelector.hasAttribute('disabled') && directVisible) {
-        directSelector.click()
-        return true
-      }
+      const findButton = (selector: string, labels: string[]): HTMLElement | null => {
+        const btn = document.querySelector(selector) as HTMLElement | null
+        if (btn) return btn
 
-      const candidates = Array.from(document.querySelectorAll('a, button')) as HTMLElement[]
-      const labels = ['load more', 'show more']
-      let loadMoreButton: HTMLElement | null = null
+        const elements = document.querySelectorAll('a, button') as NodeListOf<HTMLElement>
+        for (let i = 0; i < elements.length; i++) {
+          const element = elements[i]
+          const text = element.textContent?.trim().toLowerCase() || ''
+          for (let j = 0; j < labels.length; j++) {
+            const label = labels[j]
+            if (text === label) return element
 
-      for (let i = 0; i < candidates.length; i++) {
-        const element = candidates[i]
-        const text = element.textContent?.trim().toLowerCase() || ''
-        let matches = false
-
-        for (let j = 0; j < labels.length; j++) {
-          const label = labels[j]
-          if (text === label) {
-            matches = true
-            break
-          }
-
-          const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || ''
-          const title = element.getAttribute('title')?.toLowerCase() || ''
-          if (ariaLabel.includes(label) || title.includes(label)) {
-            matches = true
-            break
+            const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || ''
+            const title = element.getAttribute('title')?.toLowerCase() || ''
+            if (ariaLabel.includes(label) || title.includes(label)) return element
           }
         }
-
-        if (matches) {
-          loadMoreButton = element
-          break
-        }
+        return null
       }
 
+      const loadMoreButton = findButton('.load-more, .show-more', ['load more', 'show more'])
       const loadMoreVisible =
         !!loadMoreButton &&
         (loadMoreButton.offsetWidth ||
           loadMoreButton.offsetHeight ||
-          loadMoreButton.getClientRects().length)
+          loadMoreButton.getClientRects().length > 0)
+
       if (loadMoreButton && !loadMoreButton.hasAttribute('disabled') && loadMoreVisible) {
         loadMoreButton.click()
         return true

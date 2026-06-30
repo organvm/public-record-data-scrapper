@@ -49,7 +49,7 @@ vi.mock('../../database/connection', () => ({
 import outreachRouter from '../../routes/outreach'
 
 const sampleBriefing = {
-  prospectId: 'prospect-abc',
+  prospectId: '550e8400-e29b-41d4-a716-446655440000',
   generatedAt: '2026-03-23T00:00:00.000Z',
   companyName: 'Acme Corp',
   state: 'CA',
@@ -76,11 +76,13 @@ describe('Outreach Routes', () => {
     it('returns 200 with cached briefing when cache is warm', async () => {
       mocks.mockGetCachedBriefing.mockResolvedValue(sampleBriefing)
 
-      const response = await request(app).get('/api/outreach/briefing/prospect-abc')
+      const response = await request(app).get(
+        '/api/outreach/briefing/550e8400-e29b-41d4-a716-446655440000'
+      )
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({
-        prospectId: 'prospect-abc',
+        prospectId: '550e8400-e29b-41d4-a716-446655440000',
         companyName: 'Acme Corp'
       })
       expect(mocks.mockGenerateBriefing).not.toHaveBeenCalled()
@@ -90,27 +92,39 @@ describe('Outreach Routes', () => {
       mocks.mockGetCachedBriefing.mockResolvedValue(null)
       mocks.mockGenerateBriefing.mockResolvedValue(sampleBriefing)
 
-      const response = await request(app).get('/api/outreach/briefing/prospect-abc')
+      const response = await request(app).get(
+        '/api/outreach/briefing/550e8400-e29b-41d4-a716-446655440000'
+      )
 
       expect(response.status).toBe(200)
-      expect(mocks.mockGenerateBriefing).toHaveBeenCalledWith('prospect-abc')
+      expect(mocks.mockGenerateBriefing).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000'
+      )
       expect(response.body.companyName).toBe('Acme Corp')
     })
 
     it('returns 404 when prospect is not found', async () => {
       mocks.mockGetCachedBriefing.mockResolvedValue(null)
-      mocks.mockGenerateBriefing.mockRejectedValue(new Error('Prospect not found: prospect-xyz'))
+      mocks.mockGenerateBriefing.mockRejectedValue(
+        new Error('Prospect not found: 550e8400-e29b-41d4-a716-446655440001')
+      )
 
-      const response = await request(app).get('/api/outreach/briefing/prospect-xyz')
+      const response = await request(app).get(
+        '/api/outreach/briefing/550e8400-e29b-41d4-a716-446655440001'
+      )
 
       expect(response.status).toBe(404)
-      expect(response.body).toMatchObject({ error: 'Prospect not found: prospect-xyz' })
+      expect(response.body).toMatchObject({
+        error: 'Prospect not found: 550e8400-e29b-41d4-a716-446655440001'
+      })
     })
 
     it('returns 500 on unexpected error', async () => {
       mocks.mockGetCachedBriefing.mockRejectedValue(new Error('DB connection lost'))
 
-      const response = await request(app).get('/api/outreach/briefing/prospect-abc')
+      const response = await request(app).get(
+        '/api/outreach/briefing/550e8400-e29b-41d4-a716-446655440000'
+      )
 
       expect(response.status).toBe(500)
       expect(response.body).toMatchObject({ error: 'Failed to generate briefing' })
@@ -123,7 +137,7 @@ describe('Outreach Routes', () => {
       mocks.mockCreateSequence.mockResolvedValue('seq-new-123')
 
       const response = await request(app)
-        .post('/api/outreach/trigger/prospect-abc')
+        .post('/api/outreach/trigger/550e8400-e29b-41d4-a716-446655440000')
         .send({ triggerType: 'termination', capacityScore: 80 })
 
       expect(response.status).toBe(201)
@@ -137,7 +151,7 @@ describe('Outreach Routes', () => {
       })
 
       const response = await request(app)
-        .post('/api/outreach/trigger/prospect-abc')
+        .post('/api/outreach/trigger/550e8400-e29b-41d4-a716-446655440000')
         .send({ triggerType: 'termination' })
 
       expect(response.status).toBe(409)
@@ -152,16 +166,20 @@ describe('Outreach Routes', () => {
       mocks.mockIsEligible.mockResolvedValue({ eligible: true })
       mocks.mockCreateSequence.mockResolvedValue('seq-default')
 
-      await request(app).post('/api/outreach/trigger/prospect-abc').send({})
+      await request(app).post('/api/outreach/trigger/550e8400-e29b-41d4-a716-446655440000').send({})
 
-      expect(mocks.mockIsEligible).toHaveBeenCalledWith('prospect-abc', 'termination', undefined)
+      expect(mocks.mockIsEligible).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'termination',
+        undefined
+      )
     })
 
     it('returns 500 on unexpected error', async () => {
       mocks.mockIsEligible.mockRejectedValue(new Error('DB error'))
 
       const response = await request(app)
-        .post('/api/outreach/trigger/prospect-abc')
+        .post('/api/outreach/trigger/550e8400-e29b-41d4-a716-446655440000')
         .send({ triggerType: 'termination' })
 
       expect(response.status).toBe(500)
@@ -191,7 +209,9 @@ describe('Outreach Routes', () => {
       ]
       mocks.mockGetActiveSequences.mockResolvedValue(sequences)
 
-      const response = await request(app).get('/api/outreach/sequences/prospect-abc')
+      const response = await request(app).get(
+        '/api/outreach/sequences/550e8400-e29b-41d4-a716-446655440000'
+      )
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({ count: 2 })
@@ -201,7 +221,9 @@ describe('Outreach Routes', () => {
     it('returns empty array when no active sequences', async () => {
       mocks.mockGetActiveSequences.mockResolvedValue([])
 
-      const response = await request(app).get('/api/outreach/sequences/prospect-abc')
+      const response = await request(app).get(
+        '/api/outreach/sequences/550e8400-e29b-41d4-a716-446655440000'
+      )
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({ count: 0, sequences: [] })
@@ -210,7 +232,9 @@ describe('Outreach Routes', () => {
     it('returns 500 on error', async () => {
       mocks.mockGetActiveSequences.mockRejectedValue(new Error('DB error'))
 
-      const response = await request(app).get('/api/outreach/sequences/prospect-abc')
+      const response = await request(app).get(
+        '/api/outreach/sequences/550e8400-e29b-41d4-a716-446655440000'
+      )
 
       expect(response.status).toBe(500)
       expect(response.body).toMatchObject({ error: 'Failed to get sequences' })
@@ -221,17 +245,21 @@ describe('Outreach Routes', () => {
     it('returns 200 with cancelled status', async () => {
       mocks.mockCancelSequence.mockResolvedValue(undefined)
 
-      const response = await request(app).post('/api/outreach/sequences/seq-123/cancel')
+      const response = await request(app).post(
+        '/api/outreach/sequences/550e8400-e29b-41d4-a716-446655440002/cancel'
+      )
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({ status: 'cancelled' })
-      expect(mocks.mockCancelSequence).toHaveBeenCalledWith('seq-123')
+      expect(mocks.mockCancelSequence).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440002')
     })
 
     it('returns 500 on error', async () => {
       mocks.mockCancelSequence.mockRejectedValue(new Error('Not found'))
 
-      const response = await request(app).post('/api/outreach/sequences/seq-bad/cancel')
+      const response = await request(app).post(
+        '/api/outreach/sequences/550e8400-e29b-41d4-a716-446655440003/cancel'
+      )
 
       expect(response.status).toBe(500)
       expect(response.body).toMatchObject({ error: 'Failed to cancel sequence' })

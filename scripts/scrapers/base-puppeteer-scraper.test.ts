@@ -37,6 +37,16 @@ class TestScraper extends BasePuppeteerScraper {
       return finalize(result)
     })
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async search(_companyName: string): Promise<ScraperResult> {
+    return { success: true, timestamp: new Date().toISOString() }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getManualSearchUrl(_companyName: string): string {
+    return 'https://example.test'
+  }
 }
 
 type PageMock = Page & {

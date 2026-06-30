@@ -17,6 +17,23 @@ const router = Router()
 // Validation schemas
 const MAX_PAGE_LIMIT = 200
 
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((char) => {
+    const code = char.charCodeAt(0)
+    return code <= 31 || code === 127
+  })
+}
+
+const safeCompanyName = z
+  .string()
+  .trim()
+  .min(2, 'company name is required')
+  .max(200, 'company name must be 200 characters or less')
+  .refine((value) => !hasControlCharacters(value), {
+    message: 'company name cannot contain control characters'
+  })
+  .transform((value) => value.replace(/\s+/g, ' '))
+
 const querySchema = z.object({
   page: z.string().regex(/^\d+$/).transform(Number).default('1'),
   // Clamp limit to a sane maximum before it reaches the DB (tier constraints
@@ -66,16 +83,8 @@ const exportQuerySchema = z
         'unclaimed'
       ])
       .optional(),
-    min_score: z
-      .string()
-      .regex(/^\d+$/)
-      .transform(Number)
-      .default('70'),
-    max_score: z
-      .string()
-      .regex(/^\d+$/)
-      .transform(Number)
-      .optional()
+    min_score: z.string().regex(/^\d+$/).transform(Number).default('70'),
+    max_score: z.string().regex(/^\d+$/).transform(Number).optional()
   })
   .refine((query) => query.min_score >= 0 && query.min_score <= 100, {
     message: 'min_score must be between 0 and 100',
@@ -91,7 +100,7 @@ const exportQuerySchema = z
   })
 
 const createProspectSchema = z.object({
-  company_name: z.string().min(1),
+  company_name: safeCompanyName,
   state: z.string().length(2),
   industry: z.enum([
     'restaurant',

@@ -13,6 +13,8 @@
 import { Router, Request, Response } from 'express'
 import type Stripe from 'stripe'
 import { asyncHandler } from '../middleware/errorHandler'
+import { validateRequest } from '../middleware/validateRequest'
+import { z } from 'zod'
 import { config } from '../config'
 import {
   createCheckoutSession,
@@ -277,8 +279,14 @@ router.get('/status', (_req: Request, res: Response) => {
   })
 })
 
+const checkoutQuerySchema = z.object({
+  tier: z.string().optional(),
+  plan: z.string().optional()
+})
+
 router.post(
   '/checkout',
+  validateRequest({ query: checkoutQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
     if (!isStripeConfigured()) {
       res.status(503).json({ error: 'Billing not configured' })

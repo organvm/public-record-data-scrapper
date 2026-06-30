@@ -18,7 +18,7 @@ vi.mock('../../services/DeliveryService', () => ({
 vi.mock('../../middleware/dataTier', async () => {
   const actual = await vi.importActual('../../middleware/dataTier')
   return {
-    ...(actual as any),
+    ...actual,
     getResolvedDataTier: vi.fn()
   }
 })
@@ -57,10 +57,10 @@ describe('POST /api/prospects/:id/deliver', () => {
     expect(response.status).toBe(200)
     expect(response.body.success).toBe(true)
     expect(response.body.providerId).toBe('mock-123')
-    expect(mockDeliverLead).toHaveBeenCalledWith(
-      expect.objectContaining({ id: PROSPECT_A }),
-      { integration: 'zapier', webhookUrl: 'https://hooks.zapier.com/foo' }
-    )
+    expect(mockDeliverLead).toHaveBeenCalledWith(expect.objectContaining({ id: PROSPECT_A }), {
+      integration: 'zapier',
+      webhookUrl: 'https://hooks.zapier.com/foo'
+    })
   })
 
   it('requires a pro tier', async () => {

@@ -9,6 +9,18 @@
 
 ---
 
+## What It Is
+
+The **Public Record Data Scraper** is a high-performance orchestration engine designed to extract, aggregate, and analyze Uniform Commercial Code (UCC) filings across all 50 US states. By autonomously navigating state Secretary of State portals and combining public records with premium enrichment sources, it transforms unstructured public data into prioritized, actionable leads.
+
+## Who Pays For This?
+
+This solution is purpose-built for the alternative finance industry. The primary customers and users include:
+- **Merchant Cash Advance (MCA) Brokers** looking for real-time leads on businesses taking on new debt.
+- **Commercial Loan Brokers & Alternative Lenders** who need to monitor competitive UCC filings, detect growth signals, and underwrite risk.
+- **B2B Equipment Financiers** tracking recent equipment purchases or expansion indicators.
+- **Data Syndicators & Lead Generation Agencies** who aggregate and resell B2B intent data.
+
 ## What It Does
 
 1. **Collects** UCC-1 filing data from 50 state portals via 60+ autonomous agents (handles CAPTCHAs, rate limits, session management, and fallback strategies per state)
@@ -44,7 +56,9 @@
 
 ---
 
-## Quick Start
+## Installation
+
+To get started with local development or self-hosting, clone the repository and install the dependencies:
 
 ```bash
 git clone https://github.com/organvm-iii-ergon/public-record-data-scrapper.git
@@ -52,7 +66,9 @@ cd public-record-data-scrapper
 npm install --legacy-peer-deps
 ```
 
-### Run with Docker (recommended)
+### Run with Docker (Recommended)
+
+The easiest way to run the full stack (Frontend, API, and Background Workers) locally is via Docker Compose:
 
 ```bash
 docker-compose up -d db redis          # Start PostgreSQL + Redis
@@ -60,21 +76,28 @@ npm run db:migrate && npm run seed     # Initialize database
 npm run dev:full                       # Start frontend + API + worker
 ```
 
-Frontend: `http://localhost:5000` | API: `http://localhost:3000`
+- **Frontend Dashboard:** `http://localhost:5000`
+- **REST API:** `http://localhost:3000`
 
-### CLI Only (no database required)
+## Usage
+
+You can use the platform via the React dashboard, the REST API, or directly through the CLI for lightweight scraping tasks.
+
+### CLI Only (No database required)
+
+For direct terminal execution without starting the full server stack:
 
 ```bash
-# Scrape UCC filings for a company
+# Scrape UCC filings for a single company
 npm run scrape -- scrape-ucc -c "Company Name" -s CA -o results.json
 
 # Enrich from public sources
 npm run scrape -- enrich -c "Company Name" -s CA -o enriched.json
 
-# Batch process from CSV
+# Batch process multiple companies from a CSV
 npm run scrape -- batch -i companies.csv -o ./results
 
-# List all 50 state agents
+# List all 50 state agents and their status
 npm run scrape -- list-states
 ```
 
@@ -150,12 +173,34 @@ The Express server exposes a RESTful API documented at `/api/docs` when running.
 
 Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 
-### Data Tiers
+## Pricing & Monetization (Data Tiers)
 
-| Tier           | Sources                                                     | Cost         |
-| -------------- | ----------------------------------------------------------- | ------------ |
-| **Free / OSS** | SEC EDGAR, OSHA, USPTO, Census, SAM.gov                     | $0           |
-| **Paid**       | + D&B, Clearbit, Experian, ZoomInfo, Google Places, NewsAPI | Subscription |
+The platform routes API requests and enrichment pipelines based on a tiered `x-data-tier` header, providing a freemium model that scales from self-hosted open-source to high-volume institutional usage.
+
+### Free / OSS Tier
+- **Cost:** $0
+- **Target Audience:** Individual developers, small brokerages, and hobbyists.
+- **Includes:** Full 50-state UCC scraping agents (self-hosted), self-managed database, and basic ML lead scoring.
+- **Data Sources:** Public records only (SEC EDGAR, OSHA, USPTO, Census, SAM.gov).
+- **API Cost Limit:** N/A (Bring your own infrastructure and API keys).
+
+### Starter Tier
+- **Cost:** ~$400 per 1,000 enrichments target ceiling.
+- **Target Audience:** Growing MCA shops and lead gen agencies.
+- **Includes:** Cloud-hosted orchestration, dashboard access, and CRM integration.
+- **Data Sources:** Public records + essential commercial signals.
+
+### Professional Tier
+- **Cost:** ~$3,000 per 1,000 enrichments target ceiling.
+- **Target Audience:** Established alternative lenders and high-volume brokers.
+- **Includes:** Managed infrastructure with 99.9% uptime SLA, premium commercial enrichments, and prioritized job queuing.
+- **Data Sources:** All free sources + D&B, Clearbit, Experian, ZoomInfo, Google Places, NewsAPI.
+
+### Enterprise Tier
+- **Cost:** ~$8,000 per 1,000 enrichments target ceiling.
+- **Target Audience:** Institutional lenders, massive ISOs, and data syndicators.
+- **Includes:** Dedicated compute clusters, advanced compliance reporting (CA SB 1235, NY CFDL), custom Salesforce/HubSpot engineering, and white-labeling.
+- **Features:** Automated daily feed updates, SSO, RBAC, and dedicated account management.
 
 ---
 

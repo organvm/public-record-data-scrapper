@@ -120,7 +120,26 @@ function getVerifyOptions(): jwt.VerifyOptions {
  * Adds user info to request object if valid.
  */
 export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const apiKeyHeader = req.headers['x-api-key']
   const authHeader = req.headers.authorization
+  let token = ''
+
+  if (authHeader) {
+    const parts = authHeader.split(' ')
+    if (parts.length === 2 && parts[0] === 'Bearer') {
+      token = parts[1]
+    }
+  }
+
+  // Validate API key via header or bearer token
+  if (config.server?.apiKey && (apiKeyHeader === config.server.apiKey || token === config.server.apiKey)) {
+    req.user = {
+      id: 'system-cli',
+      role: 'admin',
+      orgId: 'system' // System-level privileges for scripts/CLI
+    }
+    return next()
+  }
 
   if (!authHeader) {
     return res.status(401).json({
@@ -129,15 +148,12 @@ export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: N
     })
   }
 
-  const parts = authHeader.split(' ')
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+  if (!token) {
     return res.status(401).json({
       error: 'Unauthorized',
       message: 'Invalid authorization header format. Expected: Bearer <token>'
     })
   }
-
-  const token = parts[1]
 
   try {
     const decoded = jwt.verify(token, config.jwt.secret, getVerifyOptions()) as JwtPayload
@@ -176,18 +192,30 @@ export const optionalAuthMiddleware = (
   res: Response,
   next: NextFunction
 ) => {
+  const apiKeyHeader = req.headers['x-api-key']
   const authHeader = req.headers.authorization
+  let token = ''
 
-  if (!authHeader) {
+  if (authHeader) {
+    const parts = authHeader.split(' ')
+    if (parts.length === 2 && parts[0] === 'Bearer') {
+      token = parts[1]
+    }
+  }
+
+  // Validate API key via header or bearer token
+  if (config.server?.apiKey && (apiKeyHeader === config.server.apiKey || token === config.server.apiKey)) {
+    req.user = {
+      id: 'system-cli',
+      role: 'admin',
+      orgId: 'system' // System-level privileges for scripts/CLI
+    }
     return next()
   }
 
-  const parts = authHeader.split(' ')
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+  if (!authHeader || !token) {
     return next()
   }
-
-  const token = parts[1]
 
   try {
     const decoded = jwt.verify(token, config.jwt.secret, getVerifyOptions()) as JwtPayload

@@ -41,6 +41,7 @@
     "test:scrapers:headed": "tsx scripts/scrapers/test-scrapers.ts --headed",
     "postinstall": "node ./scripts/ensure-main-branch.mjs",
     "scrape": "tsx scripts/cli-scraper.ts",
+    "dashboard": "tsx scripts/dashboard.ts",
     "migrate": "npm run db:migrate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:test": "tsx scripts/db-test.ts",
@@ -52,7 +53,8 @@
     "video:validate": "npx tsx scripts/video-production/validate.ts",
     "video:help": "bash scripts/video-production/generate-videos.sh --help",
     "prepare": "husky",
-    "share": "lt --port 5000"
+    "share": "lt --port 5000",
+    "api-key:generate": "tsx scripts/generate-api-key.ts"
   },
   "dependencies": {
     "@github/spark": "^0.44.5",

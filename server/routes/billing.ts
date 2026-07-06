@@ -13,7 +13,9 @@
 import { Router, Request, Response } from 'express'
 import type Stripe from 'stripe'
 import { asyncHandler } from '../middleware/errorHandler'
+import { validateRequest } from '../middleware/validateRequest'
 import { config } from '../config'
+import { z } from 'zod'
 import {
   createCheckoutSession,
   constructWebhookEvent,
@@ -270,6 +272,21 @@ function resolveCheckoutBaseUrl(req: Request): string | null {
   return configuredBase ?? null
 }
 
+const checkoutQuerySchema = z
+  .object({
+    tier: z.string().optional(),
+    plan: z.string().optional()
+  })
+  .superRefine((value, ctx) => {
+    if (value.tier && value.plan && value.tier !== value.plan) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['plan'],
+        message: 'tier and plan must match when both are provided'
+      })
+    }
+  })
+
 router.get('/status', (_req: Request, res: Response) => {
   res.json({
     configured: isStripeConfigured(),
@@ -279,6 +296,7 @@ router.get('/status', (_req: Request, res: Response) => {
 
 router.post(
   '/checkout',
+  validateRequest({ query: checkoutQuerySchema }),
   asyncHandler(async (req: Request, res: Response) => {
     if (!isStripeConfigured()) {
       res.status(503).json({ error: 'Billing not configured' })
@@ -289,7 +307,8 @@ router.post(
     // is mounted with express.raw for the webhook, so req.body is a Buffer here,
     // not parsed JSON). Default to 'starter' to preserve the prior single-SKU
     // behavior, which resolves to STRIPE_PRICE_STARTER || STRIPE_PRICE_ID.
-    const requestedTier = req.query.tier ?? req.query.plan
+    const query = req.query as z.infer<typeof checkoutQuerySchema>
+    const requestedTier = query.tier ?? query.plan
     const tier = requestedTier === undefined ? 'starter' : normalizeCheckoutTier(requestedTier)
     if (!tier) {
       res.status(400).json({

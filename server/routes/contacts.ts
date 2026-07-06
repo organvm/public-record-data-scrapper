@@ -136,6 +136,15 @@ const logActivitySchema = z.object({
   completed_at: z.string().datetime().optional()
 }).strict()
 
+const activitiesQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(200).default(50),
+  before: z.string().optional()
+})
+
+const prospectIdParamSchema = z.object({
+  prospectId: z.string().uuid()
+})
+
 // GET /api/contacts - List contacts with filters (org_id required)
 router.get(
   '/',
@@ -349,17 +358,16 @@ router.post(
 // GET /api/contacts/:id/activities - Get activity timeline for contact
 router.get(
   '/:id/activities',
-  validateRequest({ params: idParamSchema }),
+  validateRequest({ params: idParamSchema, query: activitiesQuerySchema }),
   asyncHandler(async (req, res) => {
     const contactsService = new ContactsService()
     const { id } = req.params
-    // Parse with explicit radix, guard NaN/non-positive, and cap to a sane max.
-    const parsedLimit = parseInt(req.query.limit as string, 10)
-    const limit =
-      Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 200) : 50
-    const before = req.query.before as string | undefined
+    const query = req.query as z.infer<typeof activitiesQuerySchema>
 
-    const activities = await contactsService.getActivityTimeline(id, { limit, before })
+    const activities = await contactsService.getActivityTimeline(id, {
+      limit: query.limit,
+      before: query.before
+    })
 
     res.json({ activities })
   })
@@ -368,6 +376,7 @@ router.get(
 // GET /api/contacts/by-prospect/:prospectId - Get contacts for a prospect
 router.get(
   '/by-prospect/:prospectId',
+  validateRequest({ params: prospectIdParamSchema }),
   asyncHandler(async (req, res) => {
     const contactsService = new ContactsService()
     const { prospectId } = req.params

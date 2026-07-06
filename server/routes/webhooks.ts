@@ -620,6 +620,10 @@ function extractEmailAddress(raw: string | undefined): string | null {
  * message as multipart form fields; we only require `from`. Everything else is
  * optional/best-effort.
  */
+const sendgridInboundQuerySchema = z.object({
+  token: z.string().optional()
+})
+
 const sendgridInboundSchema = z.object({
   from: z.string().min(1),
   to: z.string().optional(),
@@ -644,6 +648,7 @@ const sendgridInboundSchema = z.object({
  */
 router.post(
   '/sendgrid/inbound',
+  validateRequest({ query: sendgridInboundQuerySchema }),
   parseMultipartFields(),
   asyncHandler(async (req: Request, res: Response) => {
     // FAIL CLOSED on the shared secret before doing any work.
@@ -654,8 +659,8 @@ router.post(
         error: { message: 'Inbound parse token not configured', statusCode: 401 }
       })
     }
-    const provided = typeof req.query.token === 'string' ? req.query.token : ''
-    if (!timingSafeEqualStr(provided, expectedToken)) {
+    const { token } = req.query as z.infer<typeof sendgridInboundQuerySchema>
+    if (!token || !timingSafeEqualStr(token, expectedToken)) {
       console.error('[webhooks] Invalid inbound parse token')
       return res.status(401).json({
         error: { message: 'Invalid inbound parse token', statusCode: 401 }

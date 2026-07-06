@@ -13,7 +13,7 @@ import { database } from './database/connection'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler'
 import { requestLogger } from './middleware/requestLogger'
 import { createRateLimiter, closeRateLimiterConnection } from './middleware/rateLimiter'
-import { authMiddleware } from './middleware/authMiddleware'
+import { authMiddleware, requireRole } from './middleware/authMiddleware'
 import { apiKeyOrJwtAuth } from './middleware/apiKeyAuth'
 import { orgContextMiddleware } from './middleware/orgContext'
 import { httpsRedirect } from './middleware/httpsRedirect'
@@ -170,7 +170,14 @@ export class Server {
     this.app.use('/api/compliance', authMiddleware, orgContextMiddleware, complianceRouter)
     this.app.use('/api/discovery', authMiddleware, orgContextMiddleware, discoveryRouter)
     this.app.use('/api/agentic', authMiddleware, orgContextMiddleware, agenticRouter)
-    this.app.use('/api/keys', authMiddleware, orgContextMiddleware, apiKeysRouter)
+    // API key management (JWT + admin only - API keys must not be able to mint more keys)
+    this.app.use(
+      '/api/keys',
+      authMiddleware,
+      requireRole('admin'),
+      orgContextMiddleware,
+      apiKeysRouter
+    )
     this.app.use('/api/scrape', apiKeyOrJwtAuth, scrapeRouter)
 
     // Root endpoint
@@ -195,6 +202,7 @@ export class Server {
           compliance: '/api/compliance',
           discovery: '/api/discovery',
           scrape: '/api/scrape',
+          keys: '/api/keys',
           metrics: '/api/metrics',
           webhooks: '/api/webhooks'
         }

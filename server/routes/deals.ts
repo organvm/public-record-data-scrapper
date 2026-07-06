@@ -142,6 +142,10 @@ const documentParamsSchema = z.object({
   documentId: z.string().uuid()
 })
 
+const verifyDocumentSchema = z.object({
+  verified_by: z.string().min(1)
+})
+
 // org_id is optional here: the value is derived from the token by resolveOrgId.
 // When supplied it is validated as a UUID and cross-checked against the token.
 const orgIdQuerySchema = z.object({
@@ -515,24 +519,14 @@ async function assertDocumentBelongsToOrg(
 router.patch(
   '/:id/documents/:documentId/verify',
   requireRole('user', 'admin'),
-  validateRequest({ params: documentParamsSchema }),
+  validateRequest({ params: documentParamsSchema, body: verifyDocumentSchema }),
   asyncHandler(async (req, res) => {
     const orgId = resolveOrgId(req as AuthenticatedRequest, res)
     if (!orgId) return
 
     const dealsService = new DealsService()
     const { id, documentId } = req.params
-    const verifiedBy = req.body.verified_by as string
-
-    if (!verifiedBy) {
-      return res.status(400).json({
-        error: {
-          message: 'verified_by is required',
-          code: 'VALIDATION_ERROR',
-          statusCode: 400
-        }
-      })
-    }
+    const { verified_by: verifiedBy } = req.body as z.infer<typeof verifyDocumentSchema>
 
     if (!(await assertDocumentBelongsToOrg(dealsService, id, documentId, orgId, res))) {
       return

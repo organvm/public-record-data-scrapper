@@ -31,11 +31,10 @@ describe('serverless app wiring', () => {
     expect(res.status).toBe(401)
   })
 
-  it('mounts the API key management route (401, not 404) when unauthenticated', async () => {
+  it('keeps API keys route protected (401, not 404)', async () => {
     const app = await getServerlessApp()
     const res = await request(app).get('/api/keys')
-    // /api/keys must be mounted — a 404 here means the paying-customer key
-    // management route was accidentally dropped from server/index.ts again.
+    // /api/keys must be mounted — a 404 here means the paying-customer key management route was accidentally dropped from server/index.ts again.
     expect(res.status).toBe(401)
   })
 

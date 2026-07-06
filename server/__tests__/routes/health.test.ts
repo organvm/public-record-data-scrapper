@@ -256,7 +256,7 @@ describe('Health Routes', () => {
 
       expect(response.status).toBe(404)
       expect(response.body).toMatchObject({
-        message: 'Unknown state code: zz'
+        message: 'Unknown state code: ZZ'
       })
     })
   })

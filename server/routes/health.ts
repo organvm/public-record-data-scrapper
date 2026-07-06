@@ -1,6 +1,8 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { database } from '../database/connection'
 import { asyncHandler } from '../middleware/errorHandler'
+import { validateRequest } from '../middleware/validateRequest'
 import { getResolvedDataTier } from '../middleware/dataTier'
 import { listEnabledIntegrations, resolveUccProvider } from '../config/tieredIntegrations'
 import { getIngestionCoverageTelemetry, resolveStateIngestionStrategyChain } from '../queue/queues'
@@ -162,6 +164,16 @@ const US_STATES: StateDefinition[] = [
   { code: 'WI', name: 'Wisconsin' },
   { code: 'WY', name: 'Wyoming' }
 ]
+
+const stateCodeParamSchema = z.object({
+  stateCode: z
+    .string()
+    .trim()
+    .transform((value) => value.toUpperCase())
+    .refine((value) => /^[A-Z]{2}$/.test(value), {
+      message: 'stateCode must be a 2-letter code'
+    })
+})
 
 function sumRecordsSince(telemetry: RuntimeTelemetry | undefined, days: number): number | null {
   if (!telemetry || telemetry.successes.length === 0) {
@@ -567,13 +579,15 @@ router.get(
 // GET /api/health/coverage/:stateCode - state-specific readiness snapshot
 router.get(
   '/coverage/:stateCode',
+  validateRequest({ params: stateCodeParamSchema }),
   asyncHandler(async (req, res) => {
     const dataTier = getResolvedDataTier(req)
-    const state = getStateCoverageSnapshot(req.params.stateCode, dataTier)
+    const { stateCode } = req.params as z.infer<typeof stateCodeParamSchema>
+    const state = getStateCoverageSnapshot(stateCode, dataTier)
 
     if (!state) {
       res.status(404).json({
-        message: `Unknown state code: ${req.params.stateCode}`
+        message: `Unknown state code: ${stateCode}`
       })
       return
     }

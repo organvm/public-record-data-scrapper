@@ -73,7 +73,8 @@ export const config = {
   server: {
     port: parsePositiveIntRadix10(process.env.PORT, 3000),
     env: process.env.NODE_ENV || 'development',
-    host: process.env.HOST || '0.0.0.0'
+    host: process.env.HOST || '0.0.0.0',
+    apiKey: process.env.API_KEY || undefined
   },
   app: {
     // Whether Express should trust X-Forwarded-* headers. Default false in dev.

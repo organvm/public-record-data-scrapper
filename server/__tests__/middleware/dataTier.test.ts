@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { Request, Response, NextFunction } from 'express'
+import jwt from 'jsonwebtoken'
 
 // Mock the database module so entitlement lookups are controllable.
 vi.mock('../../database/connection', () => ({
@@ -7,6 +8,20 @@ vi.mock('../../database/connection', () => ({
     query: vi.fn()
   }
 }))
+
+// Config mock for the real authMiddleware used by the mount-order regression
+// tests below (dataTier.ts itself never reads config — inert elsewhere).
+vi.mock('../../config', () => ({
+  config: {
+    jwt: {
+      secret: 'test-secret',
+      orgClaim: 'org_id',
+      tierClaim: 'tier'
+    }
+  }
+}))
+
+import { authMiddleware } from '../../middleware/authMiddleware'
 
 import { database } from '../../database/connection'
 import {
@@ -211,6 +226,55 @@ describe('dataTier middleware', () => {
 
     it('fails closed when the router has not run', () => {
       const req = makeReq()
+      expect(getResolvedDataTier(req as unknown as Request)).toBe('free-tier')
+    })
+  })
+
+  // Mount-order regression (#348): the tier is resolved from req.user, which
+  // only exists AFTER authMiddleware. A global pre-auth dataTierRouter mount
+  // resolved free-tier for every caller, silently applying the free-tier
+  // min-score floor to paid orgs (server/index.ts now mounts it per-route,
+  // after auth). These tests pin the ordering dependency itself.
+  describe('mount order vs authMiddleware (#348 regression)', () => {
+    const runChain = async (order: 'auth-first' | 'tier-first', token: string) => {
+      const req = makeReq({ headers: { authorization: `Bearer ${token}` } })
+      const res = { ...makeRes(), status: vi.fn().mockReturnThis(), json: vi.fn() }
+      const chain =
+        order === 'auth-first' ? [authMiddleware, dataTierRouter] : [dataTierRouter, authMiddleware]
+      for (const mw of chain) {
+        const next = vi.fn() as NextFunction
+        mw(req as unknown as Request, res as unknown as Response, next)
+        await vi.waitFor(() => expect(next).toHaveBeenCalled())
+      }
+      return req
+    }
+
+    it('resolves the paid tier when mounted AFTER auth (the fixed order)', async () => {
+      const token = jwt.sign(
+        { sub: 'u1', role: 'admin', org_id: 'org-1', tier: 'professional' },
+        'test-secret'
+      )
+      const req = await runChain('auth-first', token)
+      expect(getResolvedDataTier(req as unknown as Request)).toBe('starter-tier')
+    })
+
+    it('resolves via the org subscription_tier DB fallback when the token has no tier claim', async () => {
+      mockQuery.mockResolvedValueOnce([{ subscription_tier: 'professional' }] as never)
+      const token = jwt.sign({ sub: 'u1', role: 'admin', org_id: 'org-2' }, 'test-secret')
+      const req = await runChain('auth-first', token)
+      expect(getResolvedDataTier(req as unknown as Request)).toBe('starter-tier')
+      expect(mockQuery).toHaveBeenCalledWith(
+        'SELECT subscription_tier FROM organizations WHERE id = $1',
+        ['org-2']
+      )
+    })
+
+    it('documents the regression: mounted BEFORE auth, a paid org still resolves free-tier', async () => {
+      const token = jwt.sign(
+        { sub: 'u1', role: 'admin', org_id: 'org-3', tier: 'professional' },
+        'test-secret'
+      )
+      const req = await runChain('tier-first', token)
       expect(getResolvedDataTier(req as unknown as Request)).toBe('free-tier')
     })
   })

@@ -122,8 +122,12 @@ export class Server {
     // Logging
     this.app.use(requestLogger)
 
-    // Data tier routing (OSS -> free-tier, paid -> starter-tier)
-    this.app.use(dataTierRouter)
+    // NOTE: dataTierRouter is deliberately NOT mounted here (#348). Tier
+    // resolution reads req.user (JWT tier claim, then the org's
+    // subscription_tier), and req.user is populated by the per-route
+    // authMiddleware — a global pre-auth mount always resolved free-tier,
+    // which silently applied the free-tier min-score floor to every caller.
+    // It is mounted per-route AFTER auth in setupRoutes().
 
     // Rate limiting (Redis-based in production, in-memory in development)
     this.app.use(createRateLimiter())
@@ -139,8 +143,10 @@ export class Server {
     // Public status page (no auth, bookmarkable)
     this.app.use(statusRouter)
 
-    // Public routes (no authentication required)
-    this.app.use('/api/health', healthRouter)
+    // Public routes (no authentication required). dataTierRouter resolves
+    // free-tier here (no req.user) — explicit, and keeps health's tier read
+    // honest rather than relying on the fail-closed accessor default.
+    this.app.use('/api/health', dataTierRouter, healthRouter)
 
     // Webhook routes (signature verification, no JWT auth)
     this.app.use('/api/webhooks', webhooksRouter)
@@ -157,28 +163,35 @@ export class Server {
     // orgContextMiddleware runs AFTER authMiddleware (so req.user.orgId is
     // populated) and BEFORE the routers, binding the tenant context that the
     // core DB client uses to SET app.current_org_id for RLS (migration 018).
-    this.app.use('/api/prospects', authMiddleware, orgContextMiddleware, prospectsRouter)
-    this.app.use('/api/competitors', authMiddleware, orgContextMiddleware, competitorsRouter)
-    this.app.use('/api/portfolio', authMiddleware, orgContextMiddleware, portfolioRouter)
-    this.app.use('/api/enrichment', authMiddleware, orgContextMiddleware, enrichmentRouter)
-    this.app.use('/api/jobs', authMiddleware, orgContextMiddleware, jobsRouter)
-    this.app.use('/api/contacts', authMiddleware, orgContextMiddleware, contactsRouter)
-    this.app.use('/api/deals', authMiddleware, orgContextMiddleware, dealsRouter)
-    this.app.use('/api/competitive', authMiddleware, orgContextMiddleware, competitiveRouter)
-    this.app.use('/api/outreach', authMiddleware, orgContextMiddleware, outreachRouter)
-    this.app.use('/api/communications', authMiddleware, orgContextMiddleware, communicationsRouter)
-    this.app.use('/api/compliance', authMiddleware, orgContextMiddleware, complianceRouter)
-    this.app.use('/api/discovery', authMiddleware, orgContextMiddleware, discoveryRouter)
-    this.app.use('/api/agentic', authMiddleware, orgContextMiddleware, agenticRouter)
+    // dataTierRouter likewise runs AFTER authMiddleware (#348): it resolves the
+    // entitlement from req.user (tier claim, then the org's subscription_tier),
+    // so mounted pre-auth it always failed closed to free-tier — which silently
+    // applied the free-tier min-score floor to every authenticated caller.
+    this.app.use('/api/prospects', authMiddleware, orgContextMiddleware, dataTierRouter, prospectsRouter)
+    this.app.use('/api/competitors', authMiddleware, orgContextMiddleware, dataTierRouter, competitorsRouter)
+    this.app.use('/api/portfolio', authMiddleware, orgContextMiddleware, dataTierRouter, portfolioRouter)
+    this.app.use('/api/enrichment', authMiddleware, orgContextMiddleware, dataTierRouter, enrichmentRouter)
+    this.app.use('/api/jobs', authMiddleware, orgContextMiddleware, dataTierRouter, jobsRouter)
+    this.app.use('/api/contacts', authMiddleware, orgContextMiddleware, dataTierRouter, contactsRouter)
+    this.app.use('/api/deals', authMiddleware, orgContextMiddleware, dataTierRouter, dealsRouter)
+    this.app.use('/api/competitive', authMiddleware, orgContextMiddleware, dataTierRouter, competitiveRouter)
+    this.app.use('/api/outreach', authMiddleware, orgContextMiddleware, dataTierRouter, outreachRouter)
+    this.app.use('/api/communications', authMiddleware, orgContextMiddleware, dataTierRouter, communicationsRouter)
+    this.app.use('/api/compliance', authMiddleware, orgContextMiddleware, dataTierRouter, complianceRouter)
+    this.app.use('/api/discovery', authMiddleware, orgContextMiddleware, dataTierRouter, discoveryRouter)
+    this.app.use('/api/agentic', authMiddleware, orgContextMiddleware, dataTierRouter, agenticRouter)
     // API key management (JWT + admin only - API keys must not be able to mint more keys)
     this.app.use(
       '/api/keys',
       authMiddleware,
       requireRole('admin'),
       orgContextMiddleware,
+      dataTierRouter,
       apiKeysRouter
     )
-    this.app.use('/api/scrape', apiKeyOrJwtAuth, scrapeRouter)
+    // scrape authenticates via API key OR JWT — either way req.user carries the
+    // org/tier context by the time dataTierRouter resolves.
+    this.app.use('/api/scrape', apiKeyOrJwtAuth, dataTierRouter, scrapeRouter)
 
     // Root endpoint
     this.app.get('/', (req, res) => {

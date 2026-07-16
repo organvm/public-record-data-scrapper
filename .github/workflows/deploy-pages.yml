@@ -1,0 +1,74 @@
+# ============================================================================
+# Deploy the built web bundle to GitHub Pages
+# ----------------------------------------------------------------------------
+# Fixes #345: Pages previously served the raw source tree — the dev index.html
+# pointing at /src/main.tsx (raw TSX, application/octet-stream), which browsers
+# refuse, rendering a blank page behind an HTTP 200.
+#
+# This workflow builds apps/web with the project-pages base path and publishes
+# the compiled bundle. Done-predicate (from the issue): the deployed entry
+# script serves with a JavaScript content-type and the page renders content.
+# ============================================================================
+name: deploy-pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm --workspace apps/web run build -- --base=/public-record-data-scrapper/
+      # Vite's outDir points at the repo root, but with the workspace invocation
+      # the bundle has been observed at apps/web/dist — accept either, fail loud
+      # on neither (never upload a guessed path).
+      - name: Resolve build output
+        id: out
+        run: |
+          if [ -f dist/index.html ]; then
+            echo "dir=dist" >> "$GITHUB_OUTPUT"
+          elif [ -f apps/web/dist/index.html ]; then
+            echo "dir=apps/web/dist" >> "$GITHUB_OUTPUT"
+          else
+            echo "no built index.html found in dist/ or apps/web/dist/" >&2
+            exit 1
+          fi
+      # SPA fallback: Pages serves 404.html for unknown paths; serve the app.
+      - name: Add SPA fallback
+        run: cp "${{ steps.out.outputs.dir }}/index.html" "${{ steps.out.outputs.dir }}/404.html"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.out.outputs.dir }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

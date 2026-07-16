@@ -6,12 +6,28 @@
 -- behind JWT-only auth. A JWT requires an interactive IdP/login flow, so there
 -- was no credential an operator could hand a paying stranger to call the API.
 --
--- This adds long-lived, revocable API keys scoped to an organization. The
+-- This grants long-lived, revocable API keys scoped to an organization. The
 -- secret itself is NEVER stored — only a SHA-256 hash (for lookup) and a short
 -- non-secret prefix (for display, e.g. "prk_AbC12…"). A presented key is
 -- hashed and matched against key_hash; the row carries the org_id and role that
 -- populate the request's auth context, so the existing org-scoping / RLS and
 -- requireRole machinery work unchanged.
+--
+-- IMPORTANT (#346): migration 004 ALREADY created api_keys in an older shape
+-- (scopes/is_active, key_prefix VARCHAR(10), no role/revoked_at). The original
+-- version of this file did CREATE TABLE IF NOT EXISTS, which silently no-oped
+-- against the 004 table and then failed on the revoked_at partial index —
+-- breaking the migration chain on every database. This version EVOLVES the
+-- 004 table in place to the shape ApiKeyService reads:
+--   * role, revoked_at added (what the service selects and gates on)
+--   * key_prefix widened to VARCHAR(16) — the service stores a 12-char display
+--     prefix (DISPLAY_PREFIX_LENGTH), which overflowed 004's VARCHAR(10)
+--   * rows soft-disabled under 004's is_active=false become revoked, so the
+--     new revocation predicate honors historical disables
+-- key_hash stays VARCHAR(255) (a SHA-256 hex digest fits; 004 already indexes
+-- it UNIQUE). org_id stays nullable and created_by keeps 004's FK action —
+-- neither is read by the service, and tightening them could fail on legacy
+-- rows; they are cleanup for a later migration if ever needed.
 --
 -- Migration style: the runner (scripts/migrate.ts) executes each file as one
 -- pool.query() inside a transaction; this mirrors the repo's transactional,
@@ -20,32 +36,30 @@
 
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS api_keys (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    -- Human label so an operator can tell keys apart ("acme-prod", "trial-bob").
-    name VARCHAR(120) NOT NULL,
-    -- Non-secret leading characters of the full key, safe to display in UIs/logs.
-    key_prefix VARCHAR(16) NOT NULL,
-    -- SHA-256 (hex) of the full presented key. The plaintext key is shown to the
-    -- caller exactly once at creation and never persisted.
-    key_hash CHAR(64) NOT NULL,
-    -- Role granted to requests authenticated with this key. Mirrors the role
-    -- vocabulary the scrape routes gate on via requireRole().
-    role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
-    -- Best-effort usage timestamp, updated on successful verification. Foundation
-    -- for per-key usage metering / billing.
-    last_used_at TIMESTAMP WITH TIME ZONE,
-    -- Optional expiry; NULL means the key never expires until revoked.
-    expires_at TIMESTAMP WITH TIME ZONE,
-    -- Soft revocation; set to disable a key without losing its audit trail.
-    revoked_at TIMESTAMP WITH TIME ZONE,
-    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
+-- Role granted to requests authenticated with this key. Mirrors the role
+-- vocabulary the scrape routes gate on via requireRole().
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
 
--- Unique on the hash: verification is a single point lookup by hashed key, and
--- two keys must never collide to the same secret.
+-- Named CHECK added idempotently (ADD CONSTRAINT has no IF NOT EXISTS).
+DO $$
+BEGIN
+    ALTER TABLE api_keys ADD CONSTRAINT api_keys_role_check CHECK (role IN ('user', 'admin'));
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Soft revocation; set to disable a key without losing its audit trail.
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMP WITH TIME ZONE;
+
+-- The service's display prefix is 12 chars ("prk_" + 8); 004 allowed only 10.
+ALTER TABLE api_keys ALTER COLUMN key_prefix TYPE VARCHAR(16);
+
+-- Honor 004-era soft disables under the new revocation predicate.
+UPDATE api_keys SET revoked_at = NOW() WHERE is_active = false AND revoked_at IS NULL;
+
+-- Unique on the hash: verification is a single point lookup by hashed key
+-- (004 already enforces UNIQUE via its column constraint; this keeps the
+-- 023-named index for fresh shapes and no-ops where one exists).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 
 -- List/manage keys for an org; partial index keeps the common "active keys"

@@ -164,16 +164,56 @@ describe('SBALoansChannel (streaming)', () => {
     )
   })
 
-  it('fails closed when the recent 7(a) resource is absent from CKAN', async () => {
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      statusText: 'OK',
-      json: async () => ({ result: { resources: [{ format: 'CSV', url: 'https://x/other.csv' }] } })
-    } as unknown as Response)
+  it('falls through to the DCAT catalog when CKAN is gone (2026 Drupal migration)', async () => {
+    // CKAN rung: the post-migration portal answers every /api/3/action/* with
+    // an HTML 404 — modelled here as a non-2xx response.
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: async () => ({})
+      } as unknown as Response)
+      // DCAT rung: data.json carries the dataset distribution.
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          dataset: [
+            { distribution: [{ format: 'pdf', downloadURL: 'https://x/notes.pdf' }] },
+            { distribution: [{ downloadURL: CKAN_RESOURCE_URL }] }
+          ]
+        })
+      } as unknown as Response)
+      .mockResolvedValueOnce(streamingResponse([HEADER, row('Dcat Co', 'CA')]))
+
+    const candidates = await new SBALoansChannel().discover({ limit: 10 })
+
+    expect(candidates.map((c) => c.company_name)).toEqual(['Dcat Co'])
+  })
+
+  it('fails closed with a named unavailability reason when CKAN and DCAT both lack the dataset', async () => {
+    fetchSpy
+      // CKAN answers but the recent-7(a) resource is gone.
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          result: { resources: [{ format: 'CSV', url: 'https://x/other.csv' }] }
+        })
+      } as unknown as Response)
+      // DCAT catalog exists but has no matching distribution.
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({ dataset: [{ distribution: [{ downloadURL: 'https://x/a.csv' }] }] })
+      } as unknown as Response)
 
     await expect(new SBALoansChannel().discover({ limit: 10 })).rejects.toThrow(
-      /recent 7\(a\) CSV resource/
+      /SBA 7\(a\) FOIA dataset unavailable/
     )
   })
 })

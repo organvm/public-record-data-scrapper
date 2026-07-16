@@ -22,6 +22,8 @@ function rowsResponse(rows: Record<string, unknown>[]): Response {
 
 const NY_FIELD = 'permittee_s_business_name'
 const CA_FIELD = 'contractors_business_name'
+const FL_FIELD = 'contractor_name'
+const TX_FIELD = 'contractor_company_name'
 
 describe('SocrataBuildingPermitsChannel', () => {
   let fetchSpy: ReturnType<typeof vi.fn>
@@ -64,11 +66,36 @@ describe('SocrataBuildingPermitsChannel', () => {
     fetchSpy
       .mockResolvedValueOnce(rowsResponse([{ [NY_FIELD]: 'NY Co' }]))
       .mockResolvedValueOnce(rowsResponse([{ [CA_FIELD]: 'CA Co' }]))
+      .mockResolvedValueOnce(rowsResponse([{ [FL_FIELD]: 'FL Co' }]))
+      .mockResolvedValueOnce(rowsResponse([{ [TX_FIELD]: 'TX Co' }]))
 
     const candidates = await new SocrataBuildingPermitsChannel().discover({ limit: 10 })
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
-    expect(candidates.map((c) => `${c.state}:${c.company_name}`)).toEqual(['NY:NY Co', 'CA:CA Co'])
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    expect(candidates.map((c) => `${c.state}:${c.company_name}`)).toEqual([
+      'NY:NY Co',
+      'CA:CA Co',
+      'FL:FL Co',
+      'TX:TX Co'
+    ])
+  })
+
+  it('serves FL from the Orlando dataset and requires a non-null order field', async () => {
+    fetchSpy.mockResolvedValueOnce(rowsResponse([{ [FL_FIELD]: 'Sunshine Builders LLC' }]))
+
+    const candidates = await new SocrataBuildingPermitsChannel().discover({
+      state: 'FL',
+      limit: 5
+    })
+
+    expect(candidates.map((c) => `${c.state}:${c.company_name}`)).toEqual([
+      'FL:Sunshine Builders LLC'
+    ])
+    // URLSearchParams encodes spaces as '+' — normalize before asserting.
+    const url = decodeURIComponent(String(fetchSpy.mock.calls[0][0]).replace(/\+/g, ' '))
+    expect(url).toContain('data.cityoforlando.net/resource/ryhf-m453.json')
+    // SODA sorts DESC NULL FIRST — the null-guard keeps unissued applications out.
+    expect(url).toContain('issue_permit_date IS NOT NULL')
   })
 
   it('caps the total candidates at the requested limit', async () => {
@@ -84,10 +111,10 @@ describe('SocrataBuildingPermitsChannel', () => {
 
   it('fails closed for a state with no registered dataset', async () => {
     const err = await new SocrataBuildingPermitsChannel()
-      .discover({ state: 'TX', limit: 10 })
+      .discover({ state: 'WA', limit: 10 })
       .catch((e) => e)
     expect(err).toBeInstanceOf(DiscoveryChannelError)
-    expect((err as Error).message).toMatch(/no building-permit dataset registered for state 'TX'/)
+    expect((err as Error).message).toMatch(/no building-permit dataset registered for state 'WA'/)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 

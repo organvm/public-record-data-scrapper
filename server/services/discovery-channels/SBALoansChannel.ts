@@ -5,16 +5,23 @@
  * financing event and a strong 'contract' (capital-secured) growth signal.
  *
  * ── Dataset (public FOIA release, NO API KEY) ───────────────────────────────
- *   SBA "7(a) & 504 FOIA" — CKAN dataset
- *     id: 0ff8e8e9-b967-4f4e-987c-6ac78c575087  (data.sba.gov)
+ *   SBA "7(a) & 504 FOIA" — loan-level borrower records
+ *     legacy CKAN id: 0ff8e8e9-b967-4f4e-987c-6ac78c575087  (data.sba.gov)
  *   We fetch the recent 7(a) CSV resource (FY2020-present). The "as-of" date
- *   is embedded in the filename, so the concrete file URL is resolved through
- *   the CKAN package_show API at runtime (the package id is stable; the
- *   resource filename rotates). If the recent 7(a) resource cannot be located,
- *   that is a fail-closed condition.
+ *   is embedded in the filename, so the concrete file URL must be resolved at
+ *   runtime. Resolution is a self-healing chain (#347):
  *
- *   CKAN: GET https://data.sba.gov/api/3/action/package_show?id=<pkgId>
- *         → result.resources[] : { format, url, name }
+ *   1. Legacy CKAN package_show — the pre-2026 portal API. data.sba.gov's
+ *      2026 Drupal 11 migration dropped every /api/3/action/* path (they now
+ *      return the portal's HTML 404), but the rung is kept first so the
+ *      channel heals itself if SBA restores CKAN.
+ *      GET https://data.sba.gov/api/3/action/package_show?id=<pkgId>
+ *        → result.resources[] : { format, url, name }
+ *   2. DCAT catalog — the federal open-data surface the Drupal portal DOES
+ *      serve. The 7(a)/504 FOIA dataset is absent from it as of 2026-07 but
+ *      this is where it should reappear.
+ *      GET https://data.sba.gov/data.json → dataset[].distribution[].downloadURL
+ *   3. Fail closed with a named unavailability reason (never a raw HTTP code).
  *
  * ── CSV shape (documented header; parser fails closed if columns change) ────
  *   asofdate,program,locationid,borrname,borrstreet,borrcity,borrstate,
@@ -38,6 +45,8 @@ import { clampLimit, normalizeState, errorMessage, fetchWithTimeout, fetchJson }
 const CHANNEL = 'sba-7a-loans'
 const CKAN_PACKAGE_ID = '0ff8e8e9-b967-4f4e-987c-6ac78c575087'
 const CKAN_PACKAGE_SHOW = `https://data.sba.gov/api/3/action/package_show?id=${CKAN_PACKAGE_ID}`
+// Project Open Data (DCAT) catalog the post-2026 Drupal portal serves.
+const DCAT_CATALOG_URL = 'https://data.sba.gov/data.json'
 // Filename stem of the recent 7(a) CSV resource (date suffix rotates).
 const RECENT_7A_RESOURCE_STEM = 'foia-7a-fy2020-present'
 const RATE_BUCKET = 'sba'
@@ -69,8 +78,33 @@ export class SBALoansChannel implements DiscoveryChannel {
     return this.streamCsvCandidates(csvUrl, wantState, limit)
   }
 
-  /** Resolve the rotating recent-7(a) CSV resource URL via CKAN. */
+  /**
+   * Resolve the rotating recent-7(a) CSV resource URL via the self-healing
+   * chain documented in the module header: legacy CKAN → DCAT catalog →
+   * named unavailability error. A CKAN answer that lacks the resource falls
+   * through to DCAT the same as a dead CKAN — only the final rung throws.
+   */
   private async resolveRecentCsvUrl(): Promise<string> {
+    let ckanReason: string
+    try {
+      return await this.resolveViaCkan()
+    } catch (err) {
+      ckanReason = errorMessage(err)
+    }
+    try {
+      return await this.resolveViaDcat()
+    } catch (dcatErr) {
+      throw new DiscoveryChannelError(
+        CHANNEL,
+        'SBA 7(a) FOIA dataset unavailable: the 2026 data.sba.gov migration dropped the CKAN API ' +
+          'and the loan-level dataset is absent from the DCAT catalog — no candidates until SBA ' +
+          `republishes (CKAN: ${ckanReason}; DCAT: ${errorMessage(dcatErr)})`
+      )
+    }
+  }
+
+  /** Rung 1 — legacy CKAN package_show (pre-2026 portal). */
+  private async resolveViaCkan(): Promise<string> {
     const body = await fetchJson(
       CHANNEL,
       CKAN_PACKAGE_SHOW,
@@ -100,6 +134,39 @@ export class SBALoansChannel implements DiscoveryChannel {
       )
     }
     return match.url
+  }
+
+  /** Rung 2 — DCAT catalog (data.json) served by the post-2026 Drupal portal. */
+  private async resolveViaDcat(): Promise<string> {
+    const body = await fetchJson(
+      CHANNEL,
+      DCAT_CATALOG_URL,
+      { headers: { Accept: 'application/json' } },
+      'SBA DCAT',
+      REQUEST_TIMEOUT_MS
+    )
+
+    const datasets = (body as { dataset?: unknown })?.dataset
+    if (!Array.isArray(datasets)) {
+      throw new DiscoveryChannelError(
+        CHANNEL,
+        'SBA DCAT response shape changed: expected dataset[] array'
+      )
+    }
+
+    for (const ds of datasets as { distribution?: unknown }[]) {
+      const dists = ds?.distribution
+      if (!Array.isArray(dists)) continue
+      for (const dist of dists as { downloadURL?: unknown }[]) {
+        const url = typeof dist.downloadURL === 'string' ? dist.downloadURL : ''
+        if (url.toLowerCase().includes(RECENT_7A_RESOURCE_STEM)) return url
+      }
+    }
+
+    throw new DiscoveryChannelError(
+      CHANNEL,
+      `recent 7(a) CSV ('${RECENT_7A_RESOURCE_STEM}') absent from the DCAT catalog`
+    )
   }
 
   /**

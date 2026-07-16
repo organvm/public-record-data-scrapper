@@ -16,10 +16,24 @@
  *       Business field:  contractors_business_name
  *       State:           implicit CA (LA dataset)
  *       Date field:      issue_date  (ISO 8601)
+ *  FL → City of Orlando "Permit Applications" (updated daily; verified live
+ *       2026-07-16 — Miami-Dade's Socrata is gone, 302 → ArcGIS legacy)
+ *       https://data.cityoforlando.net/resource/ryhf-m453.json
+ *       Business field:  contractor_name
+ *       State:           implicit FL (Orlando dataset)
+ *       Date field:      issue_permit_date  (ISO 8601; null until issuance —
+ *                        see the $where null-guard below)
+ *  TX → City of Austin "Issued Construction Permits"
+ *       https://data.austintexas.gov/resource/3syk-w9eu.json
+ *       Business field:  contractor_company_name
+ *       State:           implicit TX (Austin dataset)
+ *       Date field:      issue_date  (ISO 8601)
  *
- *  Both accept SODA query params ($limit, $order, $where). We request newest
- *  first and cap rows. Each row maps to one candidate (deduped per-business
- *  within the page). Courtesy rate-limit via the shared 'socrata' bucket.
+ *  All accept SODA query params ($limit, $order, $where). We request newest
+ *  first and cap rows; SODA sorts DESC with NULL FIRST, so the $where also
+ *  requires the order field non-null (else never-issued applications lead
+ *  the page). Each row maps to one candidate (deduped per-business within
+ *  the page). Courtesy rate-limit via the shared 'socrata' bucket.
  *
  * Fail-closed: a non-2xx response, non-array body, or a payload missing the
  * documented business-name field for EVERY row throws a named error rather
@@ -64,6 +78,18 @@ const SOURCES: Record<string, SocrataSource> = {
     state: 'CA',
     url: 'https://data.lacity.org/resource/xnhu-aczu.json',
     businessField: 'contractors_business_name',
+    orderField: 'issue_date'
+  },
+  FL: {
+    state: 'FL',
+    url: 'https://data.cityoforlando.net/resource/ryhf-m453.json',
+    businessField: 'contractor_name',
+    orderField: 'issue_permit_date'
+  },
+  TX: {
+    state: 'TX',
+    url: 'https://data.austintexas.gov/resource/3syk-w9eu.json',
+    businessField: 'contractor_company_name',
     orderField: 'issue_date'
   }
 }
@@ -121,7 +147,9 @@ export class SocrataBuildingPermitsChannel implements DiscoveryChannel {
     const qs = new URLSearchParams({
       $limit: String(rowLimit),
       $order: `${source.orderField} DESC`,
-      $where: `${source.businessField} IS NOT NULL`
+      // SODA orders DESC with NULL FIRST — without the order-field guard,
+      // rows that never reached issuance (null date) lead every page.
+      $where: `${source.businessField} IS NOT NULL AND ${source.orderField} IS NOT NULL`
     })
     const url = `${source.url}?${qs.toString()}`
 

@@ -92,6 +92,10 @@ export class SBALoansChannel implements DiscoveryChannel {
       ckanReason = errorMessage(err)
     }
     try {
+      // The fallback is a distinct external request and therefore consumes its
+      // own token. One token for the resolution chain is not enough when CKAN
+      // fails and DCAT is attempted in the same discovery run.
+      await rateLimiterManager.waitForTokens(RATE_BUCKET)
       return await this.resolveViaDcat()
     } catch (dcatErr) {
       throw new DiscoveryChannelError(
@@ -157,9 +161,15 @@ export class SBALoansChannel implements DiscoveryChannel {
     for (const ds of datasets as { distribution?: unknown }[]) {
       const dists = ds?.distribution
       if (!Array.isArray(dists)) continue
-      for (const dist of dists as { downloadURL?: unknown }[]) {
+      for (const dist of dists as {
+        downloadURL?: unknown
+        format?: unknown
+        mediaType?: unknown
+      }[]) {
         const url = typeof dist.downloadURL === 'string' ? dist.downloadURL : ''
-        if (url.toLowerCase().includes(RECENT_7A_RESOURCE_STEM)) return url
+        if (url.toLowerCase().includes(RECENT_7A_RESOURCE_STEM) && isCsvDistribution(dist, url)) {
+          return url
+        }
       }
     }
 
@@ -279,6 +289,29 @@ export class SBALoansChannel implements DiscoveryChannel {
 
     return out
   }
+}
+
+/** Accept a DCAT distribution only when its metadata or URL identifies CSV. */
+function isCsvDistribution(
+  dist: { format?: unknown; mediaType?: unknown },
+  downloadUrl: string
+): boolean {
+  const format = typeof dist.format === 'string' ? dist.format.trim().toLowerCase() : ''
+  const mediaType =
+    typeof dist.mediaType === 'string' ? dist.mediaType.split(';', 1)[0].trim().toLowerCase() : ''
+  let pathname = ''
+  try {
+    pathname = new URL(downloadUrl).pathname.toLowerCase()
+  } catch {
+    return false
+  }
+  return (
+    format === 'csv' ||
+    format === 'text/csv' ||
+    mediaType === 'text/csv' ||
+    mediaType === 'application/csv' ||
+    pathname.endsWith('.csv')
+  )
 }
 
 /** Resolved header: required column positions + optional enrichment positions. */

@@ -17,8 +17,11 @@ on:
     paths:
       - 'apps/web/**'
       - 'packages/**'
+      - 'scripts/verify-pages-public-demo.mjs'
+      - 'scripts/verify-pages-public-demo.test.mjs'
       - 'package.json'
       - 'package-lock.json'
+      - 'tsconfig.json'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
@@ -41,7 +44,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm --workspace apps/web run build -- --base=/public-record-data-scrapper/
+      - name: Test public data deployment gate
+        run: node --test scripts/verify-pages-public-demo.test.mjs
+      - name: Verify receipt-bound public data source
+        run: node scripts/verify-pages-public-demo.mjs apps/web/public/data/austin-building-permits.receipt.json
+      - name: Build receipt-bound public data demo
+        env:
+          VITE_PUBLIC_DEMO_RECEIPT_URL: data/austin-building-permits.receipt.json
+        run: npm --workspace apps/web run build -- --base=/public-record-data-scrapper/
       # Vite's outDir points at the repo root, but with the workspace invocation
       # the bundle has been observed at apps/web/dist — accept either, fail loud
       # on neither (never upload a guessed path).

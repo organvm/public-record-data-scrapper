@@ -43,8 +43,9 @@ import { ExportFormat } from '@/lib/exportUtils'
 import { UserAction } from '@/lib/agentic/types'
 import { logUserAction } from '@/lib/api/userActions'
 import { toast } from 'sonner'
+import { PublicDataDemo } from '@/components/PublicDataDemo'
 
-function App() {
+function DashboardApp() {
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [exportFormat, setExportFormat] = useKV<ExportFormat>('export-format', 'json')
@@ -334,6 +335,11 @@ function App() {
       />
     </div>
   )
+}
+
+function App() {
+  const publicDemoReceipt = String(import.meta.env.VITE_PUBLIC_DEMO_RECEIPT_URL ?? '').trim()
+  return publicDemoReceipt ? <PublicDataDemo receiptPath={publicDemoReceipt} /> : <DashboardApp />
 }
 
 export default App

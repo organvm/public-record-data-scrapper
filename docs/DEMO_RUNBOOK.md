@@ -70,15 +70,15 @@ export NODE_ENV=development
 exits at startup if it is unset (`validateConfig` in `server/config/index.ts`). The same secret must
 be used to mint the demo token in §1.6, or the API will reject it.
 
-### 1.4 Run migrations through 021
+### 1.4 Run migrations through 024
 
 ```bash
 npm run db:migrate
 ```
 
 This applies every pending `database/migrations/NNN_*.sql` in order and records them in
-`schema_migrations`. The latest is `021_communications_followups_and_inbound.sql`. Confirm the tail of
-the output shows migration `021` completed and "All migrations completed successfully". Migration
+`schema_migrations`. The latest is `024_scrape_jobs.sql`. Confirm the tail of
+the output shows migration `024` completed and "All migrations completed successfully". Migration
 `018` installs row-level security keyed on the `app.current_org_id` GUC; this is why the org-binding
 in §1.5 matters.
 

@@ -137,10 +137,17 @@ export class Server {
   }
 
   private setupRoutes(): void {
+    // Public routes have no authenticated entitlement context, so resolve them
+    // explicitly as free-tier and expose that decision on every response. Keep
+    // these mounts path-scoped: mounting dataTierRouter globally would run
+    // before auth and incorrectly freeze protected requests at free-tier.
+    this.app.use('/api/docs', dataTierRouter)
+
     // Swagger UI documentation
     this.setupSwaggerDocs()
 
     // Public status page (no auth, bookmarkable)
+    this.app.use('/status', dataTierRouter)
     this.app.use(statusRouter)
 
     // Public routes (no authentication required). dataTierRouter resolves
@@ -149,15 +156,15 @@ export class Server {
     this.app.use('/api/health', dataTierRouter, healthRouter)
 
     // Webhook routes (signature verification, no JWT auth)
-    this.app.use('/api/webhooks', webhooksRouter)
+    this.app.use('/api/webhooks', dataTierRouter, webhooksRouter)
 
     // Metrics (self-protecting: valid JWT OR METRICS_TOKEN; 401 when neither —
     // must NOT sit behind the global authMiddleware or the token scrape path breaks)
-    this.app.use('/api/metrics', metricsRouter)
+    this.app.use('/api/metrics', dataTierRouter, metricsRouter)
 
     // Billing routes (Stripe). The webhook is authenticated via Stripe signature
     // verification on the raw body (mounted above), not JWT.
-    this.app.use('/api/billing', billingRouter)
+    this.app.use('/api/billing', dataTierRouter, billingRouter)
 
     // Protected API routes (authentication required).
     // orgContextMiddleware runs AFTER authMiddleware (so req.user.orgId is
@@ -194,7 +201,7 @@ export class Server {
     this.app.use('/api/scrape', apiKeyOrJwtAuth, dataTierRouter, scrapeRouter)
 
     // Root endpoint
-    this.app.get('/', (req, res) => {
+    this.app.get('/', dataTierRouter, (req, res) => {
       res.json({
         name: 'UCC-MCA Intelligence API',
         version: '1.0.0',

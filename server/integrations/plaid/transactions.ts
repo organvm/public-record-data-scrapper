@@ -9,6 +9,7 @@
  */
 
 import { plaidClient, PlaidClient } from './client'
+import { mcaLenderNames } from '../../services/calibration/funderIntel'
 
 /**
  * Plaid account types
@@ -234,32 +235,6 @@ export interface ParsedTransactionCategory {
   /** Confidence in category assignment (0-1) */
   confidence: number
 }
-
-/**
- * Known MCA lender names for payment detection
- */
-const KNOWN_MCA_LENDERS = [
-  'KAPITUS',
-  'CAN CAPITAL',
-  'BLUEVINE',
-  'ONDECK',
-  'KABBAGE',
-  'SQUARE CAPITAL',
-  'PAYPAL WORKING CAPITAL',
-  'FUNDBOX',
-  'CREDIBLY',
-  'NATIONAL FUNDING',
-  'RAPID FINANCE',
-  'FORWARD FINANCING',
-  'LIBERTAS FUNDING',
-  'ALLIED FUNDING',
-  'GREENBOX CAPITAL',
-  'PEARL CAPITAL',
-  'RELIANT FUNDING',
-  'MERCHANT CASH',
-  'BUSINESS FUNDING',
-  'FUNDING CIRCLE'
-]
 
 /**
  * NSF/Overdraft fee indicators
@@ -619,7 +594,7 @@ export class PlaidTransactionsManager {
     // Check for lender payments (MCA, loans, etc.)
     const isLenderPayment =
       !isNsfFee &&
-      (KNOWN_MCA_LENDERS.some((lender) => name.includes(lender) || merchantName.includes(lender)) ||
+      (mcaLenderNames().some((lender) => name.includes(lender) || merchantName.includes(lender)) ||
         category.includes('Loan') ||
         category.includes('Loan Payments') ||
         primaryCategory === 'LOAN_PAYMENTS')

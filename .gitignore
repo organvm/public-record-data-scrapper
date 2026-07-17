@@ -67,3 +67,7 @@ src-tauri/bindings/
 !/server/
 # VSCode Local History extension
 .lh/
+
+# Private scoring calibration (funder intel, source-map, credit-box tuning) — the moat.
+# Injected into the live operation; never committed to this public repo.
+server/services/calibration/*.private.json

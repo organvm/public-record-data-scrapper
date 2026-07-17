@@ -20,6 +20,7 @@ import {
   plaidTransactionsManager,
   PlaidTransactionsManager
 } from '../integrations/plaid'
+import { mcaLenderNames } from './calibration/funderIntel'
 
 /**
  * Daily balance record for ADB calculation
@@ -606,29 +607,9 @@ export class UnderwritingService {
   private extractLenderName(tx: PlaidTransaction): string {
     const name = (tx.merchantName || tx.name || '').toUpperCase()
 
-    // Try to match known lenders
-    const knownLenders = [
-      'KAPITUS',
-      'CAN CAPITAL',
-      'BLUEVINE',
-      'ONDECK',
-      'KABBAGE',
-      'SQUARE CAPITAL',
-      'PAYPAL WORKING CAPITAL',
-      'FUNDBOX',
-      'CREDIBLY',
-      'NATIONAL FUNDING',
-      'RAPID FINANCE',
-      'FORWARD FINANCING',
-      'LIBERTAS FUNDING',
-      'ALLIED FUNDING',
-      'GREENBOX CAPITAL',
-      'PEARL CAPITAL',
-      'RELIANT FUNDING',
-      'FUNDING CIRCLE'
-    ]
-
-    for (const lender of knownLenders) {
+    // Match against the curated funder dictionary (injected from private
+    // calibration; a bare public clone sees only the illustrative default).
+    for (const lender of mcaLenderNames()) {
       if (name.includes(lender)) {
         return lender
       }

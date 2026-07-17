@@ -1,0 +1,8 @@
+{
+  "_note": "Template for the PRIVATE funder-intelligence calibration. Copy to funderIntel.private.json (gitignored) and populate with the production funder dictionary, or point SCORING_CALIBRATION_PATH at your own JSON. Without it, the platform uses the illustrative default in funderIntel.ts — the shape works, the market intelligence does not ship in this public repo.",
+  "mcaLenderNames": [
+    "EXAMPLE FUNDING CO",
+    "SAMPLE CAPITAL PARTNERS",
+    "DEMO ADVANCE GROUP"
+  ]
+}

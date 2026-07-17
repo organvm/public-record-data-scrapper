@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import request from 'supertest'
+import express from 'express'
 import { createTestApp, createAuthHeader } from '../helpers/testApp'
+import { authMiddleware } from '../../middleware/authMiddleware'
+import { dataTierRouter } from '../../middleware/dataTier'
+import prospectsRouter from '../../routes/prospects'
+import { errorHandler } from '../../middleware/errorHandler'
 import type { Express } from 'express'
 
 const { mockExportLeads, mockSerializeLeadExportCsv } = vi.hoisted(() => ({
@@ -115,5 +120,85 @@ describe('Lead export API', () => {
     const response = await request(app).get('/api/prospects/export/leads')
 
     expect(response.status).toBe(401)
+  })
+})
+
+// Tier gating through the REAL auth → dataTier chain (production mount order,
+// per #353): a verified `tier` claim resolves without any DB lookup, so these
+// tests exercise genuine server-side tier resolution, not a mocked accessor.
+describe('Lead export tier gating', () => {
+  let app: Express
+
+  function createTieredApp(): Express {
+    const tiered = express()
+    tiered.use(express.json())
+    tiered.use('/api/prospects', authMiddleware, dataTierRouter, prospectsRouter)
+    tiered.use(errorHandler)
+    return tiered
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    app = createTieredApp()
+  })
+
+  it('free-tier: floors min_score to 70 and caps limit at the list parity cap', async () => {
+    mockExportLeads.mockResolvedValueOnce(leadExportBatch())
+    const freeAuth = createAuthHeader('free-user', { orgId: 'free-org', tier: 'free' })
+
+    const response = await request(app)
+      .get('/api/prospects/export/leads?min_score=0&limit=500')
+      .set('Authorization', freeAuth)
+
+    expect(response.status).toBe(200)
+    expect(mockExportLeads).toHaveBeenCalledWith(
+      expect.objectContaining({ minScore: 70, limit: 20 })
+    )
+  })
+
+  it('free-tier: respects a caller min_score already above the floor', async () => {
+    mockExportLeads.mockResolvedValueOnce(leadExportBatch())
+    const freeAuth = createAuthHeader('free-user', { orgId: 'free-org', tier: 'free' })
+
+    const response = await request(app)
+      .get('/api/prospects/export/leads?min_score=85')
+      .set('Authorization', freeAuth)
+
+    expect(response.status).toBe(200)
+    expect(mockExportLeads).toHaveBeenCalledWith(
+      expect.objectContaining({ minScore: 85, limit: 20 })
+    )
+  })
+
+  it('starter-tier: passes an explicit min_score=0 and full limit through unchanged', async () => {
+    mockExportLeads.mockResolvedValueOnce(leadExportBatch())
+    const paidAuth = createAuthHeader('pro-user', { orgId: 'pro-org', tier: 'professional' })
+
+    const response = await request(app)
+      .get('/api/prospects/export/leads?min_score=0&limit=1000')
+      .set('Authorization', paidAuth)
+
+    expect(response.status).toBe(200)
+    expect(mockExportLeads).toHaveBeenCalledWith(
+      expect.objectContaining({ minScore: 0, limit: 1000 })
+    )
+  })
+
+  it('fails closed to free-tier when the chain omits dataTierRouter', async () => {
+    mockExportLeads.mockResolvedValueOnce(leadExportBatch())
+    const bare = express()
+    bare.use(express.json())
+    bare.use('/api/prospects', authMiddleware, prospectsRouter)
+    bare.use(errorHandler)
+    const paidAuth = createAuthHeader('pro-user', { orgId: 'pro-org', tier: 'professional' })
+
+    const response = await request(bare)
+      .get('/api/prospects/export/leads?min_score=0&limit=1000')
+      .set('Authorization', paidAuth)
+
+    expect(response.status).toBe(200)
+    expect(mockExportLeads).toHaveBeenCalledWith(
+      expect.objectContaining({ minScore: 70, limit: 20 })
+    )
   })
 })

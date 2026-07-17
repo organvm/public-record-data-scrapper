@@ -216,6 +216,31 @@ function applyProspectTierConstraints(
   }
 }
 
+// Export caps are deliberately asymmetric with the list caps: free tier must
+// never export more rows than it can list (teaser parity), while paid tiers
+// may pull the full feed batch the export schema already allows.
+const EXPORT_TIER_LIMITS: Record<ResolvedDataTier, number> = {
+  'free-tier': PROSPECT_TIER_LIMITS['free-tier'],
+  'starter-tier': 1000
+}
+
+function applyExportTierConstraints(
+  query: LeadExportQuery,
+  dataTier: ResolvedDataTier
+): LeadExportQuery {
+  const limit = Math.min(query.limit, EXPORT_TIER_LIMITS[dataTier])
+
+  if (dataTier !== 'free-tier') {
+    return { ...query, limit }
+  }
+
+  return {
+    ...query,
+    limit,
+    min_score: Math.max(query.min_score, FREE_TIER_MIN_SCORE)
+  }
+}
+
 // GET /api/prospects - List prospects (paginated, filtered, sorted)
 router.get(
   '/',
@@ -278,7 +303,10 @@ router.get(
   '/export/leads',
   validateRequest({ query: exportQuerySchema }),
   asyncHandler(async (req, res) => {
-    const query = req.query as LeadExportQuery
+    const query = applyExportTierConstraints(
+      req.query as LeadExportQuery,
+      getResolvedDataTier(req)
+    )
     const exportService = new LeadExportService()
     const batch = await exportService.exportLeads({
       state: query.state,

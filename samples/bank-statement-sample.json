@@ -1,0 +1,944 @@
+{
+  "_note": "SYNTHETIC sample statement (labeled, zero PII) — a ready-to-POST body for /api/underwriting/analyze-statement. Two stacked MCA positions (daily FORWARD FINANCING, weekly KAPITUS), 4 NSF events, mixed regular/lumpy deposits over ~90 days. Sign convention: positive=debit, negative=deposit.",
+  "transactions": [
+    {
+      "date": "2026-04-20",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 17500
+    },
+    {
+      "date": "2026-04-20",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 16300
+    },
+    {
+      "date": "2026-04-21",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 15800
+    },
+    {
+      "date": "2026-04-21",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -11200,
+      "running_balance": 27000
+    },
+    {
+      "date": "2026-04-22",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 26500
+    },
+    {
+      "date": "2026-04-22",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 9200,
+      "running_balance": 17300
+    },
+    {
+      "date": "2026-04-23",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 16800
+    },
+    {
+      "date": "2026-04-23",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -8400,
+      "running_balance": 25200
+    },
+    {
+      "date": "2026-04-24",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 24700
+    },
+    {
+      "date": "2026-04-24",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 12300,
+      "running_balance": 12400
+    },
+    {
+      "date": "2026-04-24",
+      "description": "GUSTO PAYROLL RUN",
+      "amount": 5200,
+      "running_balance": 7200
+    },
+    {
+      "date": "2026-04-27",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 6700
+    },
+    {
+      "date": "2026-04-27",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 5500
+    },
+    {
+      "date": "2026-04-27",
+      "description": "FPL ELECTRIC UTILITY",
+      "amount": 465.2,
+      "running_balance": 5034.8
+    },
+    {
+      "date": "2026-04-28",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 4534.8
+    },
+    {
+      "date": "2026-04-28",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -14750,
+      "running_balance": 19284.8
+    },
+    {
+      "date": "2026-04-29",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 18784.8
+    },
+    {
+      "date": "2026-04-29",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 8400,
+      "running_balance": 10384.8
+    },
+    {
+      "date": "2026-04-29",
+      "description": "NSF FEE INSUFFICIENT FUNDS",
+      "amount": 35,
+      "running_balance": 10349.8
+    },
+    {
+      "date": "2026-04-30",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 9849.8
+    },
+    {
+      "date": "2026-04-30",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -9300,
+      "running_balance": 19149.8
+    },
+    {
+      "date": "2026-05-01",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 18649.8
+    },
+    {
+      "date": "2026-05-01",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -12800,
+      "running_balance": 31449.8
+    },
+    {
+      "date": "2026-05-01",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 11100,
+      "running_balance": 20349.8
+    },
+    {
+      "date": "2026-05-01",
+      "description": "COMMERCIAL RENT LLC",
+      "amount": 5800,
+      "running_balance": 14549.8
+    },
+    {
+      "date": "2026-05-04",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 14049.8
+    },
+    {
+      "date": "2026-05-04",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 12849.8
+    },
+    {
+      "date": "2026-05-05",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 12349.8
+    },
+    {
+      "date": "2026-05-05",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -10150,
+      "running_balance": 22499.8
+    },
+    {
+      "date": "2026-05-05",
+      "description": "OFFICE DEPOT SUPPLIES",
+      "amount": 210.4,
+      "running_balance": 22289.4
+    },
+    {
+      "date": "2026-05-06",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 21789.4
+    },
+    {
+      "date": "2026-05-06",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 10300,
+      "running_balance": 11489.4
+    },
+    {
+      "date": "2026-05-07",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 10989.4
+    },
+    {
+      "date": "2026-05-07",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -13400,
+      "running_balance": 24389.4
+    },
+    {
+      "date": "2026-05-08",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 23889.4
+    },
+    {
+      "date": "2026-05-08",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 13200,
+      "running_balance": 10689.4
+    },
+    {
+      "date": "2026-05-08",
+      "description": "GUSTO PAYROLL RUN",
+      "amount": 6850,
+      "running_balance": 3839.4
+    },
+    {
+      "date": "2026-05-11",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 3339.4
+    },
+    {
+      "date": "2026-05-11",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 2139.4
+    },
+    {
+      "date": "2026-05-12",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 1639.4
+    },
+    {
+      "date": "2026-05-12",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -8900,
+      "running_balance": 10539.4
+    },
+    {
+      "date": "2026-05-13",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 10039.4
+    },
+    {
+      "date": "2026-05-13",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 8800,
+      "running_balance": 1239.4
+    },
+    {
+      "date": "2026-05-14",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 739.4
+    },
+    {
+      "date": "2026-05-14",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -11200,
+      "running_balance": 11939.4
+    },
+    {
+      "date": "2026-05-15",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 11439.4
+    },
+    {
+      "date": "2026-05-15",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -8400,
+      "running_balance": 19839.4
+    },
+    {
+      "date": "2026-05-15",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 9200,
+      "running_balance": 10639.4
+    },
+    {
+      "date": "2026-05-15",
+      "description": "INSURANCE REIMBURSEMENT",
+      "amount": -22000,
+      "running_balance": 32639.4
+    },
+    {
+      "date": "2026-05-18",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 32139.4
+    },
+    {
+      "date": "2026-05-18",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 30939.4
+    },
+    {
+      "date": "2026-05-19",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 30439.4
+    },
+    {
+      "date": "2026-05-19",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -14750,
+      "running_balance": 45189.4
+    },
+    {
+      "date": "2026-05-20",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 44689.4
+    },
+    {
+      "date": "2026-05-20",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 12300,
+      "running_balance": 32389.4
+    },
+    {
+      "date": "2026-05-21",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 31889.4
+    },
+    {
+      "date": "2026-05-21",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -9300,
+      "running_balance": 41189.4
+    },
+    {
+      "date": "2026-05-21",
+      "description": "NSF FEE INSUFFICIENT FUNDS",
+      "amount": 35,
+      "running_balance": 41154.4
+    },
+    {
+      "date": "2026-05-22",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 40654.4
+    },
+    {
+      "date": "2026-05-22",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 8400,
+      "running_balance": 32254.4
+    },
+    {
+      "date": "2026-05-22",
+      "description": "GUSTO PAYROLL RUN",
+      "amount": 7400,
+      "running_balance": 24854.4
+    },
+    {
+      "date": "2026-05-25",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 24354.4
+    },
+    {
+      "date": "2026-05-25",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 23154.4
+    },
+    {
+      "date": "2026-05-26",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 22654.4
+    },
+    {
+      "date": "2026-05-26",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -12800,
+      "running_balance": 35454.4
+    },
+    {
+      "date": "2026-05-26",
+      "description": "OFFICE DEPOT SUPPLIES",
+      "amount": 385.75,
+      "running_balance": 35068.65
+    },
+    {
+      "date": "2026-05-27",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 34568.65
+    },
+    {
+      "date": "2026-05-27",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 11100,
+      "running_balance": 23468.65
+    },
+    {
+      "date": "2026-05-27",
+      "description": "FPL ELECTRIC UTILITY",
+      "amount": 465.2,
+      "running_balance": 23003.45
+    },
+    {
+      "date": "2026-05-28",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 22503.45
+    },
+    {
+      "date": "2026-05-28",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -10150,
+      "running_balance": 32653.45
+    },
+    {
+      "date": "2026-05-29",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 32153.45
+    },
+    {
+      "date": "2026-05-29",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -13400,
+      "running_balance": 45553.45
+    },
+    {
+      "date": "2026-05-29",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 10300,
+      "running_balance": 35253.45
+    },
+    {
+      "date": "2026-06-01",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 34753.45
+    },
+    {
+      "date": "2026-06-01",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 33553.45
+    },
+    {
+      "date": "2026-06-01",
+      "description": "COMMERCIAL RENT LLC",
+      "amount": 5800,
+      "running_balance": 27753.45
+    },
+    {
+      "date": "2026-06-02",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 27253.45
+    },
+    {
+      "date": "2026-06-02",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -8900,
+      "running_balance": 36153.45
+    },
+    {
+      "date": "2026-06-03",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 35653.45
+    },
+    {
+      "date": "2026-06-03",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 13200,
+      "running_balance": 22453.45
+    },
+    {
+      "date": "2026-06-04",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 21953.45
+    },
+    {
+      "date": "2026-06-04",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -11200,
+      "running_balance": 33153.45
+    },
+    {
+      "date": "2026-06-05",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 32653.45
+    },
+    {
+      "date": "2026-06-05",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 8800,
+      "running_balance": 23853.45
+    },
+    {
+      "date": "2026-06-05",
+      "description": "GUSTO PAYROLL RUN",
+      "amount": 5900,
+      "running_balance": 17953.45
+    },
+    {
+      "date": "2026-06-08",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 17453.45
+    },
+    {
+      "date": "2026-06-08",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 16253.45
+    },
+    {
+      "date": "2026-06-09",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 15753.45
+    },
+    {
+      "date": "2026-06-09",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -8400,
+      "running_balance": 24153.45
+    },
+    {
+      "date": "2026-06-10",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 23653.45
+    },
+    {
+      "date": "2026-06-10",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 9200,
+      "running_balance": 14453.45
+    },
+    {
+      "date": "2026-06-11",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 13953.45
+    },
+    {
+      "date": "2026-06-11",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -14750,
+      "running_balance": 28703.45
+    },
+    {
+      "date": "2026-06-12",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 28203.45
+    },
+    {
+      "date": "2026-06-12",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -9300,
+      "running_balance": 37503.45
+    },
+    {
+      "date": "2026-06-12",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 12300,
+      "running_balance": 25203.45
+    },
+    {
+      "date": "2026-06-12",
+      "description": "INSURANCE REIMBURSEMENT",
+      "amount": -22000,
+      "running_balance": 47203.45
+    },
+    {
+      "date": "2026-06-15",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 46703.45
+    },
+    {
+      "date": "2026-06-15",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 45503.45
+    },
+    {
+      "date": "2026-06-16",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 45003.45
+    },
+    {
+      "date": "2026-06-16",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -12800,
+      "running_balance": 57803.45
+    },
+    {
+      "date": "2026-06-16",
+      "description": "OFFICE DEPOT SUPPLIES",
+      "amount": 149.99,
+      "running_balance": 57653.46
+    },
+    {
+      "date": "2026-06-17",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 57153.46
+    },
+    {
+      "date": "2026-06-17",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 8400,
+      "running_balance": 48753.46
+    },
+    {
+      "date": "2026-06-17",
+      "description": "NSF FEE INSUFFICIENT FUNDS",
+      "amount": 35,
+      "running_balance": 48718.46
+    },
+    {
+      "date": "2026-06-18",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 48218.46
+    },
+    {
+      "date": "2026-06-18",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -10150,
+      "running_balance": 58368.46
+    },
+    {
+      "date": "2026-06-19",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 57868.46
+    },
+    {
+      "date": "2026-06-19",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 11100,
+      "running_balance": 46768.46
+    },
+    {
+      "date": "2026-06-19",
+      "description": "GUSTO PAYROLL RUN",
+      "amount": 6300,
+      "running_balance": 40468.46
+    },
+    {
+      "date": "2026-06-22",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 39968.46
+    },
+    {
+      "date": "2026-06-22",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 38768.46
+    },
+    {
+      "date": "2026-06-23",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 38268.46
+    },
+    {
+      "date": "2026-06-23",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -13400,
+      "running_balance": 51668.46
+    },
+    {
+      "date": "2026-06-24",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 51168.46
+    },
+    {
+      "date": "2026-06-24",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 10300,
+      "running_balance": 40868.46
+    },
+    {
+      "date": "2026-06-25",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 40368.46
+    },
+    {
+      "date": "2026-06-25",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -8900,
+      "running_balance": 49268.46
+    },
+    {
+      "date": "2026-06-26",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 48768.46
+    },
+    {
+      "date": "2026-06-26",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -11200,
+      "running_balance": 59968.46
+    },
+    {
+      "date": "2026-06-26",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 13200,
+      "running_balance": 46768.46
+    },
+    {
+      "date": "2026-06-26",
+      "description": "FPL ELECTRIC UTILITY",
+      "amount": 465.2,
+      "running_balance": 46303.26
+    },
+    {
+      "date": "2026-06-29",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 45803.26
+    },
+    {
+      "date": "2026-06-29",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 44603.26
+    },
+    {
+      "date": "2026-06-30",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 44103.26
+    },
+    {
+      "date": "2026-06-30",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -8400,
+      "running_balance": 52503.26
+    },
+    {
+      "date": "2026-07-01",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 52003.26
+    },
+    {
+      "date": "2026-07-01",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 8800,
+      "running_balance": 43203.26
+    },
+    {
+      "date": "2026-07-01",
+      "description": "COMMERCIAL RENT LLC",
+      "amount": 5800,
+      "running_balance": 37403.26
+    },
+    {
+      "date": "2026-07-02",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 36903.26
+    },
+    {
+      "date": "2026-07-02",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -14750,
+      "running_balance": 51653.26
+    },
+    {
+      "date": "2026-07-03",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 51153.26
+    },
+    {
+      "date": "2026-07-03",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 9200,
+      "running_balance": 41953.26
+    },
+    {
+      "date": "2026-07-03",
+      "description": "GUSTO PAYROLL RUN",
+      "amount": 5200,
+      "running_balance": 36753.26
+    },
+    {
+      "date": "2026-07-06",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 36253.26
+    },
+    {
+      "date": "2026-07-06",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 35053.26
+    },
+    {
+      "date": "2026-07-07",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 34553.26
+    },
+    {
+      "date": "2026-07-07",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -9300,
+      "running_balance": 43853.26
+    },
+    {
+      "date": "2026-07-07",
+      "description": "OFFICE DEPOT SUPPLIES",
+      "amount": 512.3,
+      "running_balance": 43340.96
+    },
+    {
+      "date": "2026-07-08",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 42840.96
+    },
+    {
+      "date": "2026-07-08",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 12300,
+      "running_balance": 30540.96
+    },
+    {
+      "date": "2026-07-08",
+      "description": "NSF FEE INSUFFICIENT FUNDS",
+      "amount": 35,
+      "running_balance": 30505.96
+    },
+    {
+      "date": "2026-07-09",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 30005.96
+    },
+    {
+      "date": "2026-07-09",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -12800,
+      "running_balance": 42805.96
+    },
+    {
+      "date": "2026-07-10",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 42305.96
+    },
+    {
+      "date": "2026-07-10",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -10150,
+      "running_balance": 52455.96
+    },
+    {
+      "date": "2026-07-10",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 8400,
+      "running_balance": 44055.96
+    },
+    {
+      "date": "2026-07-13",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 43555.96
+    },
+    {
+      "date": "2026-07-13",
+      "description": "KAPITUS FUNDING PMT",
+      "amount": 1200,
+      "running_balance": 42355.96
+    },
+    {
+      "date": "2026-07-14",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 41855.96
+    },
+    {
+      "date": "2026-07-14",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -13400,
+      "running_balance": 55255.96
+    },
+    {
+      "date": "2026-07-15",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 54755.96
+    },
+    {
+      "date": "2026-07-15",
+      "description": "SYSCO FOOD SUPPLIER PAYMENT",
+      "amount": 11100,
+      "running_balance": 43655.96
+    },
+    {
+      "date": "2026-07-16",
+      "description": "FORWARD FINANCING ACH DEBIT",
+      "amount": 500,
+      "running_balance": 43155.96
+    },
+    {
+      "date": "2026-07-16",
+      "description": "CUSTOMER PAYMENT ACH",
+      "amount": -8900,
+      "running_balance": 52055.96
+    }
+  ],
+  "time_in_business_months": 30,
+  "industry": "restaurant",
+  "state": "FL"
+}

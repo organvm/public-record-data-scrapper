@@ -42,6 +42,7 @@ import discoveryRouter from './routes/discovery'
 import metricsRouter from './routes/metrics'
 import agenticRouter from './routes/agentic'
 import scrapeRouter from './routes/scrape'
+import underwritingRouter from './routes/underwriting'
 
 // Import queue infrastructure
 import {
@@ -180,6 +181,7 @@ export class Server {
     this.app.use('/api/compliance', authMiddleware, orgContextMiddleware, dataTierRouter, complianceRouter)
     this.app.use('/api/discovery', authMiddleware, orgContextMiddleware, dataTierRouter, discoveryRouter)
     this.app.use('/api/agentic', authMiddleware, orgContextMiddleware, dataTierRouter, agenticRouter)
+    this.app.use('/api/underwriting', authMiddleware, orgContextMiddleware, dataTierRouter, underwritingRouter)
     // API key management (JWT + admin only - API keys must not be able to mint more keys)
     this.app.use(
       '/api/keys',

@@ -65,14 +65,16 @@ fields and adds nested objects:
 
 ## Scoring
 
-The sample follows the platform scoring service weights:
+Each `priority_score` is a 0–100 composite of three proprietary sub-scores — **intent**,
+**health**, and **position** — combined under a proprietary weighting and adjusted by
+industry and state risk modifiers, then bucketed into an A–F grade and an outreach
+recommendation.
 
-`priority_score = round((intent_score * 0.40 + health_score * 0.35 + position_score * 0.25) * industry_modifier * state_modifier)`
+- **Intent** captures UCC filing recency, filing volume, active/lapsed/terminated pattern, and recent trend.
+- **Health** captures synthetic review/sentiment/violation proxies.
+- **Position** captures active UCC count, known MCA positions, and estimated payment burden.
 
-Intent captures UCC filing recency, filing volume, active/lapsed/terminated pattern, and recent trend.
-Health captures synthetic review/sentiment/violation proxies. Position captures active UCC count,
-known MCA positions, and estimated payment burden.
-
-Grades use these thresholds: A = 80-100, B = 65-79, C = 50-64, D = 35-49, F = 0-34.
-Recommendations use these thresholds: high priority at 75+ with confidence at 60+, moderate at 55+,
-low at 40+, and pass below 40.
+The exact sub-score weights, modifier tables, and grade/recommendation cutoffs are part of the
+platform's calibrated scoring engine and are not published. The sample values above are produced
+by that engine so the output *shape* is faithful; the calibration behind them is what the product
+delivers.

@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
+import { writeFileSync } from 'fs'
 import { JSDOM } from 'jsdom'
 import type { Browser, Frame, Page } from 'puppeteer'
 import { TexasScraper } from './texas'
@@ -58,10 +56,16 @@ type BrowserDouble = {
 }
 
 const originalEnv = process.env
-const globalKeys = ['window', 'document', 'HTMLElement', 'HTMLButtonElement', 'Event', 'Node', 'URL'] as const
+const globalKeys = [
+  'window',
+  'document',
+  'HTMLElement',
+  'HTMLButtonElement',
+  'Event',
+  'Node',
+  'URL'
+] as const
 type GlobalKey = (typeof globalKeys)[number]
-type GlobalRecord = Partial<Record<GlobalKey, unknown>>
-
 function restoreEnv() {
   process.env = { ...originalEnv }
 }
@@ -106,10 +110,7 @@ async function runInDom<T>(dom: JSDOM, callback: () => T | Promise<T>): Promise<
   }
 }
 
-function createPage(
-  html: string,
-  url = 'https://direct.sos.state.tx.us/'
-): PageDouble {
+function createPage(html: string, url = 'https://direct.sos.state.tx.us/'): PageDouble {
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url,
     pretendToBeVisual: true
@@ -138,15 +139,15 @@ function createPage(
   const nativeClick = dom.window.HTMLElement.prototype.click
   dom.window.HTMLElement.prototype.click = function click(this: HTMLElement) {
     this.setAttribute('data-clicked', 'true')
-    
+
     // Simulate removing login form on submit to mock successful login
     if (this.getAttribute('type') === 'submit' && this.getAttribute('name') === 'submit') {
-      const form = dom.window.document.getElementById('login');
+      const form = dom.window.document.getElementById('login')
       if (form) {
-        form.remove();
+        form.remove()
       }
     }
-    
+
     nativeClick.call(this)
   }
 
@@ -210,12 +211,13 @@ describe('TexasScraper', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    vi.spyOn(TexasScraper.prototype as unknown as Sleepable, 'sleep').mockResolvedValue(
-      undefined
-    )
-    
+    vi.spyOn(TexasScraper.prototype as unknown as Sleepable, 'sleep').mockResolvedValue(undefined)
+
     vi.mocked(authConfig.hasTexasAuth).mockReturnValue(true)
-    vi.mocked(authConfig.getTexasCredentials).mockReturnValue({ username: 'testuser', password: 'testpassword' })
+    vi.mocked(authConfig.getTexasCredentials).mockReturnValue({
+      username: 'testuser',
+      password: 'testpassword'
+    })
   })
 
   afterEach(() => {
@@ -238,15 +240,15 @@ describe('TexasScraper', () => {
     const { page } = createPage('')
     mockBrowser(page)
     const scraper = new TexasScraper()
-    
+
     const result = await scraper.search('Acme LLC')
-    
+
     expect(result.success).toBe(false)
     expect(result.error).toContain('Texas authentication credentials not configured')
   })
 
   it('successfully authenticates, searches, and parses results', async () => {
-    const { dom, page, rawPage } = createPage(`
+    const { page } = createPage(`
       <form id="login">
         <input name="client_id" />
         <input name="web_password" />
@@ -284,9 +286,9 @@ describe('TexasScraper', () => {
     `)
     mockBrowser(page)
     const scraper = new TexasScraper()
-    
+
     const result = await scraper.search('Acme Corp')
-    
+
     expect(result.success).toBe(true)
     expect(result.filings).toBeDefined()
     expect(result.filings?.length).toBe(2)
@@ -324,9 +326,9 @@ describe('TexasScraper', () => {
     `)
     mockBrowser(page)
     const scraper = new TexasScraper()
-    
+
     const result = await scraper.search('Acme Corp')
-    
+
     expect(result.success).toBe(false)
     expect(result.error).toContain('CAPTCHA detected')
   })
@@ -347,9 +349,9 @@ describe('TexasScraper', () => {
     `)
     mockBrowser(page)
     const scraper = new TexasScraper({ keepPageOpenOnFailure: true })
-    
+
     await scraper.search('Acme Corp')
-    
+
     expect(rawPage.close).not.toHaveBeenCalled()
   })
 

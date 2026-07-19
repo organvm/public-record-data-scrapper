@@ -1,0 +1,33 @@
+{
+  "schema": "public-records.pages_public_demo_source.v1",
+  "receipt_id": "austin-issued-construction-permits-3syk-w9eu",
+  "mode": "read_only_live_public_data",
+  "source": {
+    "owner": "City of Austin",
+    "dataset_id": "3syk-w9eu",
+    "dataset_name": "Issued Construction Permits",
+    "dataset_page_url": "https://data.austintexas.gov/Building-and-Development/Issued-Construction-Permits/3syk-w9eu",
+    "metadata_url": "https://data.austintexas.gov/api/views/3syk-w9eu",
+    "api_url": "https://data.austintexas.gov/resource/3syk-w9eu.json"
+  },
+  "fields": {
+    "record_id": "permit_number",
+    "company_name": "contractor_company_name",
+    "event_date": "issue_date",
+    "record_type": "permit_type_desc"
+  },
+  "rejected_fields": ["issued_date"],
+  "query": {
+    "limit": 24
+  },
+  "privacy": {
+    "displayed_fields": [
+      "permit_number",
+      "contractor_company_name",
+      "issue_date",
+      "permit_type_desc"
+    ],
+    "excluded_categories": ["address", "contact", "owner", "applicant"],
+    "browser_writes": false
+  }
+}

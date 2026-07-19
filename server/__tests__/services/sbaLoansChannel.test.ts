@@ -9,6 +9,7 @@ vi.mock('@public-records/core/enrichment', () => ({
 
 import { SBALoansChannel } from '../../services/discovery-channels/SBALoansChannel'
 import { DiscoveryChannelError } from '../../services/discovery-channels/types'
+import { rateLimiterManager } from '@public-records/core/enrichment'
 
 const CKAN_RESOURCE_URL = 'https://data.sba.gov/dataset/x/foia-7a-fy2020-present-asof-250101.csv'
 
@@ -69,6 +70,7 @@ describe('SBALoansChannel (streaming)', () => {
   beforeEach(() => {
     fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
+    vi.mocked(rateLimiterManager.waitForTokens).mockClear()
   })
 
   afterEach(() => {
@@ -182,7 +184,16 @@ describe('SBALoansChannel (streaming)', () => {
         json: async () => ({
           dataset: [
             { distribution: [{ format: 'pdf', downloadURL: 'https://x/notes.pdf' }] },
-            { distribution: [{ downloadURL: CKAN_RESOURCE_URL }] }
+            {
+              distribution: [
+                {
+                  format: 'ZIP',
+                  downloadURL:
+                    'https://data.sba.gov/dataset/x/foia-7a-fy2020-present-asof-250101.zip'
+                },
+                { mediaType: 'text/csv', downloadURL: CKAN_RESOURCE_URL }
+              ]
+            }
           ]
         })
       } as unknown as Response)
@@ -191,6 +202,46 @@ describe('SBALoansChannel (streaming)', () => {
     const candidates = await new SBALoansChannel().discover({ limit: 10 })
 
     expect(candidates.map((c) => c.company_name)).toEqual(['Dcat Co'])
+    expect(rateLimiterManager.waitForTokens).toHaveBeenCalledTimes(3)
+    expect(fetchSpy.mock.calls[2]?.[0]).toBe(CKAN_RESOURCE_URL)
+  })
+
+  it('skips a same-stem non-CSV DCAT distribution that precedes the CSV', async () => {
+    const csvUrl =
+      'https://data.sba.gov/dataset/x/foia-7a-fy2020-present-asof-250102.csv?download=1'
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: async () => ({})
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          dataset: [
+            {
+              distribution: [
+                {
+                  format: 'XLSX',
+                  mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  downloadURL:
+                    'https://data.sba.gov/dataset/x/foia-7a-fy2020-present-asof-250102.xlsx'
+                },
+                { downloadURL: csvUrl }
+              ]
+            }
+          ]
+        })
+      } as unknown as Response)
+      .mockResolvedValueOnce(streamingResponse([HEADER, row('CSV Co', 'NY')]))
+
+    const candidates = await new SBALoansChannel().discover({ limit: 10 })
+
+    expect(candidates.map((candidate) => candidate.company_name)).toEqual(['CSV Co'])
+    expect(fetchSpy.mock.calls[2]?.[0]).toBe(csvUrl)
   })
 
   it('fails closed with a named unavailability reason when CKAN and DCAT both lack the dataset', async () => {

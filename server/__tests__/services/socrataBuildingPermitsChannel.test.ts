@@ -50,7 +50,10 @@ describe('SocrataBuildingPermitsChannel', () => {
       ])
     )
 
-    const candidates = await new SocrataBuildingPermitsChannel().discover({ state: 'NY', limit: 10 })
+    const candidates = await new SocrataBuildingPermitsChannel().discover({
+      state: 'NY',
+      limit: 10
+    })
 
     expect(candidates.map((c) => c.company_name)).toEqual(['Acme Builders', 'Beta Contractors'])
     expect(candidates[0]).toMatchObject({
@@ -98,11 +101,31 @@ describe('SocrataBuildingPermitsChannel', () => {
     expect(url).toContain('issue_permit_date IS NOT NULL')
   })
 
+  it('uses Austin issue_date and never the obsolete issued_date alias', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      rowsResponse([
+        {
+          [TX_FIELD]: 'Lone Star Builders LLC',
+          issue_date: '2026-07-16T00:00:00.000'
+        }
+      ])
+    )
+
+    await new SocrataBuildingPermitsChannel().discover({ state: 'TX', limit: 5 })
+
+    // Austin dataset 3syk-w9eu exposes `issue_date`. Its live metadata does
+    // not contain `issued_date`; using that review-suggested alias yields a
+    // SODA no-such-column response.
+    const url = decodeURIComponent(String(fetchSpy.mock.calls[0][0]).replace(/\+/g, ' '))
+    expect(url).toContain('data.austintexas.gov/resource/3syk-w9eu.json')
+    expect(url).toContain('issue_date DESC')
+    expect(url).toContain('issue_date IS NOT NULL')
+    expect(url).not.toContain('issued_date')
+  })
+
   it('caps the total candidates at the requested limit', async () => {
     fetchSpy.mockResolvedValueOnce(
-      rowsResponse(
-        Array.from({ length: 10 }, (_, n) => ({ [NY_FIELD]: `Co ${n}` }))
-      )
+      rowsResponse(Array.from({ length: 10 }, (_, n) => ({ [NY_FIELD]: `Co ${n}` })))
     )
 
     const candidates = await new SocrataBuildingPermitsChannel().discover({ state: 'NY', limit: 3 })

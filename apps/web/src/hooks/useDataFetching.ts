@@ -24,6 +24,8 @@ export interface UseDataFetchingResult {
   userActions: UserAction[]
   isLoading: boolean
   loadError: string | null
+  /** True when the live API was unreachable and demo data is being shown instead. */
+  isDemoFallback: boolean
   lastDataRefresh: string
   setProspects: (updater: Prospect[] | ((prev: Prospect[]) => Prospect[])) => void
   setCompetitors: (
@@ -51,6 +53,7 @@ export function useDataFetching({
 
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [isDemoFallback, setIsDemoFallback] = useState(false)
 
   const fetchData = useCallback(
     async ({ signal, silent }: { signal?: AbortSignal; silent?: boolean } = {}) => {
@@ -58,6 +61,7 @@ export function useDataFetching({
         setIsLoading(true)
       }
       setLoadError(null)
+      setIsDemoFallback(false)
 
       try {
         if (useMockData) {
@@ -100,9 +104,28 @@ export function useDataFetching({
           return false
         }
 
-        const message = error instanceof Error ? error.message : 'Failed to load data'
-        setLoadError(message)
-        console.error('Failed to load datasets', error)
+        // Live API unreachable — load demo data so the product looks functional
+        // to first-time visitors instead of showing a scary red error banner.
+        console.error('Failed to load datasets — falling back to demo data', error)
+        try {
+          const [demoProspects, demoCompetitors, demoPortfolio] = [
+            generateProspects(12, { dataTier }),
+            generateCompetitorData({ dataTier }),
+            generatePortfolioCompanies(8, { dataTier })
+          ]
+          if (!signal?.aborted) {
+            setProspects(demoProspects)
+            setCompetitors(demoCompetitors)
+            setPortfolio(demoPortfolio)
+            setLastDataRefresh(new Date().toISOString())
+            setIsDemoFallback(true)
+          }
+        } catch (fallbackError) {
+          // If even demo generation fails, surface the original error.
+          console.error('Demo fallback also failed', fallbackError)
+          const message = error instanceof Error ? error.message : 'Failed to load data'
+          setLoadError(message)
+        }
         return false
       } finally {
         if (!silent && !signal?.aborted) {
@@ -134,6 +157,7 @@ export function useDataFetching({
     userActions: userActions || [],
     isLoading,
     loadError,
+    isDemoFallback,
     lastDataRefresh: lastDataRefresh || new Date().toISOString(),
     setProspects: setProspects as UseDataFetchingResult['setProspects'],
     setCompetitors: setCompetitors as UseDataFetchingResult['setCompetitors'],

@@ -21,6 +21,7 @@ import {
   UnderwritingService,
   underwritingService
 } from './UnderwritingService'
+import { qualificationRules } from './calibration/qualificationRules'
 
 /**
  * Qualification tiers
@@ -98,65 +99,18 @@ export interface QualificationRules {
 }
 
 /**
- * Default qualification rules
+ * Default qualification rules.
+ *
+ * The calibrated credit-box band VALUES are calibration, not source: they are
+ * injected from the private scoring calibration file (see
+ * ./calibration/qualificationRules — the reusable seam from
+ * ./calibration/funderIntel). A bare public clone gets illustrative bands that
+ * keep the engine functional; the operator's real values load identically to
+ * before once a private.json (or SCORING_CALIBRATION_PATH) is present. The
+ * QualificationRules TYPE stays public (see the interface above).
  */
-const DEFAULT_RULES: QualificationRules = {
-  minAdbByTier: {
-    A: 25000,
-    B: 15000,
-    C: 7500,
-    D: 3000,
-    Decline: 0
-  },
-  maxNsfByTier: {
-    A: 0,
-    B: 2,
-    C: 4,
-    D: 8,
-    Decline: Infinity
-  },
-  maxNegativeDaysByTier: {
-    A: 0,
-    B: 3,
-    C: 7,
-    D: 15,
-    Decline: Infinity
-  },
-  maxPositionsByTier: {
-    A: 0,
-    B: 1,
-    C: 2,
-    D: 4,
-    Decline: Infinity
-  },
-  minTimeInBusinessByTier: {
-    A: 24, // 2 years
-    B: 12, // 1 year
-    C: 6, // 6 months
-    D: 3, // 3 months
-    Decline: 0
-  },
-  minMonthlyRevenueByTier: {
-    A: 50000,
-    B: 25000,
-    C: 15000,
-    D: 10000,
-    Decline: 0
-  },
-  factorRatesByTier: {
-    A: 1.15,
-    B: 1.25,
-    C: 1.35,
-    D: 1.45,
-    Decline: 0
-  },
-  maxFundingMultiple: {
-    A: 1.5, // Up to 1.5x monthly revenue
-    B: 1.25,
-    C: 1.0,
-    D: 0.75,
-    Decline: 0
-  }
+function defaultRules(): QualificationRules {
+  return qualificationRules()
 }
 
 /**
@@ -197,7 +151,7 @@ export class QualificationService {
   private underwriting: UnderwritingService
 
   constructor(rules?: Partial<QualificationRules>, underwriting?: UnderwritingService) {
-    this.rules = { ...DEFAULT_RULES, ...rules }
+    this.rules = { ...defaultRules(), ...rules }
     this.underwriting = underwriting || underwritingService
   }
 

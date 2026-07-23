@@ -5,8 +5,11 @@
  * financing event and a strong 'contract' (capital-secured) growth signal.
  *
  * ── Dataset (public FOIA release, NO API KEY) ───────────────────────────────
- *   SBA "7(a) & 504 FOIA" — loan-level borrower records
- *     legacy CKAN id: 0ff8e8e9-b967-4f4e-987c-6ac78c575087  (data.sba.gov)
+ *   SBA "7(a) & 504 FOIA" — loan-level borrower records (data.sba.gov). The
+ *     curated legacy CKAN package id is calibration, not source: it is injected
+ *     from the private discovery source-map (see
+ *     ../calibration/discoverySources) so this public repo carries only a fake
+ *     placeholder. A bare public clone still resolves via the DCAT rung below.
  *   We fetch the recent 7(a) CSV resource (FY2020-present). The "as-of" date
  *   is embedded in the filename, so the concrete file URL must be resolved at
  *   runtime. Resolution is a self-healing chain (#347):
@@ -41,10 +44,14 @@ import {
   DiscoveryChannelError
 } from './types'
 import { clampLimit, normalizeState, errorMessage, fetchWithTimeout, fetchJson } from './utils'
+import { sbaCkanPackageId } from '../calibration/discoverySources'
 
 const CHANNEL = 'sba-7a-loans'
-const CKAN_PACKAGE_ID = '0ff8e8e9-b967-4f4e-987c-6ac78c575087'
-const CKAN_PACKAGE_SHOW = `https://data.sba.gov/api/3/action/package_show?id=${CKAN_PACKAGE_ID}`
+// The curated CKAN package id is calibration (see ../calibration/discoverySources)
+// — injected privately, illustrative placeholder in the public repo. The
+// package_show URL is therefore built at runtime from the resolved id.
+const CKAN_PACKAGE_SHOW = (): string =>
+  `https://data.sba.gov/api/3/action/package_show?id=${sbaCkanPackageId()}`
 // Project Open Data (DCAT) catalog the post-2026 Drupal portal serves.
 const DCAT_CATALOG_URL = 'https://data.sba.gov/data.json'
 // Filename stem of the recent 7(a) CSV resource (date suffix rotates).
@@ -107,7 +114,7 @@ export class SBALoansChannel implements DiscoveryChannel {
   private async resolveViaCkan(): Promise<string> {
     const body = await fetchJson(
       CHANNEL,
-      CKAN_PACKAGE_SHOW,
+      CKAN_PACKAGE_SHOW(),
       { headers: { Accept: 'application/json' } },
       'SBA CKAN',
       REQUEST_TIMEOUT_MS

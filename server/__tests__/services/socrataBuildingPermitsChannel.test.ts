@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { writeFileSync, mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 
 // Rate limiter is a no-op in tests — never block / hit a real bucket.
 vi.mock('@public-records/core/enrichment', () => ({
@@ -9,6 +12,41 @@ vi.mock('@public-records/core/enrichment', () => ({
 
 import { SocrataBuildingPermitsChannel } from '../../services/discovery-channels/SocrataBuildingPermitsChannel'
 import { DiscoveryChannelError } from '../../services/discovery-channels/types'
+import { __resetDiscoverySourcesCache } from '../../services/calibration/discoverySources'
+
+// The curated per-state source-map is now injected through the calibration seam
+// (see server/services/calibration/discoverySources.ts). The real production
+// endpoints/fields are the MOAT and never live in tracked source — including
+// this test. So the suite injects a SAMPLE source-map via SCORING_CALIBRATION_PATH
+// (exactly how an operator supplies their private map) and asserts the channel
+// faithfully uses whatever it was given. Behavior is what's under test; the real
+// values are proven by the same code path with the operator's own private file.
+const SAMPLE_SOURCES = {
+  NY: {
+    state: 'NY',
+    url: 'https://example.data.gov/resource/nyxx-xxxx.json',
+    businessField: 'sample_ny_business',
+    orderField: 'sample_ny_date'
+  },
+  CA: {
+    state: 'CA',
+    url: 'https://example.data.gov/resource/caxx-xxxx.json',
+    businessField: 'sample_ca_business',
+    orderField: 'sample_ca_date'
+  },
+  FL: {
+    state: 'FL',
+    url: 'https://example.data.gov/resource/flxx-xxxx.json',
+    businessField: 'sample_fl_business',
+    orderField: 'sample_fl_date'
+  },
+  TX: {
+    state: 'TX',
+    url: 'https://example.data.gov/resource/txxx-xxxx.json',
+    businessField: 'sample_tx_business',
+    orderField: 'sample_tx_date'
+  }
+}
 
 /** A successful JSON Response wrapping a Socrata row array. */
 function rowsResponse(rows: Record<string, unknown>[]): Response {
@@ -20,21 +58,34 @@ function rowsResponse(rows: Record<string, unknown>[]): Response {
   } as unknown as Response
 }
 
-const NY_FIELD = 'permittee_s_business_name'
-const CA_FIELD = 'contractors_business_name'
-const FL_FIELD = 'contractor_name'
-const TX_FIELD = 'contractor_company_name'
+const NY_FIELD = SAMPLE_SOURCES.NY.businessField
+const CA_FIELD = SAMPLE_SOURCES.CA.businessField
+const FL_FIELD = SAMPLE_SOURCES.FL.businessField
+const TX_FIELD = SAMPLE_SOURCES.TX.businessField
 
 describe('SocrataBuildingPermitsChannel', () => {
   let fetchSpy: ReturnType<typeof vi.fn>
+  let calibrationDir: string
+  const originalCalibrationPath = process.env.SCORING_CALIBRATION_PATH
 
   beforeEach(() => {
+    // Inject the sample source-map through the calibration seam.
+    calibrationDir = mkdtempSync(join(tmpdir(), 'socrata-cal-'))
+    const calibrationPath = join(calibrationDir, 'calibration.json')
+    writeFileSync(calibrationPath, JSON.stringify({ socrataBuildingPermitSources: SAMPLE_SOURCES }))
+    process.env.SCORING_CALIBRATION_PATH = calibrationPath
+    __resetDiscoverySourcesCache()
+
     fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    if (originalCalibrationPath === undefined) delete process.env.SCORING_CALIBRATION_PATH
+    else process.env.SCORING_CALIBRATION_PATH = originalCalibrationPath
+    __resetDiscoverySourcesCache()
+    rmSync(calibrationDir, { recursive: true, force: true })
   })
 
   it('always reports as configured (key-less public source)', () => {
@@ -50,7 +101,10 @@ describe('SocrataBuildingPermitsChannel', () => {
       ])
     )
 
-    const candidates = await new SocrataBuildingPermitsChannel().discover({ state: 'NY', limit: 10 })
+    const candidates = await new SocrataBuildingPermitsChannel().discover({
+      state: 'NY',
+      limit: 10
+    })
 
     expect(candidates.map((c) => c.company_name)).toEqual(['Acme Builders', 'Beta Contractors'])
     expect(candidates[0]).toMatchObject({
@@ -93,16 +147,15 @@ describe('SocrataBuildingPermitsChannel', () => {
     ])
     // URLSearchParams encodes spaces as '+' — normalize before asserting.
     const url = decodeURIComponent(String(fetchSpy.mock.calls[0][0]).replace(/\+/g, ' '))
-    expect(url).toContain('data.cityoforlando.net/resource/ryhf-m453.json')
+    // The channel queries whatever resource the injected source-map names for FL.
+    expect(url).toContain(SAMPLE_SOURCES.FL.url)
     // SODA sorts DESC NULL FIRST — the null-guard keeps unissued applications out.
-    expect(url).toContain('issue_permit_date IS NOT NULL')
+    expect(url).toContain(`${SAMPLE_SOURCES.FL.orderField} IS NOT NULL`)
   })
 
   it('caps the total candidates at the requested limit', async () => {
     fetchSpy.mockResolvedValueOnce(
-      rowsResponse(
-        Array.from({ length: 10 }, (_, n) => ({ [NY_FIELD]: `Co ${n}` }))
-      )
+      rowsResponse(Array.from({ length: 10 }, (_, n) => ({ [NY_FIELD]: `Co ${n}` })))
     )
 
     const candidates = await new SocrataBuildingPermitsChannel().discover({ state: 'NY', limit: 3 })
@@ -148,6 +201,6 @@ describe('SocrataBuildingPermitsChannel', () => {
     fetchSpy.mockResolvedValueOnce(rowsResponse([{ some_other_field: 'x' }, { another: 'y' }]))
     await expect(
       new SocrataBuildingPermitsChannel().discover({ state: 'NY', limit: 10 })
-    ).rejects.toThrow(/Socrata \(NY\) schema changed: field 'permittee_s_business_name' absent/)
+    ).rejects.toThrow(new RegExp(`Socrata \\(NY\\) schema changed: field '${NY_FIELD}' absent`))
   })
 })

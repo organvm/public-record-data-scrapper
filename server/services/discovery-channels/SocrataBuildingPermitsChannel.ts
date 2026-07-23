@@ -6,28 +6,16 @@
  * expansion activity and near-term capital needs.
  *
  * ── Endpoints (public Socrata SODA, NO API KEY) ─────────────────────────────
- *  NY → NYC DOB Permit Issuance
- *       https://data.cityofnewyork.us/resource/ipu4-2q9a.json
- *       Business field:  permittee_s_business_name
- *       State:           implicit NY (NYC dataset)
- *       Date field:      issuance_date  (MM/DD/YYYY string)
- *  CA → City of Los Angeles "LA BUILD PERMITS"
- *       https://data.lacity.org/resource/xnhu-aczu.json
- *       Business field:  contractors_business_name
- *       State:           implicit CA (LA dataset)
- *       Date field:      issue_date  (ISO 8601)
- *  FL → City of Orlando "Permit Applications" (updated daily; verified live
- *       2026-07-16 — Miami-Dade's Socrata is gone, 302 → ArcGIS legacy)
- *       https://data.cityoforlando.net/resource/ryhf-m453.json
- *       Business field:  contractor_name
- *       State:           implicit FL (Orlando dataset)
- *       Date field:      issue_permit_date  (ISO 8601; null until issuance —
- *                        see the $where null-guard below)
- *  TX → City of Austin "Issued Construction Permits"
- *       https://data.austintexas.gov/resource/3syk-w9eu.json
- *       Business field:  contractor_company_name
- *       State:           implicit TX (Austin dataset)
- *       Date field:      issue_date  (ISO 8601)
+ *  The curated per-state source-map — which city Socrata dataset covers each
+ *  state, its resource URL, and the per-dataset business-name / order field
+ *  mapping — is market intelligence, NOT source. It is injected from the
+ *  private discovery source-map (see ../calibration/discoverySources); this
+ *  public repo carries only obviously-sample entries. Each registered source is
+ *  a city-scoped dataset providing:
+ *    - state:         the state the dataset implicitly covers
+ *    - url:           the SODA resource (.json) endpoint
+ *    - businessField: the row field holding the business / contractor name
+ *    - orderField:    the date field used for newest-first ordering
  *
  *  All accept SODA query params ($limit, $order, $where). We request newest
  *  first and cap rows; SODA sorts DESC with NULL FIRST, so the $where also
@@ -50,48 +38,18 @@ import {
   DiscoveryChannelError
 } from './types'
 import { clampLimit, fetchJson } from './utils'
+import { socrataBuildingPermitSources, type SocrataSource } from '../calibration/discoverySources'
 
 const CHANNEL = 'socrata-building-permits'
 const REQUEST_TIMEOUT_MS = 12000
 const RATE_BUCKET = 'socrata'
 
-interface SocrataSource {
-  /** State this dataset implicitly covers (datasets are city-scoped). */
-  state: string
-  /** Base resource URL (.json). */
-  url: string
-  /** Field holding the business name in each row. */
-  businessField: string
-  /** Field used for newest-first ordering. */
-  orderField: string
-}
-
-// Per-state dataset registry. Adding a state = adding a documented entry here.
-const SOURCES: Record<string, SocrataSource> = {
-  NY: {
-    state: 'NY',
-    url: 'https://data.cityofnewyork.us/resource/ipu4-2q9a.json',
-    businessField: 'permittee_s_business_name',
-    orderField: 'issuance_date'
-  },
-  CA: {
-    state: 'CA',
-    url: 'https://data.lacity.org/resource/xnhu-aczu.json',
-    businessField: 'contractors_business_name',
-    orderField: 'issue_date'
-  },
-  FL: {
-    state: 'FL',
-    url: 'https://data.cityoforlando.net/resource/ryhf-m453.json',
-    businessField: 'contractor_name',
-    orderField: 'issue_permit_date'
-  },
-  TX: {
-    state: 'TX',
-    url: 'https://data.austintexas.gov/resource/3syk-w9eu.json',
-    businessField: 'contractor_company_name',
-    orderField: 'issue_date'
-  }
+// Per-state dataset registry. The curated map is calibration (see
+// ../calibration/discoverySources): production endpoints are injected from the
+// private source-map, a bare public clone gets illustrative sample entries.
+// Adding a state = adding a documented entry to that private source-map.
+function sources(): Record<string, SocrataSource> {
+  return socrataBuildingPermitSources()
 }
 
 export class SocrataBuildingPermitsChannel implements DiscoveryChannel {
@@ -124,18 +82,19 @@ export class SocrataBuildingPermitsChannel implements DiscoveryChannel {
    * geography).
    */
   private resolveSources(state?: string): SocrataSource[] {
+    const registry = sources()
     if (state) {
       const code = state.trim().toUpperCase()
-      const source = SOURCES[code]
+      const source = registry[code]
       if (!source) {
         throw new DiscoveryChannelError(
           CHANNEL,
-          `no building-permit dataset registered for state '${code}' (have: ${Object.keys(SOURCES).join(', ')})`
+          `no building-permit dataset registered for state '${code}' (have: ${Object.keys(registry).join(', ')})`
         )
       }
       return [source]
     }
-    return Object.values(SOURCES)
+    return Object.values(registry)
   }
 
   private async fetchSource(

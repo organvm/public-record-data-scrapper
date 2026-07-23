@@ -1,0 +1,13 @@
+{
+  "_note": "Template for the PRIVATE qualification credit-box calibration. Copy to qualificationRules.private.json (gitignored) and populate with the real calibrated bands, or point SCORING_CALIBRATION_PATH at one shared JSON that carries this and every other calibration key. Without it, the platform uses the illustrative bands in qualificationRules.ts — the engine works, the real credit box does not ship in this public repo. Each per-tier sub-table must carry a number for every tier (A, B, C, D, Decline); use a large sentinel where the source uses Infinity (JSON has no Infinity literal, e.g. 999999). Any omitted sub-table falls back to the illustrative default for that table.",
+  "qualificationRules": {
+    "minAdbByTier": { "A": 20000, "B": 10000, "C": 5000, "D": 2000, "Decline": 0 },
+    "maxNsfByTier": { "A": 0, "B": 2, "C": 5, "D": 10, "Decline": 999999 },
+    "maxNegativeDaysByTier": { "A": 0, "B": 5, "C": 10, "D": 20, "Decline": 999999 },
+    "maxPositionsByTier": { "A": 0, "B": 1, "C": 3, "D": 5, "Decline": 999999 },
+    "minTimeInBusinessByTier": { "A": 24, "B": 12, "C": 6, "D": 3, "Decline": 0 },
+    "minMonthlyRevenueByTier": { "A": 40000, "B": 20000, "C": 10000, "D": 5000, "Decline": 0 },
+    "factorRatesByTier": { "A": 1.2, "B": 1.3, "C": 1.4, "D": 1.5, "Decline": 0 },
+    "maxFundingMultiple": { "A": 1.4, "B": 1.1, "C": 0.8, "D": 0.5, "Decline": 0 }
+  }
+}

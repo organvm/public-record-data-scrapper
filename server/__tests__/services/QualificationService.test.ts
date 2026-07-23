@@ -1,10 +1,38 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { writeFileSync, mkdtempSync, rmSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
 import {
   QualificationService,
   createQualificationService
 } from '../../services/QualificationService'
+import { __resetQualificationRulesCache } from '../../services/calibration/qualificationRules'
 // DatabaseError imported for potential future use in error handling tests
 import type { UnderwritingFeatures } from '../../services/UnderwritingService'
+
+// The calibrated credit box is the MOAT and never lives in tracked source —
+// including this test. So the suite injects a SAMPLE (obviously-non-real) rule
+// set through the calibration seam (see
+// server/services/calibration/qualificationRules.ts) via SCORING_CALIBRATION_PATH
+// — exactly how an operator supplies their private calibration — and asserts the
+// service faithfully applies WHATEVER it was given (rate/amount/threshold logic)
+// plus the tier-classification logic. The real production bands are proven by the
+// same code path with the operator's own private file, not embedded here.
+//
+// The sample bands below use round, clearly-synthetic numbers that preserve tier
+// ORDERING (A best → D worst) so every scenario test still resolves to its
+// intended tier. Decline caps are Infinity in source but never read by the A..D
+// evaluation loops, so a large sentinel is fine in JSON.
+const SAMPLE_RULES = {
+  minAdbByTier: { A: 20000, B: 10000, C: 5000, D: 2000, Decline: 0 },
+  maxNsfByTier: { A: 0, B: 2, C: 5, D: 10, Decline: 999999 },
+  maxNegativeDaysByTier: { A: 0, B: 5, C: 10, D: 20, Decline: 999999 },
+  maxPositionsByTier: { A: 0, B: 1, C: 3, D: 5, Decline: 999999 },
+  minTimeInBusinessByTier: { A: 24, B: 12, C: 6, D: 3, Decline: 0 },
+  minMonthlyRevenueByTier: { A: 40000, B: 20000, C: 10000, D: 5000, Decline: 0 },
+  factorRatesByTier: { A: 1.1, B: 1.2, C: 1.3, D: 1.4, Decline: 0 },
+  maxFundingMultiple: { A: 1.4, B: 1.2, C: 1.0, D: 0.8, Decline: 0 }
+}
 
 // Mock the database module
 vi.mock('../../database/connection', () => ({
@@ -31,6 +59,8 @@ const mockExtractFeatures = vi.mocked(underwritingService.extractFeatures)
 
 describe('QualificationService', () => {
   let service: QualificationService
+  let calibrationDir: string
+  const originalCalibrationPath = process.env.SCORING_CALIBRATION_PATH
 
   const createMockFeatures = (
     overrides: Partial<UnderwritingFeatures> = {}
@@ -69,7 +99,21 @@ describe('QualificationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Inject the SAMPLE credit box through the calibration seam so these
+    // assertions run against synthetic bands, never the real production values.
+    calibrationDir = mkdtempSync(join(tmpdir(), 'qual-cal-'))
+    const calibrationPath = join(calibrationDir, 'calibration.json')
+    writeFileSync(calibrationPath, JSON.stringify({ qualificationRules: SAMPLE_RULES }))
+    process.env.SCORING_CALIBRATION_PATH = calibrationPath
+    __resetQualificationRulesCache()
     service = new QualificationService()
+  })
+
+  afterEach(() => {
+    if (originalCalibrationPath === undefined) delete process.env.SCORING_CALIBRATION_PATH
+    else process.env.SCORING_CALIBRATION_PATH = originalCalibrationPath
+    __resetQualificationRulesCache()
+    rmSync(calibrationDir, { recursive: true, force: true })
   })
 
   describe('qualify', () => {
@@ -97,18 +141,18 @@ describe('QualificationService', () => {
 
       expect(result.qualified).toBe(true)
       expect(result.tier).toBe('A')
-      expect(result.suggestedRate).toBe(1.15)
+      expect(result.suggestedRate).toBe(SAMPLE_RULES.factorRatesByTier.A)
     })
 
     it('should qualify prospect as Tier B for good metrics', async () => {
-      // B-tier requires <= 1 warning and >= 6 passes
-      // Values that hit B-tier thresholds (just above B minimums)
+      // B-tier requires <= 1 warning and >= 6 passes. Inputs sit at/just above
+      // the B thresholds of the injected SAMPLE_RULES (not the real bands).
       const features = createMockFeatures({
-        averageDailyBalance: 20000, // B tier: >= 15000
-        nsfCount: 1, // B tier: <= 2, creates warning
-        negativeDaysPercentage: 1, // B tier: <= 3, should pass
-        estimatedPositionCount: 1, // B tier: <= 1, creates warning but within limit
-        averageMonthlyDeposits: 35000, // B tier: >= 25000
+        averageDailyBalance: 20000, // >= sample B minAdb
+        nsfCount: 1, // within sample B maxNsf, creates warning
+        negativeDaysPercentage: 1, // within sample B maxNegativeDays
+        estimatedPositionCount: 1, // at sample B maxPositions, creates warning
+        averageMonthlyDeposits: 35000, // >= sample B minMonthlyRevenue
         depositConsistencyScore: 80 // Pass
       })
 
@@ -122,14 +166,14 @@ describe('QualificationService', () => {
     })
 
     it('should qualify prospect as Tier C for moderate metrics', async () => {
-      // C-tier requires <= 3 warnings and > 1 warning (to not be B)
-      // Values that create 2-3 warnings
+      // C-tier requires <= 3 warnings and > 1 warning (to not be B). Inputs sit
+      // in the C bands of the injected SAMPLE_RULES (not the real bands).
       const features = createMockFeatures({
-        averageDailyBalance: 10000, // C tier: >= 7500, creates warning
-        nsfCount: 3, // C tier: <= 4, creates warning
-        negativeDaysPercentage: 5, // C tier: <= 7, creates warning
-        estimatedPositionCount: 2, // C tier: <= 2, creates warning
-        averageMonthlyDeposits: 18000, // C tier: >= 15000, creates warning
+        averageDailyBalance: 10000, // in sample C minAdb band, creates warning
+        nsfCount: 3, // within sample C maxNsf, creates warning
+        negativeDaysPercentage: 5, // within sample C maxNegativeDays, warning
+        estimatedPositionCount: 2, // within sample C maxPositions, warning
+        averageMonthlyDeposits: 18000, // in sample C minMonthlyRevenue band, warning
         depositConsistencyScore: 60 // Warning
       })
 
@@ -158,7 +202,7 @@ describe('QualificationService', () => {
 
       expect(result.qualified).toBe(true)
       expect(result.tier).toBe('D')
-      expect(result.suggestedRate).toBe(1.45)
+      expect(result.suggestedRate).toBe(SAMPLE_RULES.factorRatesByTier.D)
     })
 
     it('should decline prospect for poor metrics', async () => {
@@ -190,8 +234,8 @@ describe('QualificationService', () => {
 
       const result = await service.qualify('prospect-1', features, { timeInBusinessMonths: 36 })
 
-      // Tier A: up to 1.5x monthly revenue, capped at $500k
-      expect(result.maxAmount).toBe(150000) // 100000 * 1.5
+      // Tier A: up to (sample) 1.4x monthly revenue, capped at $500k.
+      expect(result.maxAmount).toBe(100000 * SAMPLE_RULES.maxFundingMultiple.A)
     })
 
     it('should include warnings for concerning metrics', async () => {
@@ -278,17 +322,17 @@ describe('QualificationService', () => {
       const requirements = service.getTierRequirements('A')
 
       expect(requirements.tier).toBe('A')
-      expect(requirements.requirements.minAdb).toBe(25000)
-      expect(requirements.requirements.maxNsf).toBe(0)
-      expect(requirements.terms.factorRate).toBe(1.15)
+      expect(requirements.requirements.minAdb).toBe(SAMPLE_RULES.minAdbByTier.A)
+      expect(requirements.requirements.maxNsf).toBe(SAMPLE_RULES.maxNsfByTier.A)
+      expect(requirements.terms.factorRate).toBe(SAMPLE_RULES.factorRatesByTier.A)
     })
 
     it('should return requirements for Tier D', () => {
       const requirements = service.getTierRequirements('D')
 
       expect(requirements.tier).toBe('D')
-      expect(requirements.requirements.minAdb).toBe(3000)
-      expect(requirements.terms.factorRate).toBe(1.45)
+      expect(requirements.requirements.minAdb).toBe(SAMPLE_RULES.minAdbByTier.D)
+      expect(requirements.terms.factorRate).toBe(SAMPLE_RULES.factorRatesByTier.D)
     })
   })
 

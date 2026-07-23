@@ -1,0 +1,18 @@
+{
+  "_note": "Template for the PRIVATE discovery source-map calibration. Copy to discoverySources.private.json (gitignored) and populate with the real curated endpoints, or point SCORING_CALIBRATION_PATH at one shared JSON that carries this and every other calibration key. Without it, the platform uses the illustrative sample entries in discoverySources.ts — the shape works, the curated source-map does not ship in this public repo. The keys below (socrataBuildingPermitSources, sbaCkanPackageId) may also live alongside qualificationRules / industryRiskModifiers / stateModifiers in ONE shared file read via SCORING_CALIBRATION_PATH.",
+  "socrataBuildingPermitSources": {
+    "XX": {
+      "state": "XX",
+      "url": "https://example.data.gov/resource/xxxx-xxxx.json",
+      "businessField": "business_name",
+      "orderField": "issued_date"
+    },
+    "YY": {
+      "state": "YY",
+      "url": "https://sample.data.gov/resource/yyyy-yyyy.json",
+      "businessField": "contractor_name",
+      "orderField": "issue_date"
+    }
+  },
+  "sbaCkanPackageId": "00000000-0000-0000-0000-000000000000"
+}

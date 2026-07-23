@@ -20,6 +20,7 @@
 import { database } from '../database/connection'
 import { EquipmentLifecycleDetector } from './EquipmentLifecycleDetector'
 import { mlScoringStrategy, type MlScoreOutput } from './MLScoringStrategy'
+import { industryRiskModifiers, stateModifiers } from './calibration/scoringModifiers'
 
 export interface IntentScoreInput {
   daysSinceLastFiling: number
@@ -122,30 +123,13 @@ const DEFAULT_CONFIG: ScoringConfig = {
   compositePositionWeight: 0.25
 }
 
-// Industry risk modifiers (lower = higher risk)
-const INDUSTRY_RISK_MODIFIERS: Record<string, number> = {
-  restaurant: 0.85,
-  retail: 0.9,
-  construction: 0.8,
-  healthcare: 0.95,
-  manufacturing: 0.88,
-  services: 0.92,
-  technology: 0.95
-}
-
-// State modifiers (regulatory environment, market size)
-const STATE_MODIFIERS: Record<string, number> = {
-  CA: 1.0,
-  TX: 0.98,
-  FL: 0.95,
-  NY: 1.02,
-  IL: 0.97,
-  PA: 0.96,
-  OH: 0.94,
-  GA: 0.96,
-  NC: 0.95,
-  MI: 0.93
-}
+// Industry-risk and state modifier tables (lower industry value = higher risk).
+// The POPULATED tables are calibration, not source: they are injected from the
+// private scoring calibration file (see ./calibration/scoringModifiers — the
+// reusable seam from ./calibration/funderIntel). A bare public clone gets a
+// small illustrative set; unknown industries/states fall back to a neutral 1.0
+// in calculateCompositeScore. The composite formula weights (DEFAULT_CONFIG
+// above) remain public research and are NOT calibration.
 
 export class ScoringService {
   private config: ScoringConfig
@@ -546,8 +530,8 @@ export class ScoringService {
     // Get modifiers
     const industry = options.industry || prospect.industry
     const state = options.state || prospect.state
-    const industryModifier = INDUSTRY_RISK_MODIFIERS[industry] || 1
-    const stateModifier = STATE_MODIFIERS[state] || 1
+    const industryModifier = industryRiskModifiers()[industry] || 1
+    const stateModifier = stateModifiers()[state] || 1
 
     // Detect equipment-lifecycle signals from the filings already fetched.
     // A recent equipment purchase financed outside the MCA channel marks an

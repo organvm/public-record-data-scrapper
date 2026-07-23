@@ -82,6 +82,29 @@ export function useDataFetching({
           return true
         }
 
+        // Guard: on a static production deploy (GitHub Pages, Cloudflare Pages, etc.)
+        // there is no backend reachable at the default `/api` path.  Firing the
+        // request would produce a 404 + an ApiError in the console even though the
+        // catch block recovers gracefully.  Skip straight to demo data when we are
+        // in a production build AND no explicit API base URL was configured — those
+        // two facts together mean the call is guaranteed to fail.
+        const hasApiBase = Boolean(import.meta.env.VITE_API_BASE_URL)
+        if (import.meta.env.PROD && !hasApiBase) {
+          if (!signal?.aborted) {
+            const [demoProspects, demoCompetitors, demoPortfolio] = [
+              generateProspects(12, { dataTier }),
+              generateCompetitorData({ dataTier }),
+              generatePortfolioCompanies(8, { dataTier })
+            ]
+            setProspects(demoProspects)
+            setCompetitors(demoCompetitors)
+            setPortfolio(demoPortfolio)
+            setLastDataRefresh(new Date().toISOString())
+            setIsDemoFallback(true)
+          }
+          return !signal?.aborted
+        }
+
         const [liveProspects, liveCompetitors, livePortfolio, liveUserActions] = await Promise.all([
           fetchProspects(signal, { dataTier }),
           fetchCompetitors(signal, { dataTier }),

@@ -316,7 +316,9 @@ describe('ScoringService', () => {
 
       const withModifier = {
         ...baseInput,
-        industryRiskModifier: 0.85 // restaurant - higher risk
+        // A sample sub-1.0 modifier (higher-risk industry); the real per-industry
+        // multipliers are calibration and never live in tracked source.
+        industryRiskModifier: 0.8
       }
 
       const baseScore = service.calculateCompositeScore(baseInput)
@@ -332,15 +334,17 @@ describe('ScoringService', () => {
         positionScore: 90
       }
 
-      const nyInput = {
+      const favorableStateInput = {
         ...baseInput,
-        stateModifier: 1.02 // NY has higher modifier
+        // A sample above-1.0 modifier (favorable state); the real per-state
+        // multipliers are calibration and never live in tracked source.
+        stateModifier: 1.05
       }
 
       const baseScore = service.calculateCompositeScore(baseInput)
-      const nyScore = service.calculateCompositeScore(nyInput)
+      const favorableScore = service.calculateCompositeScore(favorableStateInput)
 
-      expect(nyScore).toBeGreaterThan(baseScore)
+      expect(favorableScore).toBeGreaterThan(baseScore)
     })
 
     it('should add the MCA-adjacency boost additively', () => {
@@ -492,9 +496,7 @@ describe('ScoringService', () => {
     })
 
     it('should boost MCA-adjacent prospects with a recent equipment purchase', async () => {
-      const recentDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10)
+      const recentDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
       const mockProspect = {
         company_name: 'Growth Mfg Co',

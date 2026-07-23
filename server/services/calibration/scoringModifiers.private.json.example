@@ -1,0 +1,13 @@
+{
+  "_note": "Template for the PRIVATE scoring-modifier calibration. Copy to scoringModifiers.private.json (gitignored) and populate with the real industry-risk and state modifier tables, or point SCORING_CALIBRATION_PATH at one shared JSON that carries this and every other calibration key. Without it, the platform uses the illustrative sets in scoringModifiers.ts (unknown industries/states fall back to a neutral 1.0) — the scorer works, the real multipliers do not ship in this public repo. NOTE: the composite formula weights (DEFAULT_CONFIG in ScoringService, intentRecencyWeight etc.) are public research and are NOT part of this calibration.",
+  "industryRiskModifiers": {
+    "sample-industry-a": 0.9,
+    "sample-industry-b": 1.0,
+    "sample-industry-c": 0.9
+  },
+  "stateModifiers": {
+    "XX": 1.0,
+    "YY": 0.9,
+    "ZZ": 1.0
+  }
+}

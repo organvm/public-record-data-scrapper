@@ -182,6 +182,7 @@ function App() {
           <LoadingAndErrorState
             isLoading={data.isLoading}
             loadError={data.loadError}
+            isDemoFallback={data.isDemoFallback}
             onRetry={() => void data.fetchData()}
           />
 

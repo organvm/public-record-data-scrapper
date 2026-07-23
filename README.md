@@ -123,38 +123,38 @@ The CLI supports `CA`, `TX`, `FL`, and `NY` for commands that validate state
 through `SUPPORTED_CLI_STATES`.
 
 ```bash
-# Scrape UCC filings for a company
+## Scrape UCC filings for a company
 npm run scrape -- scrape-ucc -c "Company Name" -s CA -o ./results.json
-#   required: -c|--company <name>, -s|--state <code>
-#   optional: -o|--output <file> (default: ./output.json), --csv
-#   supported states: CA, TX, FL, NY
+##   required: -c|--company <name>, -s|--state <code>
+##   optional: -o|--output <file> (default: ./output.json), --csv
+##   supported states: CA, TX, FL, NY
 
-# Normalize one company name
+## Normalize one company name
 npm run scrape -- normalize -n "Company Name"
-#   required: -n|--name <name>
+##   required: -n|--name <name>
 
-# Enrich from public sources
+## Enrich from public sources
 npm run scrape -- enrich -c "Company Name" -s CA --tier professional -o ./enriched-data.json
-#   required: -c|--company <name>, -s|--state <code>
-#   optional: -o|--output <file> (default: ./enriched-data.json), --tier <free|starter|professional>, --csv
-#   supported states: CA, TX, FL, NY
+##   required: -c|--company <name>, -s|--state <code>
+##   optional: -o|--output <file> (default: ./enriched-data.json), --tier <free|starter|professional>, --csv
+##   supported states: CA, TX, FL, NY
 
-# Batch process CSV input
+## Batch process CSV input
 npm run scrape -- batch -i ./companies.csv -o ./batch-results
-#   required: -i|--input <file> (CSV header + rows company,state)
-#   optional: -o|--output <dir> (default: ./batch-results)
-#   max 1,000 rows; input file must be 5,242,880 bytes or smaller
-#   note: --enrich is accepted by the parser but the batch loop only scrapes UCC filings
+##   required: -i|--input <file> (CSV header + rows company,state)
+##   optional: -o|--output <dir> (default: ./batch-results)
+##   max 1,000 rows; input file must be 5,242,880 bytes or smaller
+##   note: --enrich is accepted by the parser but the batch loop only scrapes UCC filings
 
-# Export scored leads (database-backed)
+## Export scored leads (database-backed)
 npm run scrape -- lead-export --min-score 70 --max-score 95 --state CA --limit 100 --offset 0 --output-dir ./lead-export
-#   optional: -o|--output-dir <dir> (default: ./lead-export)
-#   optional: --format <json|csv|both> (default: both)
-#   optional: --min-score <0-100> (default: 70), --max-score <0-100>
-#   optional: --state <CA|TX|FL|NY>, --industry <name>, --status <status>
-#   optional: --limit <1-1000> (default: 100), --offset <integer> (default: 0)
+##   optional: -o|--output-dir <dir> (default: ./lead-export)
+##   optional: --format <json|csv|both> (default: both)
+##   optional: --min-score <0-100> (default: 70), --max-score <0-100>
+##   optional: --state <CA|TX|FL|NY>, --industry <name>, --status <status>
+##   optional: --limit <1-1000> (default: 100), --offset <integer> (default: 0)
 
-# List available states with configured UCC collectors
+## List available states with configured UCC collectors
 npm run scrape -- list-states
 ```
 
@@ -177,24 +177,24 @@ The Express server exposes Swagger UI at `/api/docs` and raw OpenAPI at
 The on-demand UCC API is mounted behind API-key-or-JWT auth:
 
 ```bash
-# Check whether a state scraper is available
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/scrape/readiness/CA
+## Check whether a state scraper is available
+curl -H "Authorization: Bearer <token>" http://localhost:3000/api/scrape/readiness/CA
 
-# Synchronous search — waits for results (suitable for small queries)
+## Synchronous search — waits for results (suitable for small queries)
 curl -X POST http://localhost:3000/api/scrape/ucc \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"company_name":"Company Name","state":"CA","limit":100}'
 
-# Async search — returns 202 immediately with a jobId (use for large or slow queries)
+## Async search — returns 202 immediately with a jobId (use for large or slow queries)
 curl -X POST http://localhost:3000/api/scrape/jobs \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"company_name":"Company Name","state":"CA","limit":500}'
-# → {"data":{"jobId":"<uuid>","status":"pending","pollUrl":"/api/scrape/jobs/<uuid>"},...}
+## → {"data":{"jobId":"<uuid>","status":"pending","pollUrl":"/api/scrape/jobs/<uuid>"},...}
 
-# Poll until status is "completed" or "failed"
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/scrape/jobs/<jobId>
+## Poll until status is "completed" or "failed"
+curl -H "Authorization: Bearer <token>" http://localhost:3000/api/scrape/jobs/<jobId>
 ```
 
 ### Workspace exports
@@ -410,7 +410,7 @@ Provisions: VPC with multi-AZ subnets, RDS PostgreSQL (encrypted, Multi-AZ), Ela
 - **State agent implementations** -- live implementations needed for NY, IL, OH, GA, PA
 - **Enrichment sources** -- state business registries, county assessor records
 - **Compliance expansion** -- additional state disclosure requirements
-- **Performance** -- query optimization for large prospect datasets (10K+)
+- **Performance** -- query optimization for very large prospect datasets (tens of thousands of rows and beyond)
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. Report security issues via [SECURITY.md](SECURITY.md).
 

@@ -31,7 +31,7 @@
     }
   ],
   "enrichment": {
-    "revenue_estimate": "$2.4M",
+    "revenue_estimate": "2.4M",
     "employee_count": 34,
     "growth_signals": ["hiring_detected", "new_permits", "equipment_purchase"],
     "health_grade": "B+",
@@ -311,8 +311,8 @@ Full endpoint list: [server/openapi.yaml](server/openapi.yaml)
 
 | Tier                    | Sources                                                           | Cost               |
 | ----------------------- | ----------------------------------------------------------------- | ------------------ |
-| **Free / OSS (no key)** | SEC EDGAR, OSHA, USPTO, Census                                    | $0                 |
-| **Optional, key-gated** | SAM.gov, D&B, Clearbit, ZoomInfo (fail closed without an API key) | Provider-dependent |
+| **Free / OSS (no key)** | SEC EDGAR, OSHA, USPTO, Census                                    | No charge          |
+| **Optional, key-gated** | SAM.gov, D&B, Clearbit, ZoomInfo (fail closed without an API key) | Vendor-dependent   |
 
 ---
 
@@ -429,6 +429,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. Report security issue
 | Infrastructure | Terraform (AWS), Docker Compose, Kubernetes            |
 | CI/CD          | GitHub Actions                                         |
 | Deployment     | Vercel (frontend), AWS (backend)                       |
+
+---
+
+## Contact
+
+Questions or issues? Reach out on GitHub: [@4444J99](https://github.com/4444J99)
 
 ---
 
